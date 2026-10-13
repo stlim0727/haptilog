@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Center circular pulse -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M54,54m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0" />
+    <!-- Microphone icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,40c2.76,0 5,2.24 5,5v10c0,2.76 -2.24,5 -5,5s-5,-2.24 -5,-5v-10c0,-2.76 2.24,-5 5,-5zM63,55c0,4.97 -4.03,9 -9,9s-9,-4.03 -9,-9h-3c0,6.08 4.54,11.09 10.5,11.93v4.07h3v-4.07c5.96,-0.84 10.5,-5.85 10.5,-11.93h-3z" />
+</vector>
