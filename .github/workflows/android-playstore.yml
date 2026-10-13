@@ -15,13 +15,13 @@ on:
   workflow_dispatch:
     inputs:
       track:
-        description: 'Target Play Store track (internal, alpha, beta, production)'
+        description: 'Target Play Store track (wear:internal, wear:beta, wear:production)'
         required: true
-        default: 'internal'
+        default: 'wear:internal'
       status:
         description: 'Release status (completed, draft, inProgress, halted)'
         required: false
-        default: 'draft'
+        default: 'completed'
 
 concurrency:
   group: wear-playstore
@@ -69,5 +69,5 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.haptilog.watch
           releaseFiles: watch/app/build/outputs/bundle/release/*.aab
-          track: ${{ github.event.inputs.track || 'internal' }}
-          status: ${{ github.event.inputs.status || 'draft' }}
+          track: ${{ github.event.inputs.track || 'wear:internal' }}
+          status: ${{ github.event.inputs.status || 'completed' }}
