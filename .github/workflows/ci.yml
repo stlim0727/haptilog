@@ -59,13 +59,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify SQL migration syntax
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test enrichment authorization and validation
+        run: node --experimental-strip-types --test tests/voice-enrich.test.mjs
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.5.4
+
+      - name: Typecheck Edge Function
+        run: deno check supabase/functions/voice-enrich/index.ts
+
+      - name: Check migration files exist
         run: |
-          echo "Checking SQL migrations syntax..."
+          echo "Checking migration files..."
           for file in supabase/migrations/*.sql; do
             if [ -f "$file" ]; then
               echo "Validating $file..."
               grep -q "create table" "$file" || exit 1
             fi
           done
-          echo "SQL migrations validation passed."
+          echo "Migration presence checks passed (not SQL syntax validation)."

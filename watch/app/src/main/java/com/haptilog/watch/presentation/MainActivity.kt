@@ -1,7 +1,12 @@
 package com.haptilog.watch.presentation
 
+import android.annotation.SuppressLint
+import android.os.Build
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -35,23 +40,62 @@ import com.haptilog.watch.service.VoiceRecordingService
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val EXTRA_TOGGLE = "toggle_recording"
+    }
+
+    private var pendingToggle = false
+    // This activity extends ComponentActivity and does not use FragmentActivity.
+    @SuppressLint("InvalidFragmentVersionForActivityResult")
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        // Permissions granted
+        if (pendingToggle && permissions[Manifest.permission.RECORD_AUDIO] == true) {
+            sendToggle()
+        } else if (pendingToggle) {
+            Toast.makeText(this, "Microphone permission is needed to record", Toast.LENGTH_LONG).show()
+        }
+        pendingToggle = false
+    }
+
+    private fun sendToggle() {
+        val serviceIntent = Intent(this, VoiceRecordingService::class.java).apply {
+            action = VoiceRecordingService.ACTION_TOGGLE
+        }
+        if (VoiceRecordingService.isRecording.value) startService(serviceIntent)
+        else ContextCompat.startForegroundService(this, serviceIntent)
+    }
+
+    private fun toggleRecording() {
+        if (VoiceRecordingService.isRecording.value ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            sendToggle()
+        } else {
+            pendingToggle = true
+            val permissions = mutableListOf(
+                Manifest.permission.RECORD_AUDIO,
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            permissionLauncher.launch(permissions.toTypedArray())
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("pending_toggle", pendingToggle)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Request initial permissions
-        permissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.POST_NOTIFICATIONS
-            )
-        )
+        pendingToggle = savedInstanceState?.getBoolean("pending_toggle") ?: false
+        if (savedInstanceState == null && intent.getBooleanExtra(EXTRA_TOGGLE, false)) {
+            intent.removeExtra(EXTRA_TOGGLE)
+            toggleRecording()
+        }
 
         setContent {
             MaterialTheme {
@@ -59,12 +103,7 @@ class MainActivity : ComponentActivity() {
 
                 RecordingScreen(
                     isRecording = isRecording,
-                    onToggleRecording = {
-                        val intent = Intent(this, VoiceRecordingService::class.java).apply {
-                            action = VoiceRecordingService.ACTION_TOGGLE
-                        }
-                        startService(intent)
-                    }
+                    onToggleRecording = ::toggleRecording
                 )
             }
         }

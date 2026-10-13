@@ -42,15 +42,16 @@ jobs:
           cache: 'gradle'
 
       - name: Decode Keystore
-        if: "${{ env.KEYSTORE_BASE64 != '' }}"
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > watch/app/release.keystore
+          test -n "$KEYSTORE_BASE64"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > watch/app/release.keystore
 
       - name: Build Wear OS Bundle (AAB)
         working-directory: watch
         env:
+          VERSION_CODE: ${{ github.run_number }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

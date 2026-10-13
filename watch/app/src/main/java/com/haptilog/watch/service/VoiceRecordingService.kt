@@ -1,5 +1,13 @@
 package com.haptilog.watch.service
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import android.util.AtomicFile
+import android.os.SystemClock
+import java.time.Instant
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -25,9 +33,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.UUID
 
 class VoiceRecordingService : Service() {
@@ -50,10 +55,13 @@ class VoiceRecordingService : Service() {
     private var currentAudioFile: File? = null
     private var currentSessionId: String? = null
     private var startTimeMs: Long = 0L
+    private var elapsedStartMs: Long = 0L
+    private var metadata = JSONObject()
+    private var locationJob: Job? = null
 
     private lateinit var hapticManager: HapticHeartbeatManager
     private lateinit var locationProvider: LocationSnapshotProvider
-    private val serviceScope = CoroutineScope(Dispatchers.IO)
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var timeoutJob: Job? = null
 
     override fun onCreate() {
@@ -80,28 +88,30 @@ class VoiceRecordingService : Service() {
     private fun startRecording() {
         if (_isRecording.value) return
 
-        wakeLock?.acquire(MAX_RECORDING_MS + 5000L)
-        val notification = buildForegroundNotification()
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-            startForeground(NOTIFICATION_ID, notification, type)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            hapticManager.playFailureFeedback()
+            stopSelf()
+            return
         }
 
-        currentSessionId = UUID.randomUUID().toString()
-        startTimeMs = System.currentTimeMillis()
-
-        // 1. Immediate start haptic & heartbeat pulse
-        hapticManager.playStartFeedback()
-        hapticManager.startHeartbeatLoop()
-
-        // 2. Setup audio file & MediaRecorder
-        val recordingsDir = File(filesDir, "recordings").apply { mkdirs() }
-        currentAudioFile = File(recordingsDir, "rec_${currentSessionId}.m4a")
-
         try {
+            val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
+                if (locationProvider.hasLocationPermission() && locationProvider.isLocationEnabled())
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+            startForeground(NOTIFICATION_ID, buildForegroundNotification(), type)
+            wakeLock?.acquire(MAX_RECORDING_MS + 5000L)
+            currentSessionId = UUID.randomUUID().toString()
+            startTimeMs = System.currentTimeMillis()
+            elapsedStartMs = SystemClock.elapsedRealtime()
+            val recordingsDir = File(filesDir, "recordings").apply { mkdirs() }
+            currentAudioFile = File(recordingsDir, "rec_${currentSessionId}.m4a")
+            metadata = JSONObject().apply {
+                put("id", currentSessionId)
+                put("started_at", Instant.ofEpochMilli(startTimeMs).toString())
+                put("status", "RECORDING")
+            }
+            writeMetadata()
+
             val recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 MediaRecorder(this)
             } else {
@@ -109,6 +119,7 @@ class VoiceRecordingService : Service() {
                 MediaRecorder()
             }
 
+            mediaRecorder = recorder
             recorder.apply {
                 setAudioSource(MediaRecorder.AudioSource.MIC)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
@@ -122,11 +133,16 @@ class VoiceRecordingService : Service() {
             }
             mediaRecorder = recorder
             _isRecording.value = true
+            hapticManager.playStartFeedback()
+            hapticManager.startHeartbeatLoop()
 
-            // 3. Concurrently snapshot location
-            serviceScope.launch {
-                val loc = locationProvider.getFastLocationSnapshot()
-                saveMetadataSnapshot(loc)
+            val sessionId = currentSessionId
+            locationJob = serviceScope.launch {
+                locationProvider.capture { loc ->
+                    if (_isRecording.value && currentSessionId == sessionId) {
+                        saveMetadataSnapshot(loc)
+                    }
+                }
             }
 
             // 4. Safety auto-timeout
@@ -150,69 +166,77 @@ class VoiceRecordingService : Service() {
         timeoutJob?.cancel()
         timeoutJob = null
 
+        locationJob?.cancel()
+        locationJob = null
+        var saved = false
         try {
-            mediaRecorder?.apply {
-                stop()
-                release()
-            }
+            mediaRecorder?.stop()
+            saved = currentAudioFile?.let { it.exists() && it.length() > 0 } == true
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
+            runCatching { mediaRecorder?.release() }
             mediaRecorder = null
         }
-
         _isRecording.value = false
-        hapticManager.playStopFeedback()
-
-        // Update metadata with final duration
-        finalizeMetadata()
-
-        if (wakeLock?.isHeld == true) {
-            wakeLock?.release()
+        hapticManager.stop()
+        try {
+            metadata.put("duration_seconds", ((SystemClock.elapsedRealtime() - elapsedStartMs) / 1000).toInt())
+            metadata.put("status", if (saved) "COMPLETED" else "FAILED")
+            metadata.put("sync_status", if (saved) "PENDING_SYNC" else "CAPTURE_FAILED")
+            writeMetadata()
+        } catch (e: Exception) {
+            saved = false
+            e.printStackTrace()
         }
-
+        if (saved) hapticManager.playStopFeedback() else hapticManager.playFailureFeedback()
+        if (wakeLock?.isHeld == true) wakeLock?.release()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
-    private fun saveMetadataSnapshot(location: LocationSnapshot?) {
-        val sessionId = currentSessionId ?: return
-        val recordingsDir = File(filesDir, "recordings")
-        val metaFile = File(recordingsDir, "meta_${sessionId}.json")
-
-        val json = JSONObject().apply {
-            put("id", sessionId)
-            put("started_at", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date(startTimeMs)))
-            put("status", "RECORDING")
-            if (location != null) {
-                put("latitude", location.latitude)
-                put("longitude", location.longitude)
-                put("altitude", location.altitude)
-                put("speed", location.speed)
-                put("accuracy", location.accuracy)
-            }
+    private fun saveMetadataSnapshot(location: LocationSnapshot) {
+        metadata.apply {
+            put("latitude", location.latitude)
+            put("longitude", location.longitude)
+            put("altitude", location.altitude)
+            put("speed", location.speed)
+            put("accuracy", location.accuracy)
+            put("location_timestamp", Instant.ofEpochMilli(location.timestamp).toString())
         }
-        metaFile.writeText(json.toString())
+        try {
+            writeMetadata()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
-    private fun finalizeMetadata() {
+    private fun writeMetadata() {
         val sessionId = currentSessionId ?: return
-        val recordingsDir = File(filesDir, "recordings")
-        val metaFile = File(recordingsDir, "meta_${sessionId}.json")
-        val durationSec = ((System.currentTimeMillis() - startTimeMs) / 1000).toInt()
-
+        val file = AtomicFile(File(File(filesDir, "recordings"), "meta_${sessionId}.json"))
+        val output = file.startWrite()
         try {
-            val json = if (metaFile.exists()) JSONObject(metaFile.readText()) else JSONObject()
-            json.put("duration_seconds", durationSec)
-            json.put("status", "COMPLETED")
-            json.put("sync_status", "PENDING_SYNC")
-            metaFile.writeText(json.toString())
-        } catch (_: Exception) {}
+            output.write(metadata.toString().toByteArray(Charsets.UTF_8))
+            file.finishWrite(output)
+        } catch (e: Exception) {
+            file.failWrite(output)
+            throw e
+        }
     }
 
     private fun cleanupFailure() {
         _isRecording.value = false
+        locationJob?.cancel()
+        timeoutJob?.cancel()
+        runCatching { mediaRecorder?.release() }
+        mediaRecorder = null
+        runCatching {
+            metadata.put("status", "FAILED")
+            metadata.put("sync_status", "CAPTURE_FAILED")
+            writeMetadata()
+        }
         hapticManager.stop()
+        hapticManager.playFailureFeedback()
         if (wakeLock?.isHeld == true) wakeLock?.release()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -250,8 +274,12 @@ class VoiceRecordingService : Service() {
     }
 
     override fun onDestroy() {
+        if (_isRecording.value) stopRecording()
+        serviceScope.cancel()
+        runCatching { mediaRecorder?.release() }
+        mediaRecorder = null
         super.onDestroy()
-        hapticManager.stop()
+        hapticManager.stop(cancelVibration = false)
         if (wakeLock?.isHeld == true) wakeLock?.release()
     }
 

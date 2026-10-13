@@ -88,9 +88,13 @@ class HapticHeartbeatManager(private val context: Context) {
         }
     }
 
-    fun stop() {
+    fun playFailureFeedback() {
+        vibrator?.vibrate(VibrationEffect.createOneShot(300, 100))
+    }
+
+    fun stop(cancelVibration: Boolean = true) {
         heartbeatJob?.cancel()
         heartbeatJob = null
-        vibrator?.cancel()
+        if (cancelVibration) vibrator?.cancel()
     }
 }

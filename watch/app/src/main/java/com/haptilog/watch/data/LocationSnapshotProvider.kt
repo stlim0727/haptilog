@@ -4,6 +4,10 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.os.SystemClock
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CancellationException
 import android.location.Location
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -39,30 +43,31 @@ class LocationSnapshotProvider(context: Context) {
         return fine || coarse
     }
 
+    fun isLocationEnabled(): Boolean =
+        (appContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager).isLocationEnabled
+
     @SuppressLint("MissingPermission")
-    suspend fun getFastLocationSnapshot(): LocationSnapshot? {
-        if (!hasLocationPermission()) return null
-
-        // 1. Try immediate cached lastLocation
+    suspend fun capture(onSnapshot: (LocationSnapshot) -> Unit) {
+        if (!hasLocationPermission() || !isLocationEnabled()) return
         try {
-            val lastLoc = fusedClient.lastLocation.await()
-            if (lastLoc != null) {
-                return lastLoc.toSnapshot()
+            withTimeoutOrNull(1000) {
+                fusedClient.lastLocation.await()?.takeIf {
+                    SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos <= 120_000_000_000L
+                }?.let { onSnapshot(it.toSnapshot()) }
             }
-        } catch (_: Exception) {
-            // Fall through to current location
-        }
-
-        // 2. Request current fresh location
-        return try {
             val cts = CancellationTokenSource()
-            val freshLoc = fusedClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                cts.token
-            ).await()
-            freshLoc?.toSnapshot()
+            try {
+                withTimeoutOrNull(15_000) {
+                    fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+                        .await()?.let { onSnapshot(it.toSnapshot()) }
+                }
+            } finally {
+                cts.cancel()
+            }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
-            null
+            // Location is optional; a failure must not interrupt capture.
         }
     }
 
