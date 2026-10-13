@@ -7,6 +7,7 @@ import androidx.wear.protolayout.DeviceParametersBuilders
 import androidx.wear.protolayout.DimensionBuilders
 import androidx.wear.protolayout.LayoutElementBuilders
 import androidx.wear.protolayout.ModifiersBuilders
+import androidx.wear.protolayout.TimelineBuilders
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.material.Button
 import androidx.wear.protolayout.material.ButtonColors
@@ -39,8 +40,6 @@ class VoiceRecordTileService : TileService() {
             .build()
 
         val recordButton = Button.Builder(this, clickModifier)
-            .setSizeContent()
-            .setButtonColors(ButtonColors.primaryButtonColors(ColorBuilders.argb(0xFF1976D2.toInt())))
             .setContentDescription("Start HaptiLog")
             .setTextContent("TAP TO\nRECORD")
             .build()
@@ -54,9 +53,9 @@ class VoiceRecordTileService : TileService() {
         val tile = TileBuilders.Tile.Builder()
             .setResourcesVersion(RESOURCES_VERSION)
             .setTimeline(
-                TileBuilders.Timeline.Builder()
+                TimelineBuilders.Timeline.Builder()
                     .addTimelineEntry(
-                        TileBuilders.TimelineEntry.Builder()
+                        TimelineBuilders.TimelineEntry.Builder()
                             .setLayout(
                                 LayoutElementBuilders.Layout.Builder()
                                     .setRoot(rootLayout)

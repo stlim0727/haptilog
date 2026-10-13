@@ -11,8 +11,12 @@ wearProtolayout = "1.2.1"
 horologist = "0.7.7-alpha"
 lifecycleKtx = "2.8.7"
 coroutines = "1.9.0"
+guava = "33.3.1-android"
+activityCompose = "1.9.3"
 
 [libraries]
+guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 play-services-wearable = { group = "com.google.android.gms", name = "play-services-wearable", version.ref = "playServicesWearable" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
