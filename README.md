@@ -5,6 +5,14 @@
 
 ---
 
+## 📱 Screenshots
+
+| Idle Ready | Active Recording Pulse | Wear OS Watch Face |
+| :---: | :---: | :---: |
+| <img src="screenshots/01_idle_record_state.png" width="180"/> | <img src="screenshots/02_recording_active_state.png" width="180"/> | <img src="screenshots/04_wearos_watchface.png" width="180"/> |
+
+---
+
 ## 🌟 Key Features
 
 1. **Screenless / Eyes-Free Voice Recording**:
