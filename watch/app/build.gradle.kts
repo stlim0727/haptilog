@@ -72,10 +72,11 @@ dependencies {
     implementation(libs.androidx.wear.compose.foundation)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-    // Wear Tiles
+    // Wear Tiles & Complications
     implementation(libs.androidx.wear.tiles)
     implementation(libs.androidx.wear.protolayout)
     implementation(libs.androidx.wear.protolayout.material)
+    implementation(libs.androidx.wear.watchface.complications.data.source)
 
     // Lifecycle & Coroutines
     implementation(libs.androidx.lifecycle.runtime.ktx)
