@@ -60,5 +60,33 @@ flowchart LR
 3. Run `app` target directly onto your watch.
 
 ### Supabase Backend
-1. Initialize Supabase: `supabase start`
-2. Deploy Edge Functions: `supabase functions deploy voice-enrich`
+1. Configure a Supabase project and apply the migration in `supabase/migrations/`.
+2. Set `GEMINI_API_KEY` and an available audio-capable `GEMINI_MODEL` as Edge Function secrets. There is deliberately no retired-model fallback.
+3. Deploy: `supabase functions deploy voice-enrich`.
+4. Call with a user bearer token, an owned `recording_id`, and `audio_base64` (`audio_mime` defaults to `audio/mp4`). Location context comes from the owned database row. Audio payloads are limited to 1.8 MB of base64.
+
+## Implementation status
+
+This repository is a prototype. Implemented: local recording, atomic session metadata, a three-minute timeout, haptic success/failure feedback, optional bounded location refinement, a recording Tile launch, and authenticated enrichment.
+
+Still required for an end-to-end product: recording history/playback/export, authentication on the watch, durable upload/retry scheduling, private audio Storage setup, enrichment retrieval, retry idempotency, and recovery of interrupted recordings. There is no complication provider yet. Physical-watch validation is required for haptic audibility, microphone interference, and battery consumption.
+
+## Validation
+
+```bash
+cd watch
+./gradlew assembleDebug lintDebug
+```
+
+From the repository root:
+
+```bash
+node --experimental-strip-types tests/voice-enrich.test.mjs
+deno check supabase/functions/voice-enrich/index.ts
+```
+
+The backend tests use mocked clients and provider responses; they do not replace deployed RLS or database integration tests.
+
+## Release signing
+
+Place the release keystore at `watch/app/release.keystore` and provide `KEYSTORE_PASSWORD`, `KEY_ALIAS`, and `KEY_PASSWORD`. Set a monotonically increasing `VERSION_CODE`. The Play workflow uses its run number; it must exceed any version previously published outside that workflow. `bundleRelease` rejects missing release credentials, and release builds never fall back to debug signing.

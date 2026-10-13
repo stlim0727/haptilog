@@ -15,8 +15,8 @@
    ├──> Haptic: Crisp Click (PRIMITIVE_CLICK)
    ├──> Location: Cache snapshot (lastLocation) & Request getCurrentLocation()
    ├──> Service: Start Foreground Service (Notification + WakeLock)
-   ├──> Audio: Initialize MediaRecorder (Output: AAC_ADTS, 16kHz, 32kbps)
-   └──> Haptic Loop: Every 2.5s -> 쿵(40ms) - 쉼(80ms) - 쾅(50ms)
+   ├──> Audio: Initialize MediaRecorder (Output: MPEG_4, 16kHz, 32kbps)
+   └──> Haptic Loop: Every 2.4s -> 쿵(40ms) - 쉼(80ms) - 쾅(50ms)
 ```
 
 ## 3. Data Contract
@@ -27,15 +27,19 @@ Each recording session produces:
 ```json
 {
   "id": "uuid-v4",
-  "created_at": "2026-10-13T12:00:00Z",
+  "started_at": "2026-10-13T12:00:00Z",
   "duration_seconds": 18,
-  "location": {
-    "latitude": 37.541,
-    "longitude": 127.056,
-    "altitude": 24.5,
-    "speed": 1.2,
-    "accuracy": 8.0
-  },
-  "sync_status": "PENDING"
+  "status": "COMPLETED",
+  "latitude": 37.541,
+  "longitude": 127.056,
+  "altitude": 24.5,
+  "speed": 1.2,
+  "accuracy": 8.0,
+  "location_timestamp": "2026-10-13T12:00:01Z",
+  "sync_status": "PENDING_SYNC"
 }
 ```
+
+The audio filename is `rec_<uuid>.m4a`. Location fields are optional. A cached fix older than two minutes is ignored; a high-accuracy refinement is attempted with a 15-second bound and cancelled at stop. Metadata is written atomically and session updates are serialized on the main dispatcher. Failed capture uses `status: FAILED` and `sync_status: CAPTURE_FAILED`; its audio is retained for inspection.
+
+The backend uses the caller's JWT and recording ownership to authorize enrichment before calling Gemini. Derived enrichments are inserted using a privileged server-only client. Sync, Storage provisioning, interruption recovery, and retry idempotency are not implemented yet.
