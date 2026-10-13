@@ -48,6 +48,9 @@ class VoiceRecordingService : Service() {
 
         private val _isRecording = MutableStateFlow(false)
         val isRecording: StateFlow<Boolean> = _isRecording
+
+        private val _elapsedDurationSeconds = MutableStateFlow(0L)
+        val elapsedDurationSeconds: StateFlow<Long> = _elapsedDurationSeconds
     }
 
     private var mediaRecorder: MediaRecorder? = null
@@ -58,6 +61,7 @@ class VoiceRecordingService : Service() {
     private var elapsedStartMs: Long = 0L
     private var metadata = JSONObject()
     private var locationJob: Job? = null
+    private var timerJob: Job? = null
 
     private lateinit var hapticManager: HapticHeartbeatManager
     private lateinit var locationProvider: LocationSnapshotProvider
@@ -133,8 +137,18 @@ class VoiceRecordingService : Service() {
             }
             mediaRecorder = recorder
             _isRecording.value = true
+            _elapsedDurationSeconds.value = 0L
             hapticManager.playStartFeedback()
             hapticManager.startHeartbeatLoop()
+
+            timerJob?.cancel()
+            timerJob = serviceScope.launch {
+                while (_isRecording.value) {
+                    val seconds = ((SystemClock.elapsedRealtime() - elapsedStartMs) / 1000L).coerceAtLeast(0L)
+                    _elapsedDurationSeconds.value = seconds
+                    delay(500L)
+                }
+            }
 
             val sessionId = currentSessionId
             locationJob = serviceScope.launch {
@@ -162,6 +176,10 @@ class VoiceRecordingService : Service() {
 
     private fun stopRecording() {
         if (!_isRecording.value) return
+
+        timerJob?.cancel()
+        timerJob = null
+        _elapsedDurationSeconds.value = 0L
 
         timeoutJob?.cancel()
         timeoutJob = null
@@ -226,6 +244,9 @@ class VoiceRecordingService : Service() {
 
     private fun cleanupFailure() {
         _isRecording.value = false
+        timerJob?.cancel()
+        timerJob = null
+        _elapsedDurationSeconds.value = 0L
         locationJob?.cancel()
         timeoutJob?.cancel()
         runCatching { mediaRecorder?.release() }
