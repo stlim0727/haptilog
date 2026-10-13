@@ -1,0 +1,43 @@
+# Built application files
+*.apk
+*.aab
+*.ap_
+
+# Gradle
+.gradle/
+build/
+*/build/
+watch/app/build/
+watch/.gradle/
+
+# Local configuration file (sdk.dir, etc)
+local.properties
+
+# Android Studio & IntelliJ
+*.iml
+.idea/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+*.ipr
+*.iws
+
+# Keystore files
+*.jks
+*.keystore
+
+# macOS & OS generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node & Supabase local
+node_modules/
+.env
+.env.local
+.supabase/
