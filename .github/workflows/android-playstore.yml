@@ -18,6 +18,10 @@ on:
         description: 'Target Play Store track (internal, alpha, beta, production)'
         required: true
         default: 'internal'
+      status:
+        description: 'Release status (completed, draft, inProgress, halted)'
+        required: false
+        default: 'draft'
 
 concurrency:
   group: wear-playstore
@@ -66,4 +70,4 @@ jobs:
           packageName: com.haptilog.watch
           releaseFiles: watch/app/build/outputs/bundle/release/*.aab
           track: ${{ github.event.inputs.track || 'internal' }}
-          status: completed
+          status: ${{ github.event.inputs.status || 'draft' }}
