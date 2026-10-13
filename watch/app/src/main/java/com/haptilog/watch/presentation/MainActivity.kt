@@ -27,10 +27,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.wear.compose.material3.Button
-import androidx.wear.compose.material3.ButtonDefaults
-import androidx.wear.compose.material3.MaterialTheme
-import androidx.wear.compose.material3.Text
+import androidx.wear.compose.material.Button
+import androidx.wear.compose.material.ButtonDefaults
+import androidx.wear.compose.material.MaterialTheme
+import androidx.wear.compose.material.Text
 import com.haptilog.watch.service.VoiceRecordingService
 
 class MainActivity : ComponentActivity() {
@@ -109,7 +109,7 @@ fun RecordingScreen(
             modifier = Modifier.size(110.dp),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (isRecording) Color(0xFFD32F2F) else Color(0xFF1976D2)
+                backgroundColor = if (isRecording) Color(0xFFD32F2F) else Color(0xFF1976D2)
             )
         ) {
             Text(
