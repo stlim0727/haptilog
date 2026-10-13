@@ -57,9 +57,10 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.guava)
-    implementation(libs.androidx.core.ktx)
     implementation(libs.play.services.wearable)
     implementation(libs.play.services.location)
 
