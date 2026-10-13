@@ -3,6 +3,8 @@
 
     <!-- Wear OS Hardware Requirement -->
     <uses-feature android:name="android.hardware.type.watch" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
 
     <!-- Audio Recording & Vibration -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
