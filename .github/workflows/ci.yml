@@ -42,7 +42,7 @@ jobs:
       - name: Build Debug APK & Run Lint
         working-directory: watch
         run: |
-          ./gradlew assembleDebug lintDebug --stacktrace
+          ./gradlew assembleDebug lintDebug testDebugUnitTest --stacktrace
 
       - name: Upload Wear OS Debug APK
         if: success()
@@ -70,8 +70,13 @@ jobs:
         with:
           deno-version: v2.5.4
 
+      - name: Validate migration and ownership policies
+        run: |
+          npm ci --prefix supabase/tests --ignore-scripts
+          npm test --prefix supabase/tests
+
       - name: Typecheck Edge Function
-        run: deno check supabase/functions/voice-enrich/index.ts
+        run: deno check --lock=supabase/functions/deno.lock supabase/functions/voice-enrich/index.ts
 
       - name: Check migration files exist
         run: |

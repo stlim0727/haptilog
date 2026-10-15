@@ -2,6 +2,13 @@ package com.haptilog.watch.presentation
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.haptilog.watch.data.RecordingExport
+import com.haptilog.watch.sync.CloudClient
+import com.haptilog.watch.sync.RecordingSyncWorker
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -17,6 +24,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +46,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,6 +91,28 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TOGGLE = "toggle_recording"
     }
 
+    private var pendingExportId: String? = null
+    private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        val id = pendingExportId
+        pendingExportId = null
+        if (uri != null && id != null) lifecycleScope.launch {
+            val success = withContext(Dispatchers.IO) {
+                runCatching {
+                    contentResolver.openOutputStream(uri)?.use { RecordingExport.write(this@MainActivity, id, it) }
+                        ?: error("No export destination")
+                }.isSuccess
+            }
+            Toast.makeText(this@MainActivity, if (success) "Recording exported" else "Export failed; recording kept", Toast.LENGTH_LONG).show()
+        }
+    }
+    private fun exportRecording(item: RecordingItem) {
+        pendingExportId = item.id
+        try { exportLauncher.launch("haptilog-${item.id}.zip") }
+        catch (_: ActivityNotFoundException) {
+            pendingExportId = null
+            Toast.makeText(this, "No export app available on this watch", Toast.LENGTH_LONG).show()
+        }
+    }
     private var pendingToggle = false
     private lateinit var repository: RecordingRepository
     private lateinit var audioPlayer: WatchAudioPlayer
@@ -123,13 +155,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_TOGGLE, false)) {
+            intent.removeExtra(EXTRA_TOGGLE)
+            toggleRecording()
+        }
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("pending_export", pendingExportId)
         outState.putBoolean("pending_toggle", pendingToggle)
         super.onSaveInstanceState(outState)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingExportId = savedInstanceState?.getString("pending_export")
         repository = RecordingRepository(this)
         audioPlayer = WatchAudioPlayer(this)
 
@@ -141,6 +184,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
+                var cloudEnabled by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
                 val isRecording by VoiceRecordingService.isRecording.collectAsState()
                 val elapsedSeconds by VoiceRecordingService.elapsedDurationSeconds.collectAsState()
                 val recordings by repository.recordings.collectAsState()
@@ -149,8 +193,9 @@ class MainActivity : ComponentActivity() {
 
                 // Refresh recordings when recording completes
                 LaunchedEffect(isRecording) {
-                    if (!isRecording) {
+                    while (!isRecording) {
                         repository.refresh()
+                        kotlinx.coroutines.delay(5000)
                     }
                 }
 
@@ -168,6 +213,20 @@ class MainActivity : ComponentActivity() {
                     isPlaying = isPlaying,
                     onToggleRecording = ::toggleRecording,
                     onTogglePlay = { item -> audioPlayer.togglePlay(item.audioFile, item.id) },
+                    onExport = ::exportRecording,
+                    onRetry = { item ->
+                        RecordingSyncWorker.retry(this, item.id)
+                        repository.refresh()
+                    },
+                    cloudConfigured = CloudClient.configured,
+                    cloudEnabled = cloudEnabled,
+                    onSync = {
+                        if (CloudClient.configured) {
+                            if (cloudEnabled) RecordingSyncWorker.disable(this) else RecordingSyncWorker.enable(this)
+                            cloudEnabled = !cloudEnabled
+                            Toast.makeText(this, if (cloudEnabled) "Cloud sync enabled; local audio is kept" else "Cloud sync paused", Toast.LENGTH_LONG).show()
+                        } else Toast.makeText(this, "Cloud sync is not set up yet", Toast.LENGTH_LONG).show()
+                    },
                     onDeleteRecording = { id ->
                         if (playingId == id) audioPlayer.stop()
                         repository.deleteRecording(id)
@@ -185,6 +244,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         audioPlayer.release()
+        repository.close()
     }
 }
 
@@ -197,7 +257,12 @@ fun HaptiLogScreen(
     isPlaying: Boolean,
     onToggleRecording: () -> Unit,
     onTogglePlay: (RecordingItem) -> Unit,
-    onDeleteRecording: (String) -> Unit
+    onDeleteRecording: (String) -> Unit,
+    onExport: (RecordingItem) -> Unit,
+    onRetry: (RecordingItem) -> Unit,
+    cloudConfigured: Boolean,
+    cloudEnabled: Boolean,
+    onSync: () -> Unit
 ) {
     val listState = rememberScalingLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -228,7 +293,7 @@ fun HaptiLogScreen(
         ) {
             // 1. Top Spacing
             item {
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(26.dp))
             }
 
             // 2. Hero Record Action Button
@@ -242,24 +307,24 @@ fun HaptiLogScreen(
 
             // 3. Section Header
             item {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth(0.85f)
+                        .fillMaxWidth(0.86f)
                         .padding(horizontal = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "최근 기록",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFEEEEEE)
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFF5F5F7)
                     )
                     Text(
-                        text = "${recordings.size}건",
+                        text = "${recordings.size}",
                         fontSize = 11.sp,
-                        color = Color(0xFF9E9E9E)
+                        color = Color(0xFF8E8E93)
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -276,13 +341,35 @@ fun HaptiLogScreen(
                         item = item,
                         isPlaying = (playingId == item.id && isPlaying),
                         onTogglePlay = { onTogglePlay(item) },
-                        onDelete = { onDeleteRecording(item.id) }
+                        onDelete = { onDeleteRecording(item.id) },
+                        onExport = { onExport(item) },
+                        onRetry = { onRetry(item) }
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                 }
             }
 
-            // 5. Bottom Safe Area Spacing
+            // 5. Cloud Sync Footer (Subtle & Quiet)
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
+                CompactChip(
+                    onClick = onSync,
+                    label = {
+                        Text(
+                            text = if (!cloudConfigured) "로컬 전용 보관" else if (cloudEnabled) "클라우드 동기화 켜짐" else "클라우드 동기화 일시정지",
+                            fontSize = 10.sp,
+                            color = Color(0xFF8E8E93)
+                        )
+                    },
+                    colors = ChipDefaults.chipColors(
+                        backgroundColor = Color(0xFF161618),
+                        contentColor = Color(0xFF8E8E93)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+            }
+
+            // 6. Bottom Safe Area Spacing
             item {
                 Spacer(modifier = Modifier.height(36.dp))
             }
@@ -296,38 +383,47 @@ fun RecordHeroSection(
     elapsedSeconds: Long,
     onToggleRecording: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.16f,
+    val infiniteTransition = rememberInfiniteTransition(label = "breathe")
+    val breatheAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.95f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "scale"
+        label = "edge_breathe"
     )
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(130.dp)
+        modifier = Modifier.size(126.dp)
     ) {
-        // Outer pulsing ring when recording
+        // Subtle 1px Edge Luminance breathing when recording
         if (isRecording) {
             Box(
                 modifier = Modifier
-                    .size(130.dp)
-                    .scale(pulseScale)
-                    .background(Color(0xFFE53935).copy(alpha = 0.35f), CircleShape)
+                    .size(126.dp)
+                    .border(
+                        width = 1.dp,
+                        color = Color(0xFFFF3B30).copy(alpha = breatheAlpha),
+                        shape = CircleShape
+                    )
             )
         }
 
-        // Main Action Circular Button
+        // Main Monolithic Action Disc
         Button(
             onClick = onToggleRecording,
-            modifier = Modifier.size(105.dp),
+            modifier = Modifier
+                .size(108.dp)
+                .border(
+                    width = 1.dp,
+                    color = if (isRecording) Color(0xFFFF3B30).copy(alpha = 0.5f) else Color(0xFF2C2C2E),
+                    shape = CircleShape
+                ),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
-                backgroundColor = if (isRecording) Color(0xFFD32F2F) else Color(0xFF1976D2)
+                backgroundColor = if (isRecording) Color(0xFF241012) else Color(0xFF161618)
             )
         ) {
             Column(
@@ -339,28 +435,43 @@ fun RecordHeroSection(
                     val ss = elapsedSeconds % 60
                     Text(
                         text = String.format(Locale.US, "%02d:%02d", mm, ss),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFFF5F5),
+                        letterSpacing = 0.5.sp
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "STOP",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFFFFCDD2)
-                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .background(Color(0xFFFF3B30).copy(alpha = breatheAlpha), CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "REC",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF453A),
+                            letterSpacing = 1.2.sp
+                        )
+                    }
                 } else {
-                    Text(
-                        text = "🎙️",
-                        fontSize = 22.sp
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(Color(0xFFFF3B30), CircleShape)
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(7.dp))
                     Text(
                         text = "RECORD",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.4.sp,
+                        color = Color(0xFFF5F5F7)
                     )
                 }
             }
@@ -370,34 +481,24 @@ fun RecordHeroSection(
 
 @Composable
 fun EmptyRecordingsCard() {
-    Card(
-        onClick = {},
+    Box(
         modifier = Modifier
-            .fillMaxWidth(0.9f)
-            .padding(vertical = 4.dp),
-        backgroundPainter = CardDefaults.cardBackgroundPainter(
-            startBackgroundColor = Color(0xFF1E1E1E),
-            endBackgroundColor = Color(0xFF1E1E1E)
-        ),
-        shape = RoundedCornerShape(16.dp)
+            .fillMaxWidth(0.85f)
+            .padding(vertical = 16.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "아직 기록이 없습니다",
+                text = "기록 없음",
                 fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF8E8E93)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "위 버튼을 탭하여 첫 음성 메모를 남겨보세요.",
+                text = "손목을 탭하여 첫 메모를 남겨보세요",
                 fontSize = 10.sp,
-                color = Color(0xFFAAAAAA),
+                color = Color(0xFF636366),
                 textAlign = TextAlign.Center
             )
         }
@@ -409,7 +510,9 @@ fun RecordingCard(
     item: RecordingItem,
     isPlaying: Boolean,
     onTogglePlay: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onExport: () -> Unit,
+    onRetry: () -> Unit
 ) {
     val timeFormatted = remember(item.startedAtTimestamp) {
         val diffMs = System.currentTimeMillis() - item.startedAtTimestamp
@@ -420,13 +523,15 @@ fun RecordingCard(
         }
     }
 
-    val cardBg = if (isPlaying) Color(0xFF2E2424) else Color(0xFF1C1C1E)
+    val cardBg = if (isPlaying) Color(0xFF221717) else Color(0xFF141416)
+    val borderColor = if (isPlaying) Color(0xFF4A2525) else Color(0xFF242426)
 
     Card(
         onClick = onTogglePlay,
         modifier = Modifier
             .fillMaxWidth(0.92f)
-            .padding(vertical = 2.dp),
+            .padding(vertical = 2.dp)
+            .border(0.5.dp, borderColor, RoundedCornerShape(16.dp)),
         backgroundPainter = CardDefaults.cardBackgroundPainter(
             startBackgroundColor = cardBg,
             endBackgroundColor = cardBg
@@ -436,9 +541,9 @@ fun RecordingCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(10.dp)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
         ) {
-            // Header: Time + Duration
+            // Header: Time & Duration
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -447,115 +552,135 @@ fun RecordingCard(
                 Text(
                     text = timeFormatted,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFF5F5F7)
                 )
                 Text(
-                    text = "${item.durationSeconds}초",
+                    text = "${item.durationSeconds}s",
                     fontSize = 11.sp,
-                    color = Color(0xFFB0BEC5)
+                    color = Color(0xFF8E8E93)
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Badges: Category Intent & Location
+            // Category & Location (Clean Dot & Typography)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
-                // Category Chip
-                val (badgeText, badgeBg) = when (item.intentType) {
-                    "EXPENSE" -> "💰 가계부" to Color(0xFF2E7D32)
-                    "TRAVEL" -> "🗺️ 여행" to Color(0xFF0277BD)
-                    "WORKOUT" -> "🏃 운동" to Color(0xFFE65100)
-                    "MEMO" -> "📝 메모" to Color(0xFF6A1B9A)
-                    else -> "⏳ 대기중" to Color(0xFF455A64)
+                val (categoryName, dotColor) = when (item.intentType) {
+                    "EXPENSE" -> "지출" to Color(0xFF34C759)
+                    "TRAVEL" -> "여행" to Color(0xFF0A84FF)
+                    "WORKOUT" -> "운동" to Color(0xFFFF9F0A)
+                    "MEMO" -> "메모" to Color(0xFFBF5AF2)
+                    else -> "대기" to Color(0xFF8E8E93)
                 }
 
                 Box(
                     modifier = Modifier
-                        .background(badgeBg.copy(alpha = 0.85f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = badgeText,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White
-                    )
-                }
+                        .size(5.dp)
+                        .background(dotColor, CircleShape)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = categoryName,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFD1D1D6)
+                )
 
-                // GPS Badge if present
                 if (item.latitude != null && item.longitude != null) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0xFF37474F), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = String.format(Locale.US, "📍 %.2f, %.2f", item.latitude, item.longitude),
-                            fontSize = 9.sp,
-                            color = Color(0xFFCFD8DC)
-                        )
-                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "·",
+                        fontSize = 10.sp,
+                        color = Color(0xFF636366)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = String.format(Locale.US, "%.2f°, %.2f°", item.latitude, item.longitude),
+                        fontSize = 10.sp,
+                        color = Color(0xFF8E8E93)
+                    )
                 }
             }
 
-            // Summary or transcript if available
+            // Summary text if present
             if (!item.summary.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = item.summary,
                     fontSize = 11.sp,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = Color(0xFFECEFF1)
+                    color = Color(0xFFE5E5EA),
+                    lineHeight = 14.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Action Buttons: Play/Stop & Delete
+            // Actions row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Play / Stop Mini Button
+                // Play / Stop button
                 CompactChip(
                     onClick = onTogglePlay,
                     label = {
                         Text(
-                            text = if (isPlaying) "⏹️ 정지" else "▶️ 듣기",
+                            text = if (isPlaying) "정지" else "재생",
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Medium
                         )
                     },
                     colors = ChipDefaults.chipColors(
-                        backgroundColor = if (isPlaying) Color(0xFFD32F2F) else Color(0xFF1976D2),
-                        contentColor = Color.White
+                        backgroundColor = if (isPlaying) Color(0xFF442022) else Color(0xFF2C2C2E),
+                        contentColor = if (isPlaying) Color(0xFFFF453A) else Color(0xFFF5F5F7)
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 )
 
-                // Delete Mini Button
-                CompactChip(
-                    onClick = onDelete,
-                    label = {
-                        Text(
-                            text = "🗑️",
-                            fontSize = 11.sp
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (item.syncStatus == "ACTION_REQUIRED") {
+                        CompactChip(
+                            onClick = onRetry,
+                            label = { Text("재시도", fontSize = 10.sp) },
+                            colors = ChipDefaults.chipColors(
+                                backgroundColor = Color(0xFF2C2C2E),
+                                contentColor = Color(0xFFFF9F0A)
+                            ),
+                            shape = RoundedCornerShape(10.dp)
                         )
-                    },
-                    colors = ChipDefaults.chipColors(
-                        backgroundColor = Color(0xFF2C2C2E),
-                        contentColor = Color(0xFFEF5350)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+
+                    CompactChip(
+                        onClick = onExport,
+                        label = { Text("내보내기", fontSize = 10.sp) },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = Color(0xFF242426),
+                            contentColor = Color(0xFF8E8E93)
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    CompactChip(
+                        onClick = onDelete,
+                        label = { Text("삭제", fontSize = 10.sp) },
+                        colors = ChipDefaults.chipColors(
+                            backgroundColor = Color(0xFF241C1C),
+                            contentColor = Color(0xFFFF6961)
+                        ),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
             }
         }
     }

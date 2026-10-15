@@ -34,15 +34,88 @@ class VoiceRecordTileService : TileService() {
             .setOnClick(launchIntent)
             .build()
 
-        val recordButton = Button.Builder(this, clickModifier)
-            .setContentDescription("Start HaptiLog")
-            .setTextContent("TAP TO\nRECORD")
+        val rubyDot = LayoutElementBuilders.Box.Builder()
+            .setWidth(DimensionBuilders.dp(10f))
+            .setHeight(DimensionBuilders.dp(10f))
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFFFF3B30.toInt()))
+                            .setCorner(
+                                ModifiersBuilders.Corner.Builder()
+                                    .setRadius(DimensionBuilders.dp(5f))
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+            )
+            .build()
+
+        val recordText = LayoutElementBuilders.Text.Builder()
+            .setText("RECORD")
+            .setFontStyle(
+                LayoutElementBuilders.FontStyle.Builder()
+                    .setSize(DimensionBuilders.sp(11f))
+                    .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFFF5F5F7.toInt()))
+                    .build()
+            )
+            .build()
+
+        val discContent = LayoutElementBuilders.Column.Builder()
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+            .addContent(rubyDot)
+            .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(8f)).build())
+            .addContent(recordText)
+            .build()
+
+        val actionDisc = LayoutElementBuilders.Box.Builder()
+            .setWidth(DimensionBuilders.dp(112f))
+            .setHeight(DimensionBuilders.dp(112f))
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setClickable(clickModifier)
+                    .setSemantics(
+                        ModifiersBuilders.Semantics.Builder()
+                            .setContentDescription("Record voice memo")
+                            .build()
+                    )
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFF161618.toInt()))
+                            .setCorner(
+                                ModifiersBuilders.Corner.Builder()
+                                    .setRadius(DimensionBuilders.dp(56f))
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .setBorder(
+                        ModifiersBuilders.Border.Builder()
+                            .setWidth(DimensionBuilders.dp(1f))
+                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFF2C2C2E.toInt()))
+                            .build()
+                    )
+                    .build()
+            )
+            .addContent(discContent)
             .build()
 
         val rootLayout = LayoutElementBuilders.Box.Builder()
             .setWidth(DimensionBuilders.expand())
             .setHeight(DimensionBuilders.expand())
-            .addContent(recordButton)
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setClickable(clickModifier)
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFF000000.toInt()))
+                            .build()
+                    )
+                    .build()
+            )
+            .addContent(actionDisc)
             .build()
 
         val tile = TileBuilders.Tile.Builder()

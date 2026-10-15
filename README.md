@@ -75,25 +75,41 @@ flowchart LR
 
 ## Implementation status
 
-This repository is a prototype. Implemented: local recording, atomic session metadata, a three-minute timeout, haptic success/failure feedback, optional bounded location refinement, a recording Tile launch, and authenticated enrichment.
+Implemented: local recording and playback, atomic session metadata, a three-minute timeout, haptic success/failure feedback, optional bounded location refinement, Tile/complication launch, ZIP export, anonymous watch authentication with encrypted session storage, opt-in durable upload/retry scheduling, private audio Storage, and authenticated idempotent enrichment.
 
-Still required for an end-to-end product: recording history/playback/export, authentication on the watch, durable upload/retry scheduling, private audio Storage setup, enrichment retrieval, retry idempotency, and recovery of interrupted recordings. There is no complication provider yet. Physical-watch validation is required for haptic audibility, microphone interference, and battery consumption.
+Interrupted recordings are preserved and shown for inspection/export, rather than automatically uploading potentially invalid audio. Physical-watch validation is still required for haptic audibility, microphone interference, battery use, and the availability of a system export picker.
+
+## Cloud sync setup
+
+The public defaults in `watch/cloud.properties` target the `haptilog` project (`pejblunajspvgxavvieu`). Override them at build time with `HAPTILOG_SUPABASE_URL` and `HAPTILOG_SUPABASE_PUBLISHABLE_KEY` for another environment. Service-role/secret keys must never be built into the watch.
+
+Apply the migrations, enable Anonymous Sign-Ins in Supabase Auth, and configure `GEMINI_API_KEY` and `GEMINI_MODEL` in Edge Function secrets. The function verifies the caller and recording ownership itself; `verify_jwt=false` allows publishable-key/asymmetric-JWT projects without depending on legacy gateway verification.
+
+Tap **Enable cloud sync** on the watch to opt in; tap **Pause cloud sync** to stop future work. Uploads require connectivity and sufficient battery, preserve the local source files, and use exponential retries. After six failed attempts or a permanent error, use **Retry sync** on the recording once the underlying problem is fixed. Uploaded audio uses the private path `<user-id>/<recording-id>.m4a`. Enrichment and sync state are separate files. Local deletion only removes the watch copy; it does not delete uploaded cloud data.
+
+Anonymous sessions belong to this installation. Clearing app storage or losing the encrypted session requires account recovery work before previously uploaded recordings can be accessed again. The app does not silently create a different owner after a session error.
+
+Export produces a ZIP containing audio, source metadata, and available enrichment. It requires a compatible system document picker; an unsupported watch reports that no export app is available and retains the original.
+
+Migration filenames match the migration history applied to the named project, so subsequent CLI deployments do not reapply the initial schema.
 
 ## Validation
 
 ```bash
 cd watch
-./gradlew assembleDebug lintDebug
+./gradlew assembleDebug lintDebug testDebugUnitTest
 ```
 
 From the repository root:
 
 ```bash
 node --experimental-strip-types tests/voice-enrich.test.mjs
-deno check supabase/functions/voice-enrich/index.ts
+deno check --lock=supabase/functions/deno.lock supabase/functions/voice-enrich/index.ts
+npm ci --prefix supabase/tests --ignore-scripts
+npm test --prefix supabase/tests
 ```
 
-The backend tests use mocked clients and provider responses; they do not replace deployed RLS or database integration tests.
+Backend handler tests use mocked clients/provider responses. Embedded PostgreSQL tests execute the migrations and verify ownership/storage policies and retry leases against test Auth/Storage schemas. Android tests verify recovery, export contents, upload checkpoints, source retention, and stable recording ownership. These complement the rollback-only live ownership checks; they do not prove a successful live Gemini request.
 
 ## Release signing
 

@@ -8,16 +8,18 @@ const result = { transcript: 'Coffee 5000 won', summary: 'Coffee', intent_type: 
 const request = (body = payload, token = 'valid') => new Request('https://local/enrich', {
   method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: JSON.stringify(body),
 });
-function fixture({ owner = true, auth = true, insertError = null, providerResult = result, providerStatus = 200 } = {}) {
-  const calls = { fetch: 0, writes: [], filters: [] };
+function fixture({ owner = true, auth = true, insertError = null, providerResult = result, providerStatus = 200, cached = null, claimed = true } = {}) {
+  const calls = { fetch: 0, writes: [], filters: [], released: 0 };
   const handler = createHandler({
     env: name => name === 'GEMINI_MODEL' ? 'configured-model' : 'configured',
     createClient: (_url, _key, options) => ({
       auth: { getUser: async () => ({ data: { user: auth ? { id: 'caller' } : null }, error: null }) },
-      from: () => ({
+      rpc: async () => ({ data: claimed, error: null }),
+      from: (table) => ({
         select() { return this; },
+        delete() { calls.released++; return this; },
         eq(key, value) { calls.filters.push([key, value]); return this; },
-        async maybeSingle() { return { data: owner ? { id: payload.recording_id, user_id: 'caller', latitude: 37 } : null, error: null }; },
+        async maybeSingle() { return { data: table === "voice_enrichments" ? cached : (owner ? { id: payload.recording_id, user_id: 'caller', latitude: 37 } : null), error: null }; },
         async insert(value) {
           assert.equal(options.global, undefined);
           calls.writes.push(value);
@@ -52,7 +54,7 @@ test('writes enrichment with verified caller ownership', async () => {
   const response = await handler(request());
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), result);
-  assert.deepEqual(calls.writes, [{ recording_id: payload.recording_id, user_id: 'caller', ...result }]);
+  assert.deepEqual(calls.writes, [{ recording_id: payload.recording_id, user_id: 'caller', pipeline_version: 'v1', ...result }]);
 });
 test('database failures are not reported as successful enrichment', async () => {
   const { handler } = fixture({ insertError: { message: 'failed' } });
@@ -80,4 +82,21 @@ test('bounds request body size before expensive work', async () => {
   const { handler, calls } = fixture();
   assert.equal((await handler(request({ ...payload, audio_base64: 'A'.repeat(2_000_001) }))).status, 413);
   assert.equal(calls.fetch, 0);
+});
+
+test('completed retry returns stored enrichment without paying again', async () => {
+  const { handler, calls } = fixture({ cached: result });
+  assert.equal((await handler(request())).status, 200);
+  assert.equal(calls.fetch, 0);
+  assert.equal(calls.writes.length, 0);
+});
+test('busy claim prevents duplicate provider calls', async () => {
+  const { handler, calls } = fixture({ claimed: false });
+  assert.equal((await handler(request())).status, 429);
+  assert.equal(calls.fetch, 0);
+});
+test('provider failure releases the lease for a retry', async () => {
+  const { handler, calls } = fixture({ providerStatus: 500 });
+  assert.equal((await handler(request())).status, 502);
+  assert.equal(calls.released, 1);
 });

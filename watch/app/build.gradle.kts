@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.util.Base64
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,6 +10,19 @@ plugins {
 val releaseStore = file("release.keystore")
 val releaseCredentials = listOf("KEYSTORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD")
 val hasReleaseSigning = releaseStore.exists() && releaseCredentials.all { !System.getenv(it).isNullOrBlank() }
+
+val cloudDefaults = Properties().apply {
+    rootProject.file("cloud.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+fun publicSetting(name: String): String = providers.environmentVariable(name)
+    .filter { it.isNotBlank() }.orElse(cloudDefaults.getProperty(name, "")).get()
+val publicKey = publicSetting("HAPTILOG_SUPABASE_PUBLISHABLE_KEY")
+check(!publicKey.startsWith("sb_secret_")) { "Only public Supabase keys may be included in the watch" }
+if (publicKey.count { it == '.' } == 2) {
+    val claims = runCatching { String(Base64.getUrlDecoder().decode(publicKey.split('.')[1])) }.getOrDefault("")
+    check(!claims.contains("service_role")) { "Service role keys must never be included in the watch" }
+}
+fun quoted(value: String) = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
 android {
     namespace = "com.haptilog.watch"
@@ -18,6 +34,8 @@ android {
         targetSdk = 35
         versionCode = providers.environmentVariable("VERSION_CODE").orElse("1").get().toInt()
         versionName = "1.0.0"
+        buildConfigField("String", "SUPABASE_URL", quoted(publicSetting("HAPTILOG_SUPABASE_URL")))
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", quoted(publicSetting("HAPTILOG_SUPABASE_PUBLISHABLE_KEY")))
     }
 
     signingConfigs {
@@ -51,12 +69,18 @@ android {
         jvmTarget = "17"
     }
 
+    testOptions { unitTests.isIncludeAndroidResources = true }
+
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
 dependencies {
+    implementation(libs.androidx.work)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.activity.compose)

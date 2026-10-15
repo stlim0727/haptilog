@@ -20,7 +20,12 @@ Smartwatch voice recorders require the user to look at the screen to verify reco
 - **Action**: Quick voice memo during interval pauses.
 - **AI Output**: Tagged with current running speed and altitude.
 
-## 3. Interaction Design
-- **Single-Tap Recording**: Wear OS Tile has a single, full-screen circular button. Tap to start, tap to stop.
-- **Heartbeat Haptic**: Periodic dual pulse informs the user that their voice is being captured without needing an active display.
-- **Auto-Stop Timeout**: Caps recordings at 180 seconds (3 minutes) to prevent accidental battery drain in case user forgets to stop.
+## 3. Interaction Design & Tactile Architecture
+- **Single-Tap Recording (The Silent Disc)**: Wear OS Tile features a monolithic obsidian disc with a centered ruby dot. Tapping anywhere initiates recording instantly.
+- **Living Pulse Haptic**: 1.2-second interval (~50 bpm resting physiological pulse) utilizing `PRIMITIVE_LOW_TICK` to stimulate wrist Pacinian corpuscles without microphone noise leakage.
+- **Stop & Seal Confirmation**: Two-stage mechanical closure (`PRIMITIVE_CLICK` 0.7f followed 80ms later by 1.0f click) confirming audio is safely committed to disk.
+- **Tactile Auto-Stop Warning**: At 150 seconds (30s before the 180s cutoff), 3 subtle consecutive taps warn the user to conclude their thought.
+- **Visual Restraint (The Inevitable Form)**:
+  - AMOLED True Black canvas (`#000000`) with no decorative emojis.
+  - 1px Edge Luminance subtle breathing ring replacing disruptive expanding blob animations.
+  - Clean typographic hierarchy and micro-index dots for semantic categorization.

@@ -22,7 +22,7 @@
 ## 3. Data Contract
 
 Each recording session produces:
-1. `recording_<uuid>.m4a`: Audio stream.
+1. `rec_<uuid>.m4a`: Audio stream.
 2. `meta_<uuid>.json`:
 ```json
 {
@@ -42,4 +42,4 @@ Each recording session produces:
 
 The audio filename is `rec_<uuid>.m4a`. Location fields are optional. A cached fix older than two minutes is ignored; a high-accuracy refinement is attempted with a 15-second bound and cancelled at stop. Metadata is written atomically and session updates are serialized on the main dispatcher. Failed capture uses `status: FAILED` and `sync_status: CAPTURE_FAILED`; its audio is retained for inspection.
 
-The backend uses the caller's JWT and recording ownership to authorize enrichment before calling Gemini. Derived enrichments are inserted using a privileged server-only client. Sync, Storage provisioning, interruption recovery, and retry idempotency are not implemented yet.
+The backend uses the caller's JWT and recording ownership to authorize enrichment before calling Gemini. Derived enrichments are inserted using a privileged server-only client. Opt-in WorkManager jobs use connectivity/battery constraints, exponential backoff and a periodic safety scan. Raw audio and metadata remain on the watch; `sync_<uuid>.json` stores retry checkpoints and `enrich_<uuid>.json` stores derived output. Startup marks unfinished captures interrupted and synthesizes discoverable metadata for orphan audio, without asserting that partial MP4 files are playable. Backend retries reuse versioned enrichment output and a service-only three-minute lease prevents concurrent provider calls. ZIP export includes source audio/metadata and enrichment, excluding session credentials.

@@ -29,6 +29,7 @@ export function createHandler(deps: Dependencies) {
       return reply(401, { error: "Authentication required" });
     }
 
+    let releaseClaim: (() => Promise<void>) | undefined;
     try {
       const url = deps.env("SUPABASE_URL");
       const anonKey = deps.env("SUPABASE_ANON_KEY");
@@ -83,6 +84,42 @@ export function createHandler(deps: Dependencies) {
       if (readError) return reply(500, { error: "Unable to read recording" });
       if (!recording) return reply(404, { error: "Recording not found" });
 
+      const admin = deps.createClient(url, serviceKey, {
+        auth: { persistSession: false },
+      });
+      const cachedResult = async () => {
+        const { data, error } = await admin.from("voice_enrichments")
+          .select("transcript,intent_type,summary,structured_data")
+          .eq("recording_id", recording.id).eq("pipeline_version", "v1")
+          .maybeSingle();
+        if (error) throw new Error("Enrichment lookup failed");
+        return data ? validateResult(data) : null;
+      };
+      const cached = await cachedResult();
+      if (cached) return reply(200, cached);
+      const claimToken = crypto.randomUUID();
+      const { data: claimed, error: claimError } = await admin.rpc(
+        "claim_voice_enrichment",
+        {
+          p_recording_id: recording.id,
+          p_claim_token: claimToken,
+        },
+      );
+      if (claimError) {
+        return reply(500, { error: "Unable to schedule enrichment" });
+      }
+      if (!claimed) {
+        return reply(429, { error: "Enrichment already in progress" });
+      }
+      releaseClaim = async () => {
+        await admin.from("enrichment_jobs").delete().eq(
+          "recording_id",
+          recording.id,
+        ).eq("claim_token", claimToken);
+      };
+      const afterClaim = await cachedResult();
+      if (afterClaim) return reply(200, afterClaim);
+
       const response = await deps.fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${
           encodeURIComponent(model)
@@ -133,13 +170,11 @@ export function createHandler(deps: Dependencies) {
         return reply(502, { error: "AI provider returned invalid enrichment" });
       }
       // Ownership is checked using the caller's JWT before this privileged write.
-      const admin = deps.createClient(url, serviceKey, {
-        auth: { persistSession: false },
-      });
       const { error: insertError } = await admin.from("voice_enrichments")
         .insert({
           recording_id: recording.id,
           user_id: user.id,
+          pipeline_version: "v1",
           ...result,
         });
       if (insertError) {
@@ -152,6 +187,8 @@ export function createHandler(deps: Dependencies) {
         error instanceof Error ? error.name : "UnknownError",
       );
       return reply(500, { error: "Enrichment failed" });
+    } finally {
+      if (releaseClaim) await releaseClaim().catch(() => {});
     }
   };
 }

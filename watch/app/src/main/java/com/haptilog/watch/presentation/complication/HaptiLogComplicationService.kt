@@ -20,14 +20,13 @@ import com.haptilog.watch.presentation.MainActivity
 class HaptiLogComplicationService : SuspendingComplicationDataSourceService() {
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
-        val icon = Icon.createWithResource(this, android.R.drawable.ic_btn_speak_now)
+        val icon = Icon.createWithResource(this, com.haptilog.watch.R.drawable.ic_complication_monolith)
         return when (type) {
             ComplicationType.SHORT_TEXT -> {
                 ShortTextComplicationData.Builder(
-                    text = PlainComplicationText.Builder("REC").build(),
+                    text = PlainComplicationText.Builder("Log").build(),
                     contentDescription = PlainComplicationText.Builder("HaptiLog Voice Record").build()
                 )
-                    .setTitle(PlainComplicationText.Builder("LOG").build())
                     .setMonochromaticImage(MonochromaticImage.Builder(icon).build())
                     .build()
             }
@@ -43,6 +42,7 @@ class HaptiLogComplicationService : SuspendingComplicationDataSourceService() {
 
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         val launchIntent = Intent(this, MainActivity::class.java).apply {
+            putExtra(MainActivity.EXTRA_TOGGLE, true)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
@@ -52,15 +52,14 @@ class HaptiLogComplicationService : SuspendingComplicationDataSourceService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val icon = Icon.createWithResource(this, android.R.drawable.ic_btn_speak_now)
+        val icon = Icon.createWithResource(this, com.haptilog.watch.R.drawable.ic_complication_monolith)
 
         return when (request.complicationType) {
             ComplicationType.SHORT_TEXT -> {
                 ShortTextComplicationData.Builder(
-                    text = PlainComplicationText.Builder("REC").build(),
+                    text = PlainComplicationText.Builder("Log").build(),
                     contentDescription = PlainComplicationText.Builder("Record Voice Memo").build()
                 )
-                    .setTitle(PlainComplicationText.Builder("LOG").build())
                     .setMonochromaticImage(MonochromaticImage.Builder(icon).build())
                     .setTapAction(pendingIntent)
                     .build()

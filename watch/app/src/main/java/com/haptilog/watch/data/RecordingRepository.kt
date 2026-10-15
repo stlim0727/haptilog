@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import kotlinx.coroutines.cancel
 import java.io.File
 import java.time.Instant
 
@@ -42,10 +43,9 @@ class RecordingRepository(private val context: Context) {
 
         metaFiles.mapNotNull { metaFile ->
             try {
-                val jsonStr = metaFile.readText(Charsets.UTF_8)
-                val json = JSONObject(jsonStr)
+                val json = RecordingFiles.read(metaFile)
                 val id = json.optString("id", "")
-                if (id.isEmpty()) return@mapNotNull null
+                if (!RecordingFiles.validId(id)) return@mapNotNull null
 
                 val audioFile = File(recordingsDir, "rec_${id}.m4a")
                 val startedAtIso = json.optString("started_at", "")
@@ -57,7 +57,11 @@ class RecordingRepository(private val context: Context) {
 
                 val durationSeconds = json.optInt("duration_seconds", 0)
                 val status = json.optString("status", "UNKNOWN")
-                val syncStatus = json.optString("sync_status", "PENDING_SYNC")
+                val syncFile = File(recordingsDir, "sync_$id.json")
+                val sync = if (syncFile.exists()) runCatching { RecordingFiles.read(syncFile) }.getOrNull() else null
+                val syncStatus = sync?.optString("status") ?: json.optString("sync_status", "PENDING_SYNC")
+                val derivedFile = File(recordingsDir, "enrich_$id.json")
+                val derived = if (derivedFile.exists()) runCatching { RecordingFiles.read(derivedFile) }.getOrNull() else null
 
                 val lat = if (json.has("latitude")) json.optDouble("latitude") else null
                 val lon = if (json.has("longitude")) json.optDouble("longitude") else null
@@ -65,9 +69,9 @@ class RecordingRepository(private val context: Context) {
                 val spd = if (json.has("speed")) json.optDouble("speed").toFloat() else null
                 val acc = if (json.has("accuracy")) json.optDouble("accuracy").toFloat() else null
 
-                val intentType = if (json.has("intent_type")) json.optString("intent_type") else null
-                val summary = if (json.has("summary")) json.optString("summary") else null
-                val transcript = if (json.has("transcript")) json.optString("transcript") else null
+                val intentType = derived?.optString("intent_type")
+                val summary = derived?.optString("summary")
+                val transcript = derived?.optString("transcript")
 
                 RecordingItem(
                     id = id,
@@ -94,14 +98,20 @@ class RecordingRepository(private val context: Context) {
         }.sortedByDescending { it.startedAtTimestamp }
     }
 
+    fun close() { scope.cancel() }
+
     fun deleteRecording(id: String): Boolean {
+        if (!RecordingFiles.validId(id)) return false
+        com.haptilog.watch.sync.RecordingSyncWorker.schedule(context)
         var deleted = false
         try {
             val metaFile = File(recordingsDir, "meta_${id}.json")
             val audioFile = File(recordingsDir, "rec_${id}.m4a")
-            if (metaFile.exists()) metaFile.delete()
-            if (audioFile.exists()) audioFile.delete()
-            deleted = true
+            // Local deletion only; never claim that uploaded cloud data was deleted.
+            deleted = (!audioFile.exists() || audioFile.delete()) && (!metaFile.exists() || metaFile.delete())
+            if (deleted) {
+                listOf("sync_$id.json", "enrich_$id.json").forEach { File(recordingsDir, it).delete() }
+            }
             refresh()
         } catch (e: Exception) {
             e.printStackTrace()

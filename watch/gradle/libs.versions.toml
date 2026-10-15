@@ -1,11 +1,12 @@
 [versions]
+work = "2.10.0"
 agp = "8.7.2"
 kotlin = "2.0.21"
 coreKtx = "1.15.0"
 playServicesWearable = "19.0.0"
 playServicesLocation = "21.3.0"
 composeBom = "2024.10.01"
-composeWear = "1.4.0"
+composeWear = "1.4.1"
 wearTiles = "1.4.1"
 wearProtolayout = "1.2.1"
 horologist = "0.7.7-alpha"
@@ -18,6 +19,7 @@ fragment = "1.8.5"
 wearWatchface = "1.2.1"
 
 [libraries]
+androidx-work = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

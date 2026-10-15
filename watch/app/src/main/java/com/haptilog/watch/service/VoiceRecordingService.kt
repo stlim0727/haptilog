@@ -159,10 +159,15 @@ class VoiceRecordingService : Service() {
                 }
             }
 
-            // 4. Safety auto-timeout
+            // 4. Safety auto-timeout with tactile warning at 150s (30s before auto-stop)
             timeoutJob?.cancel()
             timeoutJob = serviceScope.launch {
-                delay(MAX_RECORDING_MS)
+                val warningDelayMs = (MAX_RECORDING_MS - 30_000L).coerceAtLeast(0L)
+                delay(warningDelayMs)
+                if (_isRecording.value) {
+                    hapticManager.playTimeoutWarningFeedback()
+                }
+                delay(MAX_RECORDING_MS - warningDelayMs)
                 if (_isRecording.value) {
                     stopRecording()
                 }
@@ -207,7 +212,10 @@ class VoiceRecordingService : Service() {
             saved = false
             e.printStackTrace()
         }
-        if (saved) hapticManager.playStopFeedback() else hapticManager.playFailureFeedback()
+        if (saved) {
+            hapticManager.playStopFeedback()
+            com.haptilog.watch.sync.RecordingSyncWorker.schedule(this)
+        } else hapticManager.playFailureFeedback()
         if (wakeLock?.isHeld == true) wakeLock?.release()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

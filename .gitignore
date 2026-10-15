@@ -42,3 +42,6 @@ node_modules/
 .env.local
 .supabase/
 .kotlin/
+
+# Supabase CLI cache
+supabase/.temp/
