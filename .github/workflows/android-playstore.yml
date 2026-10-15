@@ -72,25 +72,11 @@ jobs:
           path: watch/app/build/outputs/bundle/release/*.aab
           retention-days: 30
 
-      - name: Resolve Play Store Track
-        id: play_track
-        run: |
-          RAW_TRACK="${{ github.event.inputs.track || 'wear:internal' }}"
-          # Google Play Developer API identifies the Wear OS internal testing track as 'wear:qa'.
-          # Standalone Wear OS apps often use 'internal', while form-factor tracks use 'wear:qa'.
-          if [ "$RAW_TRACK" = "wear:internal" ]; then
-            RESOLVED_TRACK="wear:qa"
-          else
-            RESOLVED_TRACK="$RAW_TRACK"
-          fi
-          echo "track=$RESOLVED_TRACK" >> $GITHUB_OUTPUT
-          echo "Resolved track '$RAW_TRACK' to '$RESOLVED_TRACK'"
-
       - name: Upload to Google Play Console
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.haptilog.watch
           releaseFiles: watch/app/build/outputs/bundle/release/*.aab
-          track: ${{ steps.play_track.outputs.track }}
+          track: ${{ github.event.inputs.track || 'wear:internal' }}
           status: ${{ github.event.inputs.status || 'completed' }}
