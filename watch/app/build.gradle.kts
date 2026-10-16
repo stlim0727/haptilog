@@ -34,6 +34,7 @@ android {
         targetSdk = 35
         versionCode = providers.environmentVariable("VERSION_CODE").orElse("1").get().toInt()
         versionName = "1.0.0"
+        buildConfigField("String", "WEB_PORTAL_URL", quoted(providers.environmentVariable("HAPTILOG_WEB_PORTAL_URL").orElse("https://haptilog.keepory.app").get()))
         buildConfigField("String", "SUPABASE_URL", quoted(publicSetting("HAPTILOG_SUPABASE_URL")))
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", quoted(publicSetting("HAPTILOG_SUPABASE_PUBLISHABLE_KEY")))
     }

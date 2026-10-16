@@ -1,7 +1,6 @@
 package com.haptilog.watch.sync
 
 import android.content.Context
-import android.util.Base64
 import com.haptilog.watch.data.RecordingFiles
 import org.json.JSONObject
 import java.io.File
@@ -33,7 +32,7 @@ class RecordingUploader(private val context: Context) {
         checkContinue()
         client.request("/rest/v1/recordings?on_conflict=id", "POST", row.toString().toByteArray(), token,
             extra = mapOf("Prefer" to "resolution=merge-duplicates,return=minimal"))
-        val input = JSONObject().put("recording_id", id).put("audio_base64", Base64.encodeToString(bytes, Base64.NO_WRAP)).put("audio_mime", "audio/mp4")
+        val input = JSONObject().put("recording_id", id)
         checkContinue()
         val result = JSONObject(client.request("/functions/v1/voice-enrich", "POST", input.toString().toByteArray(), token))
         RecordingFiles.write(File(directory, "enrich_$id.json"), result)

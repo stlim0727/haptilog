@@ -64,7 +64,7 @@ jobs:
           node-version: '22'
 
       - name: Test enrichment authorization and validation
-        run: node --experimental-strip-types --test tests/voice-enrich.test.mjs
+        run: node --experimental-strip-types --test tests/voice-enrich.test.mjs tests/watch-access.test.mjs
 
       - uses: denoland/setup-deno@v2
         with:
@@ -76,7 +76,7 @@ jobs:
           npm test --prefix supabase/tests
 
       - name: Typecheck Edge Function
-        run: deno check --lock=supabase/functions/deno.lock supabase/functions/voice-enrich/index.ts
+        run: deno check --lock=supabase/functions/deno.lock supabase/functions/voice-enrich/index.ts supabase/functions/watch-access/index.ts
 
       - name: Check migration files exist
         run: |
@@ -88,3 +88,27 @@ jobs:
             fi
           done
           echo "Migration presence checks passed (not SQL syntax validation)."
+
+  portal:
+    name: Portal build and browser tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: portal-browser-results
+          path: web/test-results/

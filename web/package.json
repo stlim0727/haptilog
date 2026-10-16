@@ -1,0 +1,29 @@
+{
+  "name": "haptilog-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --experimental-strip-types --test src/*.test.mjs tests/build-credentials.test.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "test:e2e": "playwright test",
+    "deploy:production": "npm run build && wrangler deploy --env production"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "lucide-react": "1.58.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vite": "8.3.4",
+    "wrangler": "4.151.1"
+  }
+}
