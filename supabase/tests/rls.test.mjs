@@ -8,6 +8,7 @@ const rec = '33333333-3333-4333-8333-333333333333';
 await db.exec(`
 create role anon; create role authenticated; create role service_role bypassrls;
 create schema auth; create schema storage;
+alter default privileges in schema public grant all on tables to anon, authenticated;
 create table auth.users(id uuid primary key);
 create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true),''),'{}')::jsonb $$;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true),'')::uuid $$;
@@ -50,6 +51,9 @@ await db.exec(`reset role; set role authenticated; set request.jwt.claim.sub='${
 assert.equal((await db.query('select * from public.voice_enrichments')).rows.length,1);
 await db.exec(`set request.jwt.claim.sub='${other}';`);
 assert.equal((await db.query('select * from public.voice_enrichments')).rows.length,0);
+// Hosted default grants must be narrowed at the table level before column grants.
+assert.equal((await db.query("select has_column_privilege('authenticated','public.portal_connections','owner_user_id','UPDATE') as allowed")).rows[0].allowed,false);
+assert.equal((await db.query("select has_column_privilege('authenticated','public.portal_connections','revoked_at','UPDATE') as allowed")).rows[0].allowed,true);
 // Pairing is a one-use capability bound to an independent browser session.
 const browser = '66666666-6666-4666-8666-666666666666';
 const session = '77777777-7777-4777-8777-777777777777';

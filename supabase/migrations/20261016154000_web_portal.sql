@@ -32,6 +32,8 @@ create table public.portal_connections (
 );
 create index portal_connections_owner on public.portal_connections(owner_user_id);
 alter table public.portal_connections enable row level security;
+-- Supabase can grant table-wide access by default; column grants alone do not narrow it.
+revoke all on public.portal_connections from anon, authenticated;
 grant select on public.portal_connections to authenticated;
 grant update (revoked_at) on public.portal_connections to authenticated;
 grant all on public.portal_connections to service_role;
@@ -126,6 +128,8 @@ create table public.enrichment_status (
   attempts integer not null default 1
 );
 alter table public.enrichment_status enable row level security;
+-- Supabase can grant table-wide access by default; column grants alone do not narrow it.
+revoke all on public.enrichment_status from anon, authenticated;
 grant select on public.enrichment_status to authenticated;
 grant all on public.enrichment_status to service_role;
 create policy "Read accessible processing status" on public.enrichment_status for select to authenticated using (private.can_read_owner(user_id));
@@ -167,6 +171,8 @@ create table public.recording_corrections (
   updated_at timestamptz not null default now()
 );
 alter table public.recording_corrections enable row level security;
+-- Supabase can grant table-wide access by default; column grants alone do not narrow it.
+revoke all on public.recording_corrections from anon, authenticated;
 grant select,insert,update on public.recording_corrections to authenticated;
 create policy "Read accessible corrections" on public.recording_corrections for select to authenticated using (
   exists(select 1 from public.recordings r where r.id = recording_id and private.can_read_owner(r.user_id))

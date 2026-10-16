@@ -127,3 +127,52 @@ test("oversized pairing bodies are rejected before RPC", async () => {
   );
   assert.equal(calls.length, 0);
 });
+
+test("runtime credential derives a stable independent verifier key", async () => {
+  const { derivedPairingSecret } =
+    await import("../supabase/functions/watch-access/handler.ts");
+  const root = "test-only-runtime-service-credential";
+  const a = await derivedPairingSecret(root),
+    b = await derivedPairingSecret(root);
+  assert.equal(a, b);
+  assert.equal(a.length, 64);
+  assert.notEqual(a, root);
+  assert.notEqual(a, await derivedPairingSecret(root + "-rotated"));
+  const handler = createAccessHandler({
+    env: (name) =>
+      name === "WATCH_PAIRING_SECRET"
+        ? undefined
+        : name === "SUPABASE_SERVICE_ROLE_KEY"
+          ? root
+          : "configured",
+    createClient: () => ({
+      auth: {
+        getUser: async () => ({ data: { user: { id: userId } }, error: null }),
+      },
+      rpc: async (_name, input) => {
+        assert.match(input.p_hash, /^[a-f0-9]{64}$/);
+        return { data: { watch_id: "HL-0123456789" }, error: null };
+      },
+    }),
+  });
+  assert.equal((await handler(req({ action: "issue" }))).status, 200);
+});
+
+test("health reports readiness without exposing runtime credentials", async () => {
+  const { handler, calls } = fixture();
+  const r = await handler(new Request("https://local/watch-access?health"));
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ready: true });
+  assert.equal(calls.length, 0);
+  const missing = createAccessHandler({
+    env: () => undefined,
+    createClient: () => {
+      throw Error("must not create client");
+    },
+  });
+  const unavailable = await missing(
+    new Request("https://local/watch-access?health"),
+  );
+  assert.equal(unavailable.status, 503);
+  assert.deepEqual(await unavailable.json(), { ready: false });
+});
