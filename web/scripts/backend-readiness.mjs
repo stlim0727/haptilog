@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { loadEnv } from "vite";
+import { assertPublicKey } from "./public-key.mjs";
 export function publicConfig(env = process.env) {
   const fileEnv = loadEnv(
     "production",
@@ -31,6 +32,7 @@ export function publicConfig(env = process.env) {
   };
 }
 export async function checkBackend(config = publicConfig(), fetcher = fetch) {
+  assertPublicKey(config.key);
   const request = async (path) => {
     try {
       const r = await fetcher(config.url + path, {

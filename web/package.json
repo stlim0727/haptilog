@@ -8,10 +8,11 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --experimental-strip-types --test src/*.test.mjs tests/*.test.mjs",
-    "deploy": "tsc --noEmit && node scripts/deploy.mjs",
+    "deploy": "node scripts/deploy.mjs",
     "test:e2e": "playwright test",
-    "deploy:production": "tsc --noEmit && node scripts/deploy.mjs --production",
-    "check:backend": "node scripts/backend-readiness.mjs"
+    "deploy:production": "node scripts/deploy.mjs --production",
+    "check:backend": "node scripts/backend-readiness.mjs",
+    "prepare:deploy": "node scripts/deploy.mjs --build-only"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.118.0",

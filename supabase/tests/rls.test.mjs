@@ -20,9 +20,29 @@ grant usage on schema public, auth, storage to authenticated, anon, service_role
 grant select,insert,update,delete on storage.objects to authenticated;
 insert into auth.users values ('${owner}'),('${other}');
 `);
-for (const name of (await readdir(new URL('../migrations/', import.meta.url))).filter(n => n.endsWith('.sql')).sort()) {
-  await db.exec(await readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8'));
+const migrationNames = (await readdir(new URL('../migrations/', import.meta.url))).filter(n => n.endsWith('.sql')).sort();
+const publishedPortal = '20261016143551_web_portal.sql';
+assert.ok(migrationNames.includes(publishedPortal), 'Published PR #3 migration must retain its version');
+const upgradeRecording = '99999999-9999-4999-8999-999999999999';
+let checkedUpgrade = false;
+for (const name of migrationNames) {
+  const sql = await readFile(new URL(`../migrations/${name}`, import.meta.url), 'utf8');
+  await db.exec(sql);
+  if (name === publishedPortal) {
+    // Existing installations can contain data and broad platform default grants.
+    assert.equal((await db.query("select has_column_privilege('authenticated','public.portal_connections','owner_user_id','UPDATE') as allowed")).rows[0].allowed, true);
+    await db.exec(`insert into public.recordings(id,user_id) values('${upgradeRecording}','${owner}');
+      insert into public.recording_corrections(recording_id,amount,currency) values('${upgradeRecording}',4500,'KRW');`);
+  }
+  if (name.endsWith('_portal_privileges.sql')) {
+    assert.equal((await db.query("select has_column_privilege('authenticated','public.portal_connections','owner_user_id','UPDATE') as allowed")).rows[0].allowed, false);
+    assert.equal((await db.query(`select amount from public.recording_corrections where recording_id='${upgradeRecording}'`)).rows[0].amount, '4500');
+    await db.exec(sql); // A repeat of the privilege-only migration is harmless.
+    checkedUpgrade = true;
+  }
 }
+assert.ok(checkedUpgrade, 'Existing portal installations need a follow-up privilege migration');
+await db.exec(`delete from public.recordings where id='${upgradeRecording}';`);
 await db.exec(`grant all on public.recordings, public.voice_enrichments to service_role;
 set role authenticated; set request.jwt.claim.sub='${owner}';`);
 await db.exec(`insert into public.recordings(id,user_id,audio_path) values ('${rec}','${owner}','${owner}/${rec}.m4a');`);

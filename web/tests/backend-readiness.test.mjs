@@ -52,3 +52,33 @@ test("public overrides take priority over checked-in defaults", () => {
     config,
   );
 });
+
+test("privileged and malformed credentials are rejected before any network call", async () => {
+  const serviceRole = `h.${Buffer.from(JSON.stringify({ role: "service_role" })).toString("base64url")}.s`;
+  for (const key of [
+    "sb_secret_test_only",
+    serviceRole,
+    "invalid",
+    "",
+    undefined,
+  ]) {
+    let requests = 0;
+    await assert.rejects(
+      checkBackend({ url: "https://untrusted.invalid", key }, async () => {
+        requests++;
+        return response({});
+      }),
+      /Privileged credentials are forbidden/,
+    );
+    assert.equal(requests, 0);
+  }
+});
+test("legacy anon keys remain valid for readiness requests", async () => {
+  const key = `h.${Buffer.from(JSON.stringify({ role: "anon" })).toString("base64url")}.s`;
+  let requests = 0;
+  await checkBackend({ ...config, key }, async () => {
+    requests++;
+    return response({});
+  });
+  assert.equal(requests, 3);
+});
