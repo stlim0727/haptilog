@@ -25,7 +25,7 @@
    - **여행 / 탐방 일지**: *"여기 골목 골동품 가게 감성 좋다"* + GPS 좌표 ➔ 여행 지도 타임라인 일기.
    - **운동 / 러닝 메모**: *"5km 지점 무릎 살짝 뻐근, 페이스 조절"* + 러닝 속도 ➔ 운동 로그 기록.
 4. **Local-First & Battery Aware**:
-   - Audio is saved locally (`.m4a` AAC 16kHz mono) with safe timeout protection before being synced to Supabase / Phone.
+   - Audio is saved locally (`.m4a` AAC 16kHz mono) with safe timeout protection before being synced directly to Supabase.
 
 ---
 
@@ -54,7 +54,8 @@ flowchart LR
 ## 📂 Project Structure
 
 - `watch/`: Standalone Wear OS Native Application (Kotlin + Jetpack Compose for Wear OS).
-- `supabase/`: Database migrations, RLS policies, and `voice-enrich` Edge Function.
+- `supabase/`: Database migrations, RLS policies, enrichment and watch pairing Edge Functions.
+- `web/`: React/Vite review portal, with Cloudflare Workers deployment configuration.
 - `.github/workflows/`: CI/CD automation including Google Play Store Internal Testing release.
 - `docs/`: Product specs and architecture guidelines.
 
@@ -71,7 +72,15 @@ flowchart LR
 1. Configure a Supabase project and apply the migration in `supabase/migrations/`.
 2. Set `GEMINI_API_KEY` and an available audio-capable `GEMINI_MODEL` as Edge Function secrets. There is deliberately no retired-model fallback.
 3. Deploy: `supabase functions deploy voice-enrich`.
-4. Call with a user bearer token, an owned `recording_id`, and `audio_base64` (`audio_mime` defaults to `audio/mp4`). Location context comes from the owned database row. Audio payloads are limited to 1.8 MB of base64.
+4. Call with a user bearer token and an accessible `recording_id`. Original audio is loaded from private Storage; location context comes from the database row. Legacy base64 fields are accepted but never replace the stored source.
+
+## Web review portal
+
+The portal in `web/` pairs directly with the watch using an expiring code. Review original audio and transcripts, retry failed analysis, correct expenses, complete extracted tasks, and export CSV. Browser access is revocable independently from the watch session.
+
+The proposed production address is **`haptilog.keepory.app`**, served by a separate Cloudflare Worker. Supabase remains the backend. Deployment needs the new migration, both updated functions, a server-only pairing secret, and Cloudflare account access; the domain is not activated by a local build.
+
+See [portal architecture and deployment](docs/architecture/web-portal.md) for the session model, recovery limits, commands, and deployment order.
 
 ## Implementation status
 
@@ -103,8 +112,8 @@ cd watch
 From the repository root:
 
 ```bash
-node --experimental-strip-types tests/voice-enrich.test.mjs
-deno check --lock=supabase/functions/deno.lock supabase/functions/voice-enrich/index.ts
+node --experimental-strip-types --test tests/voice-enrich.test.mjs tests/watch-access.test.mjs
+deno check --lock=supabase/functions/deno.lock supabase/functions/voice-enrich/index.ts supabase/functions/watch-access/index.ts
 npm ci --prefix supabase/tests --ignore-scripts
 npm test --prefix supabase/tests
 ```

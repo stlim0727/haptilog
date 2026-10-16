@@ -390,3 +390,7 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 [functions.voice-enrich]
 # Authentication is verified by getUser() and recording ownership in the handler.
 verify_jwt = false
+
+[functions.watch-access]
+# Validates bearer with Auth getUser() before privileged pairing RPCs.
+verify_jwt = false

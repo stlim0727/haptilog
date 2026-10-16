@@ -28,9 +28,9 @@ class CloudClient(context: Context) : CloudApi {
     private val prefs = context.getSharedPreferences("cloud_session", Context.MODE_PRIVATE)
     private val url = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val apiKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
-    private var session: JSONObject? = try { readSession() } catch (_: Exception) { throw AuthSessionException() }
 
     companion object {
+        private val sessionLock = Any()
         val configured get() = BuildConfig.SUPABASE_URL.startsWith("https://") && BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()
     }
 
@@ -56,11 +56,10 @@ class CloudClient(context: Context) : CloudApi {
         val encoded = Base64.encodeToString(cipher.iv, Base64.NO_WRAP) + ":" +
             Base64.encodeToString(cipher.doFinal(value.toString().toByteArray()), Base64.NO_WRAP)
         check(prefs.edit().putString("session", encoded).commit())
-        session = value
     }
-    override fun authenticate(): Pair<String, String> {
+    override fun authenticate(): Pair<String, String> = synchronized(sessionLock) {
         check(configured)
-        val old = session
+        val old = try { readSession() } catch (_: Exception) { throw AuthSessionException() }
         val next = when {
             old == null -> JSONObject(request("/auth/v1/signup", "POST", "{}".toByteArray()))
             old.optLong("expires_at") <= System.currentTimeMillis() / 1000 + 60 -> JSONObject(request(
@@ -70,7 +69,7 @@ class CloudClient(context: Context) : CloudApi {
         }
         if (!next.has("expires_at")) next.put("expires_at", System.currentTimeMillis() / 1000 + next.getLong("expires_in"))
         if (next !== old) persist(next)
-        return next.getString("access_token") to next.getJSONObject("user").getString("id")
+        next.getString("access_token") to next.getJSONObject("user").getString("id")
     }
     override fun request(path: String, method: String, body: ByteArray?, token: String?,
                 contentType: String, extra: Map<String, String>): String {

@@ -220,6 +220,7 @@ class MainActivity : ComponentActivity() {
                     },
                     cloudConfigured = CloudClient.configured,
                     cloudEnabled = cloudEnabled,
+                    onWebAccess = { if (!isRecording) startActivity(Intent(this, WebAccessActivity::class.java)) },
                     onSync = {
                         if (CloudClient.configured) {
                             if (cloudEnabled) RecordingSyncWorker.disable(this) else RecordingSyncWorker.enable(this)
@@ -262,7 +263,8 @@ fun HaptiLogScreen(
     onRetry: (RecordingItem) -> Unit,
     cloudConfigured: Boolean,
     cloudEnabled: Boolean,
-    onSync: () -> Unit
+    onSync: () -> Unit,
+    onWebAccess: () -> Unit
 ) {
     val listState = rememberScalingLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -366,6 +368,14 @@ fun HaptiLogScreen(
                         contentColor = Color(0xFF8E8E93)
                     ),
                     shape = RoundedCornerShape(12.dp)
+                )
+            }
+
+            item {
+                CompactChip(
+                    enabled = cloudConfigured && !isRecording,
+                    onClick = onWebAccess,
+                    label = { Text("Web access", fontSize = 12.sp) }
                 )
             }
 

@@ -45,3 +45,10 @@ node_modules/
 
 # Supabase CLI cache
 supabase/.temp/
+
+# Portal output and local Workers state
+web/dist/
+web/.wrangler/
+
+web/test-results/
+web/playwright-report/

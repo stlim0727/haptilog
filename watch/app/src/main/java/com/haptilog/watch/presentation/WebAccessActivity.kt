@@ -1,0 +1,141 @@
+package com.haptilog.watch.presentation
+
+import android.os.Bundle
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.material.*
+import com.haptilog.watch.BuildConfig
+import com.haptilog.watch.sync.CloudClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.time.Instant
+
+/** Pairing is deliberately separate from capture and never shares refresh tokens. */
+class WebAccessActivity : ComponentActivity() {
+    override fun onStop() {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        super.onStop()
+    }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MaterialTheme {
+                val scope = rememberCoroutineScope()
+                var code by remember { mutableStateOf<JSONObject?>(null) }
+                var connections by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+                var busy by remember { mutableStateOf(false) }
+                var error by remember { mutableStateOf<String?>(null) }
+                var remaining by remember { mutableStateOf(0L) }
+                suspend fun cloud(action: String): JSONObject = withContext(Dispatchers.IO) {
+                    val client = CloudClient(this@WebAccessActivity)
+                    val (token, _) = client.authenticate()
+                    JSONObject(client.request("/functions/v1/watch-access", "POST", JSONObject().put("action", action).toString().toByteArray(), token))
+                }
+                suspend fun refreshConnections() = withContext(Dispatchers.IO) {
+                    val client = CloudClient(this@WebAccessActivity)
+                    val (token, owner) = client.authenticate()
+                    val rows = JSONArray(client.request("/rest/v1/portal_connections?owner_user_id=eq.$owner&revoked_at=is.null&expires_at=gt.${Instant.now()}&order=created_at.desc&limit=20", "GET", token = token))
+                    List(rows.length()) { rows.getJSONObject(it) }
+                }
+                fun cancel() {
+                    if (busy) return
+                    scope.launch {
+                        busy = true
+                        try {
+                            if (code != null) cloud("cancel")
+                        } catch (_: Exception) {
+                            Toast.makeText(this@WebAccessActivity, "Code could not be cancelled; it expires automatically within 5 minutes.", Toast.LENGTH_LONG).show()
+                        } finally {
+                            code = null
+                            busy = false
+                            finish()
+                        }
+                    }
+                }
+                BackHandler { cancel() }
+                LaunchedEffect(code) {
+                    if (code != null) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                        val wakeUntil = System.currentTimeMillis() + 60_000
+                        val expiresAt = Instant.parse(code!!.getString("expires_at")).toEpochMilli()
+                        while (System.currentTimeMillis() < expiresAt) {
+                            remaining = ((expiresAt - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+                            if (System.currentTimeMillis() >= wakeUntil) window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            delay(1000)
+                        }
+                        remaining = 0
+                    }
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                DisposableEffect(Unit) { onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) } }
+                ScalingLazyColumn(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
+                    item { Text("Web access", fontSize = 18.sp) }
+                    item { Text(BuildConfig.WEB_PORTAL_URL.removePrefix("https://"), fontSize = 13.sp, textAlign = TextAlign.Center) }
+                    item { Text("Connect a browser to review your recordings. No phone needed.", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                    if (code != null) {
+                        item { Text(code!!.getString("watch_id"), fontSize = 16.sp, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center) }
+                        item { Text(if (remaining > 0) code!!.getString("code").chunked(3).joinToString(" ") else "Expired", fontSize = 27.sp, fontFamily = FontFamily.Monospace) }
+                        item { Text("${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')} remaining", fontSize = 12.sp) }
+                    }
+                    item {
+                        Chip(enabled = !busy && CloudClient.configured, onClick = {
+                            scope.launch {
+                                busy = true; error = null
+                                try { code = cloud("issue") }
+                                catch (_: Exception) { error = "Cannot create code. Check Wi-Fi; wait a minute before retrying." }
+                                finally { busy = false }
+                            }
+                        }, label = { Text(if (busy) "Connecting…" else if (code == null) "Create code" else "New code") })
+                    }
+                    if (error != null) item { Text(error!!, fontSize = 12.sp, textAlign = TextAlign.Center) }
+                    item {
+                        Chip(enabled = !busy, onClick = {
+                            scope.launch {
+                                busy = true; error = null
+                                try { connections = refreshConnections() }
+                                catch (_: Exception) { error = "Cannot load browsers. Check connection." }
+                                finally { busy = false }
+                            }
+                        }, label = { Text("Browsers") })
+                    }
+                    for (connection in connections) {
+                        item {
+                            Chip(enabled = !busy, onClick = {
+                                scope.launch {
+                                    busy = true
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            val client = CloudClient(this@WebAccessActivity)
+                                            val (token, _) = client.authenticate()
+                                            client.request("/rest/v1/portal_connections?session_id=eq.${connection.getString("session_id")}", "PATCH",
+                                                JSONObject().put("revoked_at", Instant.now().toString()).toString().toByteArray(), token)
+                                        }
+                                        connections = refreshConnections()
+                                    } catch (_: Exception) { error = "Revoke failed. Try again online." }
+                                    finally { busy = false }
+                                }
+                            }, label = { Text("Revoke access") }, secondaryLabel = { Text(connection.getString("created_at").take(10)) })
+                        }
+                    }
+                    item { Chip(enabled = !busy, onClick = { cancel() }, label = { Text(if (code == null) "Close" else "Cancel code") }) }
+                }
+            }
+        }
+    }
+}
