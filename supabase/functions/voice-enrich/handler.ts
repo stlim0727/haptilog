@@ -3,10 +3,11 @@ import { validateRequest, validateResult } from "./validation.ts";
 
 const headers = {
   "Content-Type": "application/json",
+  "Cache-Control": "no-store",
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, apikey, content-type, x-client-info",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 const reply = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers });
@@ -27,6 +28,16 @@ type Dependencies = {
 export function createHandler(deps: Dependencies) {
   return async (req: Request): Promise<Response> => {
     if (req.method === "OPTIONS") return new Response("ok", { headers });
+    if (req.method === "GET" && new URL(req.url).searchParams.has("health")) {
+      const ready = [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "GEMINI_API_KEY",
+        "GEMINI_MODEL",
+      ].every((name) => Boolean(deps.env(name)));
+      return reply(ready ? 200 : 503, { ready });
+    }
     if (req.method !== "POST") return reply(405, { error: "POST required" });
     const authorization = req.headers.get("Authorization");
     if (!authorization?.startsWith("Bearer ")) {

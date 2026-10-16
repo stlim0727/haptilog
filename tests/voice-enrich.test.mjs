@@ -253,3 +253,23 @@ test("ID-only request with no stored source cannot trigger analysis", async () =
   );
   assert.equal(calls.fetch, 0);
 });
+
+test("analysis readiness probe never performs a paid request or leaks configuration", async () => {
+  const { handler, calls } = fixture();
+  const r = await handler(new Request("https://local/enrich?health"));
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ready: true });
+  assert.equal(calls.fetch, 0);
+  const missing = createHandler({
+    env: () => undefined,
+    createClient: () => {
+      throw Error("must not create client");
+    },
+    fetch: () => {
+      throw Error("must not call provider");
+    },
+  });
+  const unavailable = await missing(new Request("https://local/enrich?health"));
+  assert.equal(unavailable.status, 503);
+  assert.deepEqual(await unavailable.json(), { ready: false });
+});

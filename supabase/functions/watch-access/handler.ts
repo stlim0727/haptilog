@@ -14,7 +14,7 @@ const headers = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, apikey, content-type, x-client-info",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 const reply = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers });
@@ -39,17 +39,54 @@ export async function codeHash(
     b.toString(16).padStart(2, "0"),
   ).join("");
 }
+export async function derivedPairingSecret(root: string) {
+  const material = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(root),
+    "HKDF",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new TextEncoder().encode("haptilog-pairing"),
+      info: new TextEncoder().encode("watch-access-v1"),
+    },
+    material,
+    256,
+  );
+  return Array.from(new Uint8Array(bits), (b) =>
+    b.toString(16).padStart(2, "0"),
+  ).join("");
+}
 export function createAccessHandler(deps: Dependencies) {
   return async (req: Request) => {
     if (req.method === "OPTIONS") return new Response("ok", { headers });
+    if (req.method === "GET" && new URL(req.url).searchParams.has("health")) {
+      const override = deps.env("WATCH_PAIRING_SECRET");
+      const ready = Boolean(
+        deps.env("SUPABASE_URL") &&
+        deps.env("SUPABASE_SERVICE_ROLE_KEY") &&
+        (override === undefined || override.length >= 32),
+      );
+      return reply(ready ? 200 : 503, { ready });
+    }
     if (req.method !== "POST") return reply(405, { error: "POST required" });
     const token = req.headers.get("Authorization")?.match(/^Bearer (.+)$/)?.[1];
     if (!token) return reply(401, { error: "Authentication required" });
     try {
       const url = deps.env("SUPABASE_URL"),
-        serviceKey = deps.env("SUPABASE_SERVICE_ROLE_KEY"),
-        secret = deps.env("WATCH_PAIRING_SECRET");
-      if (!url || !serviceKey || !secret || secret.length < 32)
+        serviceKey = deps.env("SUPABASE_SERVICE_ROLE_KEY");
+      if (!url || !serviceKey)
+        return reply(503, { error: "Web access is not configured" });
+      // Use a separate key derived from the runtime's server-only credential.
+      // An explicit pairing secret can be provided for independent rotation.
+      const secret =
+        deps.env("WATCH_PAIRING_SECRET") ??
+        (await derivedPairingSecret(serviceKey));
+      if (secret.length < 32)
         return reply(503, { error: "Web access is not configured" });
       const admin = deps.createClient(url, serviceKey, {
         auth: { persistSession: false },
