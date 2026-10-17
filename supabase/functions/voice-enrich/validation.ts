@@ -22,6 +22,10 @@ export function validateRequest(value: unknown) {
     recording_id: v.recording_id,
     audio_base64: v.audio_base64 as string | undefined,
     audio_mime: (v.audio_mime as string | undefined) ?? "audio/mp4",
+    language:
+      typeof v.language === "string" && ["ko", "en"].includes(v.language)
+        ? (v.language as "ko" | "en")
+        : undefined,
   };
 }
 
