@@ -11,6 +11,8 @@ import org.json.JSONObject
 import java.io.File
 import java.util.UUID
 
+class ReportUploadPaused : Exception()
+
 /** A bounded private queue, entirely separate from recordings and their sync state. */
 object AppReports {
     private val lock = Any()
@@ -70,9 +72,10 @@ object AppReports {
         id
     }
 
-    fun upload(context: Context, client: CloudApi) {
+    fun upload(context: Context, client: CloudApi, canUpload: () -> Boolean = { true }) {
         val queue = synchronized(lock) { files(context) }
         for (file in queue) {
+            if (!canUpload()) throw ReportUploadPaused()
             val report = synchronized(lock) {
                 if (file.exists()) JSONObject(file.readText()) else null
             } ?: continue
@@ -81,13 +84,14 @@ object AppReports {
                 continue
             }
             val (token, owner) = client.authenticate()
+            if (!canUpload()) throw ReportUploadPaused()
             report.put("user_id", owner)
             try {
                 client.request("/rest/v1/app_reports", "POST", report.toString().toByteArray(), token,
                     extra = mapOf("Prefer" to "return=minimal"))
             } catch (failure: CloudException) {
                 // A retry after an acknowledged insert lost its response is idempotent.
-                if (failure.status != 409) throw failure
+                if (failure.status != 409 || failure.databaseCode != "23505") throw failure
             }
             synchronized(lock) { if (file.exists()) check(file.delete()) }
         }

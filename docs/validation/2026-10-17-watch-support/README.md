@@ -31,11 +31,15 @@ Before broader distribution, reconcile Play Data safety and the public privacy n
 
 ## Validation
 
-- assembleDebug, lintDebug, and all 13 unit tests passed.
-- Six support tests cover default-off consent, message/path/foreign-frame redaction, durable failed upload and retry identity, duplicate acknowledgments, selective opt-out deletion, queue bounds and recording preservation, and handler delegation.
+- assembleDebug, lintDebug, and all 17 unit tests passed.
+- Ten support tests cover default-off consent, message/path/foreign-frame redaction, durable failed upload and retry identity, duplicate acknowledgments, selective opt-out deletion, queue bounds and recording preservation, and handler delegation.
 - Embedded Postgres tests include insert-only reporting under broad hosted default grants, owner spoofing denial, signed-out denial, and payload bounds.
 - Hosted rollback-only insert succeeded; live grants confirmed anon insert false, authenticated read false, and server timestamp insertion false.
 - Round Wear OS 5 x86_64 emulator, 454×454 at 320dpi; installed APK includes native x86_64 libraries.
 - Real emulator issue submission while offline showed “Saved on watch … Waiting to send”; after reconnecting, the same report UUID arrived in the hosted inbox and the local queue emptied.
 - Opted into crash reports through the watch UI, used `adb shell am crash com.haptilog.watch` only against the diagnostic emulator build, and reopened the app. Android's fatal crash log was preserved. The hosted crash report contained only exception type, empty app-frame array (system-induced crash), app/build, device model, and Android API. The shell error message was absent. Both synthetic hosted test reports were then deleted.
 - Final Settings → Web access navigation succeeded. At font scale 1.5, the Settings title, installed version/build and Web access label remained readable on the round display (settings-font-1.5.png). No dictation capability is claimed; the issue composer uses the available Wear input method.
+
+## Release review reliability fixes
+
+Support work uses APPEND_OR_REPLACE so a report saved during an active upload gets a successor. Transient network, HTTP 408/429/5xx and recording pauses remain retryable with exponential backoff; permanent authorization/schema errors keep the local file for attention/manual retry. Each report rechecks recording/stopped state before authentication and insertion. A recording-state observer cancels the dedicated client connection when capture begins. CloudClient retains only a bounded structured database error code, never error messages/details. Only HTTP 409 with SQLSTATE 23505 confirms an existing report ID; foreign-key or unclassified conflicts preserve the report. Added regression tests cover foreign-key retention, capture pauses, reports added during upload, and request guards before network access.

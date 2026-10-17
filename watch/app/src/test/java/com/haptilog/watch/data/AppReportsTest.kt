@@ -18,14 +18,15 @@ import java.io.File
 @Config(sdk = [30], application = android.app.Application::class)
 class AppReportsTest {
     private lateinit var context: Context
-    private class FakeCloud(var fail: Int = 0) : CloudApi {
+    private class FakeCloud(var fail: Int = 0, var code: String? = null, val afterRequest: () -> Unit = {}) : CloudApi {
         var report: JSONObject? = null
         override fun authenticate() = "private-token" to "owner"
         override fun request(path: String, method: String, body: ByteArray?, token: String?, contentType: String, extra: Map<String, String>): String {
             assertEquals("/rest/v1/app_reports", path)
             assertEquals("return=minimal", extra["Prefer"])
             report = JSONObject(String(body!!))
-            if (fail != 0) throw CloudException(fail)
+            if (fail != 0) throw CloudException(fail, code)
+            afterRequest()
             return ""
         }
     }
@@ -62,8 +63,44 @@ class AppReportsTest {
     }
     @Test fun duplicateAcknowledgementIsIdempotent() {
         AppReports.save(context, "issue", "Test")
-        AppReports.upload(context, FakeCloud(409))
+        AppReports.upload(context, FakeCloud(409, "23505"))
         assertEquals(0, AppReports.pending(context))
+    }
+    @Test fun foreignKeyAndUnclassifiedConflictsKeepTheLocalCopy() {
+        AppReports.save(context, "issue", "Keep this report")
+        for (code in listOf("23503", null)) {
+            try { AppReports.upload(context, FakeCloud(409, code)); fail("must preserve conflict") } catch (_: CloudException) {}
+            assertEquals(1, AppReports.pending(context))
+        }
+    }
+    @Test fun captureStartingDuringUploadPausesBeforeTheNextReport() {
+        AppReports.save(context, "issue", "First")
+        AppReports.save(context, "issue", "Second")
+        var recording = false
+        try {
+            AppReports.upload(context, FakeCloud(afterRequest = { recording = true })) { !recording }
+            fail("must pause")
+        } catch (_: com.haptilog.watch.support.ReportUploadPaused) {}
+        assertEquals(1, AppReports.pending(context))
+        AppReports.upload(context, FakeCloud()) { true }
+        assertEquals(0, AppReports.pending(context))
+    }
+    @Test fun reportsAddedDuringUploadRemainAvailableToSuccessor() {
+        AppReports.save(context, "issue", "First")
+        AppReports.upload(context, FakeCloud(afterRequest = { AppReports.save(context, "issue", "Added during upload") }))
+        assertEquals(1, AppReports.pending(context))
+        val successor = FakeCloud()
+        AppReports.upload(context, successor)
+        assertEquals("Added during upload", successor.report!!.getString("description"))
+        assertEquals(0, AppReports.pending(context))
+    }
+    @Test fun cancelledOrCaptureBlockedClientCannotStartNetworkRequests() {
+        val cancelled = com.haptilog.watch.sync.CloudClient(context)
+        cancelled.cancelRequests()
+        for (client in listOf(cancelled, com.haptilog.watch.sync.CloudClient(context) { false })) {
+            try { client.request("/rest/v1/app_reports", "POST"); fail("must not start request") }
+            catch (_: java.io.IOException) {}
+        }
     }
     @Test fun disablingDeletesOnlyUnsentCrashesAndRetainsManualIssues() {
         AppReports.setCrashReportsEnabled(context, true)
