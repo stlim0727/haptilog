@@ -36,6 +36,8 @@ export default function RecordingMap({ recordings, selectedId, onSelect }: {
       "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       {
         maxZoom: 19,
+      // Send only our origin for tile-policy compliance; retain no-referrer elsewhere.
+      referrerPolicy: "origin",
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       },

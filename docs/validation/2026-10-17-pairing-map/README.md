@@ -19,3 +19,7 @@ The portal offers an explicit Show map action. Leaflet and its tiles are loaded 
 - The temporary token-protected provider diagnostic was restored out of the serving function immediately; no operator diagnostic route remains.
 
 Screenshots are from diagnostic builds and synthetic fixture data. They do not establish the installed build number on a physical watch or claim the user's two older recordings were already reprocessed.
+
+## Production map policy check
+
+The deployed image CSP initially permitted only same-origin/data images, which blocked the external map tiles even though development-server tests passed. The policy now permits only the explicit tile.openstreetmap.org image origin. Tile images override referrer policy to origin-only for the tile service, while the rest of the page retains no-referrer. A separate acceptance server applies the built _headers file to the compiled portal; its browser test confirms a tile becomes visible and receives only the page origin as Referer. CI runs this production-header test in addition to the eight development/browser flows.
