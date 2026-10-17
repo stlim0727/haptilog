@@ -124,7 +124,17 @@ export function createHandler(deps: Dependencies) {
         return data ? validateResult(data) : null;
       };
       const cached = await cachedResult();
-      if (cached) return reply(200, cached);
+      if (cached) {
+        await admin
+          .from("enrichment_status")
+          .update({
+            state: "COMPLETED",
+            error_code: null,
+            finished_at: new Date().toISOString(),
+          })
+          .eq("recording_id", recording.id);
+        return reply(200, cached);
+      }
       const claimToken = crypto.randomUUID();
       const { data: claimed, error: claimError } = await admin.rpc(
         "claim_voice_enrichment",

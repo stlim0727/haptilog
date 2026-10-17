@@ -361,7 +361,9 @@ function App() {
     0,
   );
   const summary = totals(dateFilteredActiveRecords);
-  const ready = activeRecords.filter((r) => processingState(r) === "Ready").length;
+  const ready = dateFilteredActiveRecords.filter(
+    (r) => processingState(r) === "Ready",
+  ).length;
   function exportCsv() {
     const url = URL.createObjectURL(
       new Blob([csv(filtered)], { type: "text/csv;charset=utf-8" }),
@@ -594,7 +596,7 @@ function App() {
             <section>
               <span className="metric-label">{t.moments_label}</span>
               <strong>
-                {activeRecords.length}
+                {dateFilteredActiveRecords.length}
                 <span className="metric-unit"> {t.recordings_unit}</span>
               </strong>
               <small>
@@ -607,11 +609,11 @@ function App() {
               <span className="metric-label">{t.ready_label}</span>
               <strong>
                 {ready}
-                <span className="metric-unit"> / {activeRecords.length}</span>
+                <span className="metric-unit"> / {dateFilteredActiveRecords.length}</span>
               </strong>
               <small>
                 <span className="status-dot" />{" "}
-                {t.awaiting_label(activeRecords.length - ready)}
+                {t.awaiting_label(dateFilteredActiveRecords.length - ready)}
               </small>
             </section>
           </div>

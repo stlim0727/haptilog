@@ -45,6 +45,7 @@ function fixture({
     finished: [],
     audio: 0,
     input: null,
+    statusUpdates: [],
   };
   const handler = createHandler({
     env: (name) =>
@@ -106,6 +107,13 @@ function fixture({
           assert.equal(options.global, undefined);
           calls.writes.push(value);
           return { error: insertError };
+        },
+        update(value) {
+          calls.statusUpdates.push({ table, value });
+          return this;
+        },
+        then(resolve) {
+          return Promise.resolve({ error: null }).then(resolve);
         },
       }),
     }),
@@ -233,6 +241,10 @@ test("completed retry returns stored enrichment without paying again", async () 
   assert.equal((await handler(request())).status, 200);
   assert.equal(calls.fetch, 0);
   assert.equal(calls.writes.length, 0);
+  assert.equal(calls.statusUpdates.length, 1);
+  assert.equal(calls.statusUpdates[0].table, "enrichment_status");
+  assert.equal(calls.statusUpdates[0].value.state, "COMPLETED");
+  assert.equal(calls.statusUpdates[0].value.error_code, null);
 });
 test("busy claim prevents duplicate provider calls", async () => {
   const { handler, calls } = fixture({ claimed: false });
