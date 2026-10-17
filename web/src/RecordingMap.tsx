@@ -142,8 +142,8 @@ export default function RecordingMap({ recordings, selectedId, onSelect }: {
         recordings have a saved location.{" "}
         {recordings.length - located.length > 0 && "Others remain in the list."}
         {" "}
-        Map tiles load from OpenStreetMap; recording audio and text stay in
-        HaptiLog.
+        Map tiles load from OpenStreetMap. No recording audio or text is sent to
+        the map provider.
       </p>
       {tileError && (
         <p role="status" className="map-caption">
