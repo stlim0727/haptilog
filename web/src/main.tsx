@@ -704,6 +704,7 @@ function Inspector({
   }
   async function retry() {
     if (!supabase) return;
+    onError("");
     setRetryBusy(true);
     const { error } = await supabase.functions.invoke("voice-enrich", {
       body: { recording_id: r.id },

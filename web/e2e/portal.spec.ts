@@ -67,6 +67,7 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
     paired: connected,
     recording: structuredClone(baseRecording) as any,
     retry: 0,
+    retryFailure: null as string | null,
     corrections: [] as any[],
     audioLoads: 0,
     additional: [] as any[],
@@ -119,6 +120,7 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
       });
     } else if (path.endsWith("/voice-enrich")) {
       state.retry++;
+      if (state.retryFailure) return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "AI provider request failed", code: state.retryFailure }) });
       state.recording.voice_enrichments = structuredClone(
         baseRecording.voice_enrichments,
       );
@@ -291,4 +293,16 @@ test("a map download failure leaves the recording list and details usable", asyn
   await expect(page.getByRole("alert")).toContainText("Map unavailable");
   await expect(page.locator(".transcript")).toHaveText("아이스 라떼 5,000원");
   await expect(page.getByRole("button", { name: "Load original audio" })).toBeEnabled();
+});
+
+test("a successful analysis retry clears the previous provider failure", async ({ page }) => {
+  const state = await fixture(page, { failed: true });
+  state.retryFailure = "PROVIDER_RATE_LIMIT";
+  await page.goto("/");
+  await page.getByRole("button", { name: "Retry analysis" }).click();
+  await expect(page.getByRole("alert")).toContainText("quota or rate limit");
+  state.retryFailure = null;
+  await page.getByRole("button", { name: "Retry analysis" }).click();
+  await expect(page.locator(".transcript")).toHaveText("아이스 라떼 5,000원");
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });
