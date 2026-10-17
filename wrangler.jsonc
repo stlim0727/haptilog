@@ -1,0 +1,26 @@
+{
+  "$schema": "web/node_modules/wrangler/config-schema.json",
+  "name": "haptilog",
+  "compatibility_date": "2026-10-16",
+  "previews": {},
+  "build": {
+    "command": "npm --prefix web ci && npm --prefix web run prepare:deploy"
+  },
+  "assets": {
+    "directory": "./web/dist",
+    "not_found_handling": "single-page-application"
+  },
+  "workers_dev": true,
+  "env": {
+    "production": {
+      "name": "haptilog",
+      "workers_dev": false,
+      "routes": [
+        {
+          "pattern": "haptilog.keepory.app",
+          "custom_domain": true
+        }
+      ]
+    }
+  }
+}
