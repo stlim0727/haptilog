@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "haptilog-web-preview",
   "compatibility_date": "2026-10-16",
+  "previews": {},
   "build": {
     "command": "npm run prepare:deploy"
   },
