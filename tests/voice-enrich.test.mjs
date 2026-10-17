@@ -45,6 +45,7 @@ function fixture({
     finished: [],
     audio: 0,
     input: null,
+    statusUpdates: [],
   };
   const handler = createHandler({
     env: (name) =>
@@ -106,6 +107,13 @@ function fixture({
           assert.equal(options.global, undefined);
           calls.writes.push(value);
           return { error: insertError };
+        },
+        update(value) {
+          calls.statusUpdates.push({ table, value });
+          return this;
+        },
+        then(resolve) {
+          return Promise.resolve({ error: null }).then(resolve);
         },
       }),
     }),
@@ -233,6 +241,10 @@ test("completed retry returns stored enrichment without paying again", async () 
   assert.equal((await handler(request())).status, 200);
   assert.equal(calls.fetch, 0);
   assert.equal(calls.writes.length, 0);
+  assert.equal(calls.statusUpdates.length, 1);
+  assert.equal(calls.statusUpdates[0].table, "enrichment_status");
+  assert.equal(calls.statusUpdates[0].value.state, "COMPLETED");
+  assert.equal(calls.statusUpdates[0].value.error_code, null);
 });
 test("busy claim prevents duplicate provider calls", async () => {
   const { handler, calls } = fixture({ claimed: false });
@@ -311,9 +323,38 @@ test("language option customizes the provider system instruction", async () => {
     request({ recording_id: payload.recording_id, language: "ko" }),
   );
   assert.equal(r.status, 200);
+  assert.equal(calls.writes[0].pipeline_version, "v1:ko");
   assert.ok(
     calls.input.systemInstruction.parts[0].text.includes(
       "한국어로 요약 및 세부사항 작성",
     ),
   );
+  assert.ok(
+    calls.input.systemInstruction.parts[0].text.includes(
+      "Keep all JSON property keys strictly in English",
+    ),
+  );
+
+  const enFixture = fixture();
+  const enRes = await enFixture.handler(
+    request({ recording_id: payload.recording_id, language: "en" }),
+  );
+  assert.equal(enRes.status, 200);
+  assert.equal(enFixture.calls.writes[0].pipeline_version, "v1:en");
+  assert.ok(
+    enFixture.calls.input.systemInstruction.parts[0].text.includes(
+      "Summarize and produce user-facing details in English",
+    ),
+  );
+});
+
+test("rejects unsupported language values before provider call", async () => {
+  for (const badLang of ["kr", "KO", "es", "fr", 123, ""]) {
+    const { handler, calls } = fixture();
+    const r = await handler(
+      request({ recording_id: payload.recording_id, language: badLang }),
+    );
+    assert.equal(r.status, 400);
+    assert.equal(calls.fetch, 0);
+  }
 });

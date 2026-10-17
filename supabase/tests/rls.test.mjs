@@ -43,7 +43,7 @@ for (const name of migrationNames) {
 }
 assert.ok(checkedUpgrade, 'Existing portal installations need a follow-up privilege migration');
 await db.exec(`delete from public.recordings where id='${upgradeRecording}';`);
-await db.exec(`grant all on public.recordings, public.voice_enrichments to service_role;
+await db.exec(`grant all on public.recordings, public.voice_enrichments, storage.objects to service_role;
 set role authenticated; set request.jwt.claim.sub='${owner}';`);
 await db.exec(`insert into public.recordings(id,user_id,audio_path) values ('${rec}','${owner}','${owner}/${rec}.m4a');`);
 await assert.rejects(db.exec(`insert into public.recordings(user_id) values ('${other}');`));
@@ -100,8 +100,24 @@ await db.exec(`update public.recording_corrections set completed_tasks='["Buy co
 assert.equal((await db.query('select amount from public.recording_corrections')).rows[0].amount,'5000');
 await db.exec(`update public.recordings set deleted_at=now() where id='${rec}';`);
 assert.ok((await db.query(`select deleted_at from public.recordings where id='${rec}'`)).rows[0].deleted_at);
+// Paired session can restore by setting deleted_at back to null
 await db.exec(`update public.recordings set deleted_at=null where id='${rec}';`);
 assert.equal((await db.query(`select deleted_at from public.recordings where id='${rec}'`)).rows[0].deleted_at, null);
+// Paired session cannot mutate immutable columns (e.g. latitude or audio_path)
+await assert.rejects(db.exec(`update public.recordings set latitude=37.5665 where id='${rec}';`), /Paired sessions can only update deleted_at/);
+// Paired session cannot delete an active recording (deleted_at is null)
+assert.equal((await db.query(`delete from public.recordings where id='${rec}' returning id`)).rows.length, 0);
+// Nor can it delete its audio file while active
+assert.equal((await db.query(`delete from storage.objects where name='${owner}/${rec}.m4a' returning name`)).rows.length, 0);
+// Once moved to trash, audio deletion and recording hard-delete are permitted
+await db.exec(`update public.recordings set deleted_at=now() where id='${rec}';`);
+await db.exec(`delete from storage.objects where name='${owner}/${rec}.m4a';`);
+assert.equal((await db.query(`delete from public.recordings where id='${rec}' returning id`)).rows.length, 1);
+// Re-insert for remaining connection tests
+await db.exec(`reset role; set role service_role;
+  insert into public.recordings(id,user_id,audio_path) values ('${rec}','${owner}','${owner}/${rec}.m4a');
+  insert into storage.objects(bucket_id,name) values ('recordings','${owner}/${rec}.m4a');
+  set role authenticated; set request.jwt.claims='{"session_id":"${session}"}';`);
 await db.exec(`set request.jwt.claims='{"session_id":"${secondSession}"}';`);
 assert.equal((await db.query('select * from public.recordings')).rows.length,0);
 assert.equal((await db.query('select * from storage.objects')).rows.length,0);
