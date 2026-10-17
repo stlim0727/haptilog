@@ -28,6 +28,8 @@ function fixture({
   insertError = null,
   providerResult = result,
   providerStatus = 200,
+  providerStatuses = [],
+  model = "configured-model",
   cached = null,
   claimed = true,
   stored = true,
@@ -36,6 +38,7 @@ function fixture({
 } = {}) {
   const calls = {
     fetch: 0,
+    urls: [],
     writes: [],
     filters: [],
     released: 0,
@@ -46,10 +49,10 @@ function fixture({
   const handler = createHandler({
     env: (name) =>
       name === "GEMINI_MODEL"
-        ? "configured-model"
+        ? model
         : name === "PIPELINE_VERSION"
-          ? undefined
-          : "configured",
+        ? undefined
+        : "configured",
     createClient: (_url, _key, options) => ({
       auth: {
         getUser: async () => ({
@@ -86,19 +89,16 @@ function fixture({
         },
         async maybeSingle() {
           return {
-            data:
-              table === "voice_enrichments"
-                ? cached
-                : owner
-                  ? {
-                      id: payload.recording_id,
-                      user_id: ownerId,
-                      latitude: 37,
-                      audio_path: stored
-                        ? `${ownerId}/${payload.recording_id}.m4a`
-                        : null,
-                    }
+            data: table === "voice_enrichments" ? cached : owner
+              ? {
+                id: payload.recording_id,
+                user_id: ownerId,
+                latitude: 37,
+                audio_path: stored
+                  ? `${ownerId}/${payload.recording_id}.m4a`
                   : null,
+              }
+              : null,
             error: null,
           };
         },
@@ -110,6 +110,7 @@ function fixture({
       }),
     }),
     fetch: async (_url, options) => {
+      calls.urls.push(_url);
       calls.fetch++;
       calls.input = JSON.parse(options.body);
       return new Response(
@@ -118,12 +119,40 @@ function fixture({
             { content: { parts: [{ text: JSON.stringify(providerResult) }] } },
           ],
         }),
-        { status: providerStatus },
+        { status: providerStatuses[calls.fetch - 1] ?? providerStatus },
       );
     },
   });
   return { handler, calls };
 }
+test("configured 2.5 Flash 404 falls back once using the same stored original", async () => {
+  const { handler, calls } = fixture({
+    model: "gemini-2.5-flash",
+    providerStatuses: [404, 200],
+  });
+  assert.equal((await handler(request())).status, 200);
+  assert.equal(calls.fetch, 2);
+  assert.match(calls.urls[1], /gemini-flash-latest:generateContent$/);
+  assert.equal(calls.audio, 1);
+  assert.equal(calls.writes.length, 1);
+  assert.equal(calls.finished[0].p_error, null);
+});
+test("quota and custom-model failures are actionable and never fall back", async () => {
+  for (
+    const [model, providerStatus, code] of [
+      ["gemini-2.5-flash", 429, "PROVIDER_RATE_LIMIT"],
+      ["custom-model", 404, "MODEL_UNAVAILABLE"],
+      ["gemini-2.5-flash", 403, "PROVIDER_CONFIGURATION"],
+    ]
+  ) {
+    const { handler, calls } = fixture({ model, providerStatus });
+    const response = await handler(request());
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).code, code);
+    assert.equal(calls.fetch, 1);
+    assert.equal(calls.finished[0].p_error, code);
+  }
+});
 test("rejects missing and invalid authentication without paid requests", async () => {
   for (const token of [null, "invalid"]) {
     const { handler, calls } = fixture({ auth: false });
@@ -158,10 +187,12 @@ test("database failures are not reported as successful enrichment", async () => 
   assert.equal((await handler(request())).status, 500);
 });
 test("invalid AI output and provider failures never reach the database", async () => {
-  for (const options of [
-    { providerResult: { ...result, intent_type: "INVALID" } },
-    { providerStatus: 429 },
-  ]) {
+  for (
+    const options of [
+      { providerResult: { ...result, intent_type: "INVALID" } },
+      { providerStatus: 429 },
+    ]
+  ) {
     const { handler, calls } = fixture(options);
     assert.equal((await handler(request())).status, 502);
     assert.equal(calls.writes.length, 0);

@@ -1121,3 +1121,15 @@ audio {
     margin-top: 20px;
   }
 }
+.map-section { grid-column: 1 / -1; border: 1px solid #27272a; border-radius: 20px; padding: 20px; margin-bottom: 8px; background: #111113; }
+.map-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.map-heading h2 { margin: 0 0 6px; font-size: 20px; }
+.map-heading p, .map-caption, .map-empty { font-size: 13px; color: #a1a1aa; line-height: 1.6; }
+.map-heading p { margin: 0; }
+.recording-map { width: 100%; height: 380px; border-radius: 14px; z-index: 0; }
+.voice-marker { display: grid; place-items: center; background: #233f32; color: white; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px #0004; font-weight: 700; }
+.voice-marker.active { background: #b85625; }
+.voice-marker:focus-visible { outline: 3px solid #e2a63b; outline-offset: 3px; }
+.map-recordings { display: grid; gap: 8px; max-height: 180px; overflow: auto; }
+.map-recordings button { text-align: left; color: #202020; border: 0; border-radius: 8px; padding: 10px; background: #f4f4ee; cursor: pointer; }
+@media (max-width: 650px) { .map-heading { align-items: flex-start; flex-direction: column; } .recording-map { height: 280px; } .map-section { padding: 14px; } }
