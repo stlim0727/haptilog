@@ -13,9 +13,13 @@ The portal offers an explicit Show map action. Leaflet and its tiles are loaded 
 - Watch assembleDebug, lintDebug and 19 unit tests passed, including new-versus-old grant timestamps and expiry boundaries.
 - 26 Edge Function authorization/validation tests passed, including one-time 404 fallback and no fallback on quota/configuration/custom-model errors; Deno typecheck passed.
 - 15 web unit/config/credential-boundary tests and production build passed.
-- Browser tests cover pairing/reload, corrections/CSV, original audio/retry, revocation, desktop/mobile sizing, grouped-pin voice selection and unlocated recordings. A separate live-tile run verified actual OpenStreetMap tile loading with synthetic Seoul coordinates; map-mobile.png shows sample records, not user records.
+- Eight browser tests cover pairing/reload, corrections/CSV, original audio/retry, revocation, desktop/mobile sizing, grouped-pin voice selection, unlocated recordings, optional-map download failure, and clearing a prior provider error after a successful retry. A separate live-tile run verified actual OpenStreetMap tile loading with synthetic Seoul coordinates; map-mobile.png shows sample records, not user records.
 - Against the live backend, a fresh synthetic browser redeemed a code issued by the debug Wear OS emulator. The watch removed the numeric code and showed Browser connected (pairing-confirmed.png). The test grant was revoked, session logged out, and synthetic browser account deleted.
 - Generated a 1.5-second MP4 tone without microphone/user audio, uploaded through the normal authenticated API as a new synthetic owner, and received a validated saved enrichment from the repaired live function. The synthetic recording, storage object, enrichment and account were cleaned up.
 - The temporary token-protected provider diagnostic was restored out of the serving function immediately; no operator diagnostic route remains.
 
 Screenshots are from diagnostic builds and synthetic fixture data. They do not establish the installed build number on a physical watch or claim the user's two older recordings were already reprocessed.
+
+## Production map policy check
+
+The deployed image CSP initially permitted only same-origin/data images, which blocked the external map tiles even though development-server tests passed. The policy now permits only the explicit tile.openstreetmap.org image origin. Tile images override referrer policy to origin-only for the tile service, while the rest of the page retains no-referrer. A separate acceptance server applies the built _headers file to the compiled portal; its browser test confirms a tile becomes visible and receives only the page origin as Referer. CI runs this production-header test in addition to the eight development/browser flows.

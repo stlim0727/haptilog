@@ -10,6 +10,7 @@
     "test": "node --experimental-strip-types --test src/*.test.mjs tests/*.test.mjs",
     "deploy": "node scripts/deploy.mjs",
     "test:e2e": "playwright test",
+    "test:production": "playwright test --config playwright.production.config.ts",
     "deploy:production": "node scripts/deploy.mjs --production",
     "check:backend": "node scripts/backend-readiness.mjs",
     "prepare:deploy": "node scripts/deploy.mjs --build-only"
