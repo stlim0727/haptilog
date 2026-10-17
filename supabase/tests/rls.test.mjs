@@ -98,6 +98,10 @@ await assert.rejects(db.exec(`insert into public.recordings(user_id) values('${o
 await db.exec(`insert into public.recording_corrections(recording_id,amount,currency) values('${rec}',5000,'KRW');`);
 await db.exec(`update public.recording_corrections set completed_tasks='["Buy coffee"]' where recording_id='${rec}';`);
 assert.equal((await db.query('select amount from public.recording_corrections')).rows[0].amount,'5000');
+await db.exec(`update public.recordings set deleted_at=now() where id='${rec}';`);
+assert.ok((await db.query(`select deleted_at from public.recordings where id='${rec}'`)).rows[0].deleted_at);
+await db.exec(`update public.recordings set deleted_at=null where id='${rec}';`);
+assert.equal((await db.query(`select deleted_at from public.recordings where id='${rec}'`)).rows[0].deleted_at, null);
 await db.exec(`set request.jwt.claims='{"session_id":"${secondSession}"}';`);
 assert.equal((await db.query('select * from public.recordings')).rows.length,0);
 assert.equal((await db.query('select * from storage.objects')).rows.length,0);

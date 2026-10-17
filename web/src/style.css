@@ -1141,3 +1141,125 @@ audio {
 .map-recordings { display: grid; gap: 8px; max-height: 180px; overflow: auto; }
 .map-recordings button { text-align: left; color: #202020; border: 0; border-radius: 8px; padding: 10px; background: #f4f4ee; cursor: pointer; }
 @media (max-width: 650px) { .map-heading { align-items: flex-start; flex-direction: column; } .recording-map { height: 280px; } .map-section { padding: 14px; } }
+
+/* Wastebin, Toast, and Restore UX */
+.toast-banner {
+  margin: 18px auto;
+  padding: 12px 18px;
+  border: 1px solid #2c4235;
+  background: #15221b;
+  color: #a5c5ad;
+  max-width: 1200px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-radius: 6px;
+}
+.toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.toast-banner button.undo-button {
+  background: transparent;
+  color: #fecdd3;
+  text-decoration: underline;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.toast-banner button.dismiss-button {
+  background: transparent;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+.trashed-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #241a1a;
+  border: 1px solid #5a2e2e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #fca5a5;
+}
+.trashed-banner p {
+  font-size: 11px;
+  color: #f87171;
+  margin: 2px 0 0;
+}
+.trash-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.danger-button {
+  background: #501b1b;
+  color: #fca5a5;
+  border: 1px solid #7f1d1d;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.danger-button:hover:not(:disabled) {
+  background: #7f1d1d;
+  color: #fff;
+}
+.inspector-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.trash-trigger {
+  color: #8d8d9a;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.trash-trigger:hover {
+  color: #fca5a5;
+  background: #2b1820;
+  border-color: #5a2e2e;
+}
+.trash-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.trash-tab.active {
+  color: #fca5a5 !important;
+  border-color: #7f1d1d !important;
+}
+.feed-heading-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.empty-trash-btn {
+  font-size: 11px;
+  color: #f87171;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.empty-trash-btn:hover {
+  color: #fca5a5;
+}
+
