@@ -14,7 +14,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class CloudException(val status: Int) : Exception("Cloud request failed ($status)")
+class CloudException(val status: Int, val databaseCode: String? = null) : Exception("Cloud request failed ($status)")
 class AuthSessionException : Exception("Stored session cannot be opened")
 
 /** Small REST client: no privileged key is ever included in the watch build. */
@@ -24,7 +24,16 @@ interface CloudApi {
                 contentType: String = "application/json", extra: Map<String, String> = emptyMap()): String
 }
 
-class CloudClient(context: Context) : CloudApi {
+class CloudClient(context: Context, private val requestsAllowed: () -> Boolean = { true }) : CloudApi {
+    @Volatile private var activeConnection: HttpURLConnection? = null
+    @Volatile private var cancelled = false
+    fun cancelRequests() {
+        cancelled = true
+        activeConnection?.disconnect()
+    }
+    private fun requireAllowed() {
+        if (cancelled || !requestsAllowed()) throw java.io.IOException("Cloud request paused")
+    }
     private val prefs = context.getSharedPreferences("cloud_session", Context.MODE_PRIVATE)
     private val url = BuildConfig.SUPABASE_URL.trimEnd('/')
     private val apiKey = BuildConfig.SUPABASE_PUBLISHABLE_KEY
@@ -73,8 +82,11 @@ class CloudClient(context: Context) : CloudApi {
     }
     override fun request(path: String, method: String, body: ByteArray?, token: String?,
                 contentType: String, extra: Map<String, String>): String {
+        requireAllowed()
         val connection = URL(url + path).openConnection() as HttpURLConnection
         try {
+            activeConnection = connection
+            requireAllowed()
             connection.requestMethod = method
             connection.connectTimeout = 15_000
             connection.readTimeout = 90_000
@@ -84,13 +96,30 @@ class CloudClient(context: Context) : CloudApi {
             connection.setRequestProperty("Content-Type", contentType)
             extra.forEach { (key, value) -> connection.setRequestProperty(key, value) }
             if (body != null) {
+                requireAllowed()
                 connection.doOutput = true
                 connection.setFixedLengthStreamingMode(body.size)
                 connection.outputStream.use { it.write(body) }
             }
+            requireAllowed()
             val code = connection.responseCode
-            if (code !in 200..299) throw CloudException(code)
+            if (code !in 200..299) {
+                // Keep only the structured error code, never server messages/details.
+                val databaseCode = runCatching {
+                    val error = connection.errorStream?.bufferedReader()?.use { reader ->
+                        buildString {
+                            repeat(4096) {
+                                val next = reader.read()
+                                if (next == -1) return@buildString
+                                append(next.toChar())
+                            }
+                        }
+                    }
+                    error?.let { JSONObject(it).optString("code").takeIf { value -> value.matches(Regex("[A-Z0-9]{5,16}")) } }
+                }.getOrNull()
+                throw CloudException(code, databaseCode)
+            }
             return connection.inputStream.bufferedReader().use { it.readText() }
-        } finally { connection.disconnect() }
+        } finally { activeConnection = null; connection.disconnect() }
     }
 }

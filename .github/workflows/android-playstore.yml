@@ -69,7 +69,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: haptilog-wear-release-bundle
-          path: watch/app/build/outputs/bundle/release/*.aab
+          path: |
+            watch/app/build/outputs/bundle/release/*.aab
+            watch/app/build/outputs/mapping/release/mapping.txt
           retention-days: 30
 
       - name: Upload to Google Play Console
@@ -78,5 +80,6 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.haptilog.watch
           releaseFiles: watch/app/build/outputs/bundle/release/*.aab
-          track: ${{ github.event.inputs.track || 'wear:internal' }}
+          tracks: ${{ github.event.inputs.track || 'wear:internal' }}
+          mappingFile: watch/app/build/outputs/mapping/release/mapping.txt
           status: ${{ github.event.inputs.status || 'completed' }}

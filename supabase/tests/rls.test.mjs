@@ -126,5 +126,21 @@ assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${se
 await db.exec(`reset role; set role authenticated; set request.jwt.claim.sub='${owner}';`);
 await db.exec(`insert into storage.objects(bucket_id,name) values('recordings','${owner}/orphan.m4a');`);
 await db.exec(`insert into storage.objects(bucket_id,name) values('recordings','${owner}/orphan.m4a') on conflict(bucket_id,name) do update set name=excluded.name;`);
+// Support reports are insert-only and cannot be spoofed or read by another watch.
+const report = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+await db.exec(`insert into public.app_reports(id,user_id,kind,description,diagnostics) values('${report}','${owner}','issue','test','{}');`);
+await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,diagnostics) values(gen_random_uuid(),'${other}','crash','{}');`));
+await assert.rejects(db.exec(`select * from public.app_reports;`));
+await assert.rejects(db.exec(`update public.app_reports set description='changed';`));
+await assert.rejects(db.exec(`delete from public.app_reports;`));
+await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,description,diagnostics) values(gen_random_uuid(),'${owner}','issue',repeat('x',1001),'{}');`));
+await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,diagnostics) values(gen_random_uuid(),'${owner}','crash',jsonb_build_object('oversize',repeat('x',8192)));`));
+await db.exec(`set role anon;`);
+await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,diagnostics) values(gen_random_uuid(),'${owner}','crash','{}');`));
+await assert.rejects(db.exec(`select * from public.app_reports;`));
+await db.exec(`set role authenticated; set request.jwt.claim.sub='${other}';`);
+await assert.rejects(db.exec(`select * from public.app_reports;`));
+await db.exec(`reset role;`);
+assert.equal((await db.query(`select count(*)::int as n from public.app_reports where id='${report}'`)).rows[0].n, 1);
 await db.close();
 console.log('PASS: pairing, expiry, replay, brute-force lockout, session binding, immediate revocation, corrections, and migrations, ownership isolation, storage upsert, privileged writes, retry uniqueness and lease expiry');
