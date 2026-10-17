@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#09090b" />
+    <title>HaptiLog — Privacy Policy</title>
+    <style>
+      :root {
+        --bg: #09090b;
+        --card-bg: #131316;
+        --border: #27272a;
+        --text: #e4e4e7;
+        --text-muted: #a1a1aa;
+        --heading: #fafafa;
+        --accent: #38bdf8;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background-color: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        line-height: 1.6;
+        padding: 2rem 1rem;
+      }
+      .container {
+        max-width: 760px;
+        margin: 0 auto;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 2.5rem 2rem;
+      }
+      header {
+        margin-bottom: 2rem;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 1.5rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+        color: var(--heading);
+        margin-bottom: 0.5rem;
+      }
+      .meta {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+      }
+      h2 {
+        font-size: 1.25rem;
+        color: var(--heading);
+        margin-top: 1.75rem;
+        margin-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.35rem;
+      }
+      h3 {
+        font-size: 1rem;
+        color: var(--heading);
+        margin-top: 1.25rem;
+        margin-bottom: 0.5rem;
+      }
+      p, ul {
+        margin-bottom: 1rem;
+        color: var(--text);
+      }
+      ul {
+        padding-left: 1.5rem;
+      }
+      li {
+        margin-bottom: 0.5rem;
+      }
+      strong {
+        color: var(--heading);
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .notice-box {
+        background: rgba(56, 189, 248, 0.08);
+        border: 1px solid rgba(56, 189, 248, 0.25);
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+      }
+      footer {
+        margin-top: 2.5rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid var(--border);
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>HaptiLog Privacy Policy</h1>
+        <div class="meta">
+          <strong>Effective Date:</strong> October 17, 2026 &bull; 
+          <strong>Application:</strong> HaptiLog for Wear OS (<code>com.haptilog.watch</code>) &amp; Web Portal
+        </div>
+      </header>
+
+      <div class="notice-box">
+        HaptiLog is designed around <strong>local-first capture</strong> and <strong>privacy by design</strong>. Audio memos are recorded only when explicitly initiated by the user, stored locally on watch flash memory, and never sold or shared with advertising third parties.
+      </div>
+
+      <h2>1. Information We Collect and Process</h2>
+
+      <h3>A. Audio Recordings (Microphone)</h3>
+      <p>
+        HaptiLog records audio strictly when you explicitly tap to start a recording on the watch display, Wear OS Tile, or Complication.
+      </p>
+      <ul>
+        <li><strong>Local Storage:</strong> Audio files (AAC/M4A) are saved to your watch’s private application storage immediately. Offline voice logging works without an internet connection.</li>
+        <li><strong>Cloud Sync &amp; AI Processing:</strong> If cloud sync is active, audio files are securely uploaded via encrypted HTTPS to our backend (Supabase) to generate text transcriptions and structured summaries (expense amounts, tasks, journal notes) using Google Gemini AI.</li>
+        <li><strong>No Continuous Listening:</strong> HaptiLog does not listen passively, record in the background without user initiation, or collect ambient audio.</li>
+      </ul>
+
+      <h3>B. Location Data (GPS)</h3>
+      <p>
+        When location permission is granted, HaptiLog captures a single geographic snapshot (latitude, longitude, altitude, and velocity) at the moment of recording.
+      </p>
+      <ul>
+        <li><strong>Purpose:</strong> Geotagging your voice memos (e.g. marking where an expense was incurred, field notes taken, or running intervals logged).</li>
+        <li><strong>Scope:</strong> Location capture runs exclusively during active recording sessions and stops immediately when recording terminates. We do not track your real-time location outside active recording sessions.</li>
+      </ul>
+
+      <h3>C. Optional Diagnostic &amp; Crash Reports</h3>
+      <p>
+        Diagnostic reporting is <strong>off by default</strong>. If you explicitly opt in through Watch Settings:
+      </p>
+      <ul>
+        <li>Only high-level uncaught JVM exception class names, app build version, device model, and Android OS level are collected to fix bugs.</li>
+        <li><strong>Strict Exclusions:</strong> Crash reports <em>never</em> contain audio data, transcripts, GPS coordinates, file paths, device IDs, or exception message strings.</li>
+      </ul>
+
+      <h2>2. How We Use and Share Information</h2>
+      <p>We use captured data exclusively to deliver HaptiLog's core voice logging, transcription, and contextual organization features:</p>
+      <ul>
+        <li><strong>AI Transcription &amp; Structuring:</strong> Processed via Google Gemini Multimodal APIs through secure edge functions.</li>
+        <li><strong>No Advertising or Profiling:</strong> We do not serve advertisements, sell user data, or share personal information with data brokers or tracking networks.</li>
+        <li><strong>Map Display:</strong> When reviewing locations on the web portal, map tiles are provided by OpenStreetMap. Only the displayed map coordinates and page origin are sent to tile servers; no user voice, audio, or transcript data is transmitted.</li>
+      </ul>
+
+      <h2>3. Data Storage, Security &amp; Retention</h2>
+      <ul>
+        <li><strong>Encryption in Transit:</strong> All communications between the watch, web portal, and cloud services use TLS/HTTPS encryption.</li>
+        <li><strong>Access Control:</strong> Data stored in our database is protected using PostgreSQL Row-Level Security (RLS) ensuring each user can access only their own records.</li>
+        <li><strong>Web Pairing Security:</strong> Web portal connections authenticate using short-lived HMAC-verified codes and cryptographically scoped session tokens.</li>
+        <li><strong>User Deletion:</strong> You can delete recordings or revoke web browser access at any time directly through the app and web portal.</li>
+      </ul>
+
+      <h2>4. Permissions Used by HaptiLog</h2>
+      <ul>
+        <li><code>RECORD_AUDIO</code>: Capturing voice memos initiated by the user.</li>
+        <li><code>ACCESS_FINE_LOCATION</code> &amp; <code>ACCESS_COARSE_LOCATION</code>: Geotagging memos with location coordinates at recording time.</li>
+        <li><code>FOREGROUND_SERVICE_MICROPHONE</code> &amp; <code>FOREGROUND_SERVICE_LOCATION</code>: Maintaining uninterrupted recording with an ongoing status notification while the watch screen enters ambient sleep mode.</li>
+        <li><code>VIBRATE</code>: Providing tactile living pulse feedback during recording.</li>
+        <li><code>WAKE_LOCK</code>: Keeping the CPU awake strictly during active recording.</li>
+      </ul>
+
+      <h2>5. Contact Us</h2>
+      <p>
+        If you have questions, feedback, or data privacy requests regarding HaptiLog, please contact us at:
+      </p>
+      <p>
+        <strong>Email:</strong> <a href="mailto:support@keepory.app">support@keepory.app</a><br />
+        <strong>Website:</strong> <a href="https://haptilog.keepory.app">https://haptilog.keepory.app</a>
+      </p>
+
+      <footer>
+        &copy; 2026 HaptiLog. All rights reserved.
+      </footer>
+    </div>
+  </body>
+</html>

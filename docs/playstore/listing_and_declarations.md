@@ -73,6 +73,15 @@ HaptiLog is an eyes-free, haptic-first voice logger designed exclusively for Wea
 - Wear OS 3.0 and above (Samsung Galaxy Watch 4/5/6/7/Ultra, Google Pixel Watch 1/2/3).
 ```
 
+### 1.4 Graphic Assets & Privacy URL (그래픽 이미지 및 개인정보처리방침)
+
+- **앱 아이콘 (App Icon)**: 512×512 PNG (`haptilog_icon_512.png`)
+- **그래픽 이미지 (Feature Graphic, 필수)**: 1024×500 PNG / JPEG (스토어 상단 배너 이미지)
+- **Wear OS 스크린샷 (Wear OS Screenshots, 최소 1개)**: `screenshots/` 디렉터리에 라운드 워치 스크린샷 5종 준비 완료
+- **개인정보처리방침 URL (Privacy Policy URL, 필수)**:
+  `https://haptilog.keepory.app/privacy.html`
+  *(마이크 음성 녹음 및 위치 권한을 사용하는 앱은 공개 접근 가능한 유효한 URL 필수 입력)*
+
 ---
 
 ## 2. Policy Declarations (정책 선언)
@@ -85,7 +94,20 @@ HaptiLog is an eyes-free, haptic-first voice logger designed exclusively for Wea
 - **선택값**: **"내 앱은 건강 관련 기능을 제공하지 않습니다"** (My app does not provide health-related features)
 - **사유**: HaptiLog는 생체 측정 센서(ECG, 심박수, 혈압, 체성분)나 의료 기기를 사용하지 않으며, 임상적/의학적 진단이나 건강 관리를 목적으로 하지 않습니다.
 
-### 2.3 포그라운드 서비스 권한 선언 (Foreground Service Permissions)
+### 2.3 데이터 보안 (Data Safety Form)
+- **수집 및 공유 여부**: 수집함 (데이터가 암호화되어 전송됨, 사용자가 삭제 요청 가능)
+- **수집 항목**:
+  1. **오디오 녹음(Audio recordings)**:
+     - 목적: 앱 기능(사용자가 시작한 음성 메모 캡처, 로컬 저장 및 선택적 동기화/AI 텍스트 변환)
+     - 수집/공유: 사용자 계정에 연결됨, 데이터 암호화 전송
+  2. **정확한 위치 / 대략적인 위치(Location - Precise & Approximate)**:
+     - 목적: 앱 기능(녹음 시점의 GPS 좌표, 고도, 속도를 메모 맥락으로 태깅)
+     - 수집/공유: 녹음 세션 중에만 일회성 스냅샷 수집, 실시간 백그라운드 추적 없음
+  3. **앱 정보 및 성능 (진단 / 비정상 종료 로그)**:
+     - 목적: 분석 및 오류 수정 (선택적 동기화 옵트인 사용자만 수집)
+     - 수집/공유: 예외 클래스명 및 스택 프레임 위치만 수집 (오디오, 위치, 개인 식별자 일체 배제)
+
+### 2.4 포그라운드 서비스 권한 선언 (Foreground Service Permissions)
 
 HaptiLog 매니페스트에 등록된 포그라운드 서비스 타입:
 - `android.permission.FOREGROUND_SERVICE_MICROPHONE`
@@ -119,15 +141,32 @@ HaptiLog 매니페스트에 등록된 포그라운드 서비스 타입:
 
 ---
 
-## 3. Country & Track Release Settings (국가 및 트랙 설정)
+## 3. Production Release & Promotion Guide (프로덕션 출시 및 승격 가이드)
 
-### 국가/지역 추가 (Add Countries/Regions)
-1. Play Console 왼쪽 메뉴: **프로덕션(Production)** [또는 해당 트랙] 이동
-2. 상단 탭에서 **'국가/지역(Countries/regions)'** 클릭
-3. **'국가/지역 추가(Add countries/regions)'** 버튼 클릭
-4. **전체 선택** (또는 대한민국 포함 원하는 국가 체크) 후 **'저장'** 클릭
+### 3.1 폼팩터 전용 트랙 선택 (Crucial: Wear OS Track Selection)
+- **오류 증상**: `"This APK or bundle requires the Wear OS system feature android.hardware.type.watch. To publish this release on the current track, remove this artifact."`
+- **원인**: Play Console의 기본 트랙("휴대전화, 태블릿 및 ChromeOS")에 Wear OS 전용 번들을 출시/승격하려 할 때 발생.
+- **해결 방법**:
+  1. Play Console 좌측 메뉴: **프로덕션(Production)** 이동
+  2. 화면 우측 상단의 **기기 유형(Form factor) 드롭다운** 클릭
+  3. **"Wear OS 전용(Wear OS only)"** 트랙을 선택한 후 **'새 버전 만들기(Create new release)'** 또는 **'출시 승격(Promote release)'** 진행
+  4. CI/CD 워크플로(`.github/workflows/android-playstore.yml`)를 통해 배포할 때는 트랙 이름을 `wear:production`으로 지정 (워크플로에서 `production` 입력 시 `wear:production`으로 자동 보정됨)
 
-### 개인 개발자 계정 대시보드 요건 (Personal Account Requirements)
-- 2023년 11월 이후 생성된 개인 개발자 계정은 프로덕션(Production)에 바로 출시할 수 없습니다.
-- 대시보드의 **"비공개 테스트(Closed testing)"**에서 20명 이상의 테스터를 등록하고 14일간 연속 테스트를 완료한 후 "프로덕션 신청"을 진행해야 합니다.
+### 3.2 국가/지역 추가 (Add Countries/Regions)
+- **오류 증상**: Wear OS 전용 트랙에서 국가/지역 추가 버튼이 비활성화되어 출시를 진행할 수 없음.
+- **해결 방법**:
+  1. Play Console 왼쪽 메뉴: **프로덕션(Production)** 대시보드로 이동
+  2. 상단 탭에서 **'국가/지역(Countries/regions)'** 클릭
+  3. **'국가/지역 추가(Add countries/regions)'** 버튼 클릭
+  4. **전체 선택** (또는 대한민국 포함 원하는 국가 체크) 후 **'저장'** 클릭
+  5. 휴대전화 트랙에 국가를 추가하면 Wear OS 폼팩터 트랙의 국가 배포도 함께 잠금 해제됩니다.
+
+### 3.3 개인 개발자 계정 필수 요건 (Personal Account Closed Testing Rule)
+- 2023년 11월 13일 이후 생성된 개인 개발자 계정은 프로덕션(Production)에 바로 출시할 수 없습니다.
+- **진행 절차**:
+  1. Play Console 좌측: **테스트 > 비공개 테스트(Closed testing)** 트랙 생성
+  2. 워치 AAB를 비공개 테스트 트랙에 출시
+  3. 구글 그룹스 또는 이메일 목록으로 **최소 12명 이상의 실제 테스터** 초대 및 등록
+  4. 테스터들이 **14일간 연속**으로 테스트에 참여(앱 설치 및 실행 유지)
+  5. 14일 경과 후 대시보드의 **"프로덕션 신청(Apply for production)"** 버튼 활성화 -> 피드백 요약 및 질문 답변 제출 후 구글 심사 승인 대기
 - 내부 테스트(Internal testing) 트랙은 심사 및 14일 요건 없이 즉시 테스터에게 배포 가능합니다.

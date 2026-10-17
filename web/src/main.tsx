@@ -642,7 +642,12 @@ function App() {
         </main>
       )}
       <footer>
-        <span>HaptiLog · A little less to remember.</span>
+        <span>
+          HaptiLog · A little less to remember. ·{" "}
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer">
+            Privacy Policy
+          </a>
+        </span>
         <span>CAPTURE QUIETLY. COME BACK CLEARLY.</span>
       </footer>
     </>

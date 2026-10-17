@@ -31,3 +31,15 @@ test("production headers allow map tiles with origin-only referrer", async ({ pa
   expect(referrers.every(value => value === "http://127.0.0.1:4179/")).toBe(true);
   await expect(page.getByRole("region", { name: "Map of recording locations" })).toBeVisible();
 });
+
+test("privacy policy is accessible under production headers and linked from portal", async ({ page }) => {
+  const response = await page.goto("/privacy.html");
+  expect(response?.status()).toBe(200);
+  expect(response?.headers()["content-type"]).toContain("text/html");
+  expect(response?.headers()["x-frame-options"]).toBe("DENY");
+  await expect(page.locator("h1")).toHaveText("HaptiLog Privacy Policy");
+  await page.goto("/");
+  const link = page.getByRole("link", { name: "Privacy Policy" });
+  await expect(link).toBeVisible();
+  expect(await link.getAttribute("href")).toBe("/privacy.html");
+});

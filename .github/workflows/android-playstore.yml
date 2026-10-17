@@ -74,12 +74,40 @@ jobs:
             watch/app/build/outputs/mapping/release/mapping.txt
           retention-days: 30
 
+      - name: Resolve Play Store Track
+        id: play_track
+        run: |
+          RAW_TRACK="${{ github.event.inputs.track || 'wear:internal' }}"
+          # Wear OS standalone bundles must target form-factor tracks prefixed with 'wear:'
+          case "$RAW_TRACK" in
+            wear:*)
+              RESOLVED_TRACK="$RAW_TRACK"
+              ;;
+            production)
+              RESOLVED_TRACK="wear:production"
+              ;;
+            internal)
+              RESOLVED_TRACK="wear:internal"
+              ;;
+            beta)
+              RESOLVED_TRACK="wear:beta"
+              ;;
+            alpha)
+              RESOLVED_TRACK="wear:alpha"
+              ;;
+            *)
+              RESOLVED_TRACK="$RAW_TRACK"
+              ;;
+          esac
+          echo "track=$RESOLVED_TRACK" >> $GITHUB_OUTPUT
+          echo "Resolved target track '$RAW_TRACK' to '$RESOLVED_TRACK'"
+
       - name: Upload to Google Play Console
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.haptilog.watch
           releaseFiles: watch/app/build/outputs/bundle/release/*.aab
-          tracks: ${{ github.event.inputs.track || 'wear:internal' }}
+          tracks: ${{ steps.play_track.outputs.track }}
           mappingFile: watch/app/build/outputs/mapping/release/mapping.txt
           status: ${{ github.event.inputs.status || 'completed' }}

@@ -350,6 +350,14 @@ footer span:last-child {
   font-size: 9px;
   letter-spacing: 1.5px;
 }
+footer a {
+  color: #a1a1aa;
+  text-decoration: none;
+}
+footer a:hover {
+  color: #fafafa;
+  text-decoration: underline;
+}
 .workspace {
   max-width: 1420px;
   margin: auto;
