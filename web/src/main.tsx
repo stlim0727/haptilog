@@ -16,7 +16,10 @@ import {
   MapPin,
   Mic,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
+  Trash,
+  Trash2,
   Watch,
 } from "lucide-react";
 import { supabase } from "./client";
@@ -224,7 +227,88 @@ function App() {
     await supabase.auth.signOut({ scope: "local" });
     setBusy(false);
   }
+  const [toast, setToast] = useState<{ message: string; undoId?: string } | null>(null);
+
+  async function moveToTrash(id: string) {
+    if (!supabase) return;
+    const now = new Date().toISOString();
+    setRecords((prev) =>
+      prev.map((rec) => (rec.id === id ? { ...rec, deleted_at: now } : rec)),
+    );
+    setToast({ message: "Recording moved to trash.", undoId: id });
+    const { error } = await supabase
+      .from("recordings")
+      .update({ deleted_at: now })
+      .eq("id", id);
+    if (error) {
+      setError("Could not move recording to trash. Try again.");
+      void load();
+    }
+  }
+
+  async function restoreRecording(id: string) {
+    if (!supabase) return;
+    setRecords((prev) =>
+      prev.map((rec) => (rec.id === id ? { ...rec, deleted_at: null } : rec)),
+    );
+    setToast(null);
+    const { error } = await supabase
+      .from("recordings")
+      .update({ deleted_at: null })
+      .eq("id", id);
+    if (error) {
+      setError("Could not restore recording. Try again.");
+      void load();
+    }
+  }
+
+  async function deletePermanently(id: string) {
+    if (!supabase) return;
+    if (
+      !window.confirm(
+        "Permanently delete this recording? This cannot be undone.",
+      )
+    )
+      return;
+    setRecords((prev) => prev.filter((rec) => rec.id !== id));
+    if (selected === id) setSelected(null);
+    const { error } = await supabase.from("recordings").delete().eq("id", id);
+    if (error) {
+      setError("Could not delete recording. Try again.");
+      void load();
+    }
+  }
+
+  async function emptyTrash() {
+    if (!supabase) return;
+    const trashedIds = records.filter((r) => r.deleted_at).map((r) => r.id);
+    if (!trashedIds.length) return;
+    if (
+      !window.confirm(
+        `Permanently delete all ${trashedIds.length} recordings in trash?`,
+      )
+    )
+      return;
+    setRecords((prev) => prev.filter((rec) => !rec.deleted_at));
+    setSelected(null);
+    const { error } = await supabase
+      .from("recordings")
+      .delete()
+      .in("id", trashedIds);
+    if (error) {
+      setError("Could not empty trash. Try again.");
+      void load();
+    }
+  }
+
+  const isTrashView = category === "Trash";
+  const trashedCount = records.filter((r) => Boolean(r.deleted_at)).length;
+  const activeRecords = records.filter((r) => !r.deleted_at);
+
   const filtered = records.filter((r) => {
+    const isTrashed = Boolean(r.deleted_at);
+    if (isTrashView !== isTrashed) return false;
+    if (isTrashView) return true;
     const e = latest(r);
     const day = localDate(r.recorded_at),
       today = localDate(new Date().toISOString());
@@ -241,12 +325,12 @@ function App() {
     );
   });
   const active = filtered.find((r) => r.id === selected) ?? filtered[0];
-  const totalSeconds = filtered.reduce(
+  const totalSeconds = activeRecords.reduce(
     (n, r) => n + (r.duration_seconds ?? 0),
     0,
   );
-  const summary = totals(filtered);
-  const ready = filtered.filter((r) => processingState(r) === "Ready").length;
+  const summary = totals(activeRecords);
+  const ready = activeRecords.filter((r) => processingState(r) === "Ready").length;
   function exportCsv() {
     const url = URL.createObjectURL(
       new Blob([csv(filtered)], { type: "text/csv;charset=utf-8" }),
@@ -291,6 +375,28 @@ function App() {
           <button onClick={() => setError("")} aria-label="Dismiss message">
             ×
           </button>
+        </div>
+      )}
+      {toast && (
+        <div className="toast-banner" role="status">
+          <span>{toast.message}</span>
+          <div className="toast-actions">
+            {toast.undoId && (
+              <button
+                className="undo-button"
+                onClick={() => restoreRecording(toast.undoId!)}
+              >
+                Undo
+              </button>
+            )}
+            <button
+              className="dismiss-button"
+              onClick={() => setToast(null)}
+              aria-label="Dismiss notification"
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
       {checking ? (
@@ -444,7 +550,7 @@ function App() {
             <section>
               <span className="metric-label">MOMENTS CAPTURED</span>
               <strong>
-                {filtered.length}
+                {activeRecords.length}
                 <span className="metric-unit"> recordings</span>
               </strong>
               <small>
@@ -455,12 +561,12 @@ function App() {
               <span className="metric-label">READY TO REVIEW</span>
               <strong>
                 {ready}
-                <span className="metric-unit"> / {filtered.length}</span>
+                <span className="metric-unit"> / {activeRecords.length}</span>
               </strong>
               <small>
                 <span className="status-dot" />{" "}
-                {filtered.length - ready
-                  ? `${filtered.length - ready} awaiting attention or analysis`
+                {activeRecords.length - ready
+                  ? `${activeRecords.length - ready} awaiting attention or analysis`
                   : "Your uploaded moments, at a glance"}
               </small>
             </section>
@@ -509,8 +615,18 @@ function App() {
             </section>
             <section className="feed" aria-label="Recordings">
               <div className="feed-heading">
-                <h2>Your moments</h2>
-                <span>{filtered.length}</span>
+                <h2>{isTrashView ? "Trash" : "Your moments"}</h2>
+                <div className="feed-heading-right">
+                  {isTrashView && trashedCount > 0 && (
+                    <button
+                      className="text-button empty-trash-btn"
+                      onClick={emptyTrash}
+                    >
+                      Empty trash
+                    </button>
+                  )}
+                  <span>{filtered.length}</span>
+                </div>
               </div>
               <div
                 className="tabs"
@@ -526,6 +642,13 @@ function App() {
                     {c}
                   </button>
                 ))}
+                <button
+                  className={`trash-tab ${category === "Trash" ? "active" : ""}`}
+                  onClick={() => setCategory("Trash")}
+                  aria-label="View trash"
+                >
+                  <Trash2 size={13} /> Trash {trashedCount > 0 ? `(${trashedCount})` : ""}
+                </button>
               </div>
               <input
                 className="search"
@@ -542,20 +665,32 @@ function App() {
                 </div>
               ) : !filtered.length ? (
                 <div className="empty">
-                  <Mic size={30} />
-                  <h3>
-                    {records.length
-                      ? "Nothing here just yet."
-                      : "Your first moment starts on your wrist."}
-                  </h3>
-                  <p>
-                    {records.length
-                      ? "Try another date, category, or search."
-                      : "Record a thought on your watch and enable cloud sync. It will appear here after upload."}
-                  </p>
-                  <small>
-                    Original audio stays on your watch. No demo recordings here.
-                  </small>
+                  {isTrashView ? (
+                    <>
+                      <Trash2 size={30} />
+                      <h3>Trash is empty.</h3>
+                      <p>
+                        Deleted moments will appear here until permanently removed.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <Mic size={30} />
+                      <h3>
+                        {records.length
+                          ? "Nothing here just yet."
+                          : "Your first moment starts on your wrist."}
+                      </h3>
+                      <p>
+                        {records.length
+                          ? "Try another date, category, or search."
+                          : "Record a thought on your watch and enable cloud sync. It will appear here after upload."}
+                      </p>
+                      <small>
+                        Original audio stays on your watch. No demo recordings here.
+                      </small>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="record-list">
@@ -618,6 +753,9 @@ function App() {
                   recording={active}
                   onChange={load}
                   onError={setError}
+                  onMoveToTrash={moveToTrash}
+                  onRestore={restoreRecording}
+                  onDeletePermanently={deletePermanently}
                 />
               ) : (
                 <div className="inspector-empty">
@@ -657,10 +795,16 @@ function Inspector({
   recording: r,
   onChange,
   onError,
+  onMoveToTrash,
+  onRestore,
+  onDeletePermanently,
 }: {
   recording: Recording;
   onChange: () => Promise<void>;
   onError: (message: string) => void;
+  onMoveToTrash: (id: string) => Promise<void>;
+  onRestore: (id: string) => Promise<void>;
+  onDeletePermanently: (id: string) => Promise<void>;
 }) {
   const e = latest(r),
     x = expense(r),
@@ -767,11 +911,53 @@ function Inspector({
     completed = r.recording_corrections?.completed_tasks ?? [];
   return (
     <>
+      {r.deleted_at && (
+        <div className="trashed-banner" role="alert">
+          <div>
+            <strong>In trash</strong>
+            <p>
+              Moved to trash on{" "}
+              {new Date(r.deleted_at).toLocaleString([], {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          </div>
+          <div className="trash-actions">
+            <button
+              className="secondary-button restore-btn"
+              onClick={() => onRestore(r.id)}
+            >
+              <RotateCcw size={14} /> Restore
+            </button>
+            <button
+              className="danger-button"
+              onClick={() => onDeletePermanently(r.id)}
+            >
+              <Trash size={14} /> Delete permanently
+            </button>
+          </div>
+        </div>
+      )}
       <div className="inspector-top">
         <span className="eyebrow">THE ORIGINAL & THE DETAILS</span>
-        <span className={`state-pill ${state === "Ready" ? "is-ready" : ""}`}>
-          {state}
-        </span>
+        <div className="inspector-top-actions">
+          <span className={`state-pill ${state === "Ready" ? "is-ready" : ""}`}>
+            {state}
+          </span>
+          {!r.deleted_at && (
+            <button
+              className="trash-trigger"
+              onClick={() => onMoveToTrash(r.id)}
+              title="Move recording to trash"
+              aria-label="Move recording to trash"
+            >
+              <Trash2 size={13} /> Move to trash
+            </button>
+          )}
+        </div>
       </div>
       <h2>{e?.summary || "Your voice, preserved."}</h2>
       <p className="detail-time">

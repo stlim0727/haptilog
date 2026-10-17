@@ -105,7 +105,15 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
       }
       body = state.paired ? [connection] : [];
     } else if (path.endsWith("/recordings")) {
-      body = [state.recording, ...state.additional];
+      if (req.method() === "PATCH") {
+        const patch = req.postDataJSON();
+        if (state.recording) state.recording = { ...state.recording, ...patch };
+        return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+      } else if (req.method() === "DELETE") {
+        state.recording = null;
+        return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+      }
+      body = [state.recording, ...state.additional].filter(Boolean);
     } else if (path.endsWith("/recording_corrections")) {
       const patch = req.postDataJSON();
       state.corrections.push(patch);
@@ -305,4 +313,36 @@ test("a successful analysis retry clears the previous provider failure", async (
   await page.getByRole("button", { name: "Retry analysis" }).click();
   await expect(page.locator(".transcript")).toHaveText("아이스 라떼 5,000원");
   await expect(page.getByRole("alert")).toHaveCount(0);
+});
+
+test("moves a recording to trash with undo and restores from the trash tab", async ({ page }) => {
+  await fixture(page);
+  await page.goto("/");
+  await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
+
+  // Move to trash
+  await page.getByRole("button", { name: "Move recording to trash" }).click();
+  await expect(page.getByRole("status")).toContainText("Recording moved to trash");
+  await expect(page.getByText("아이스 라떼 5,000원")).toHaveCount(0);
+
+  // Undo
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
+
+  // Move to trash again
+  await page.getByRole("button", { name: "Move recording to trash" }).click();
+  await expect(page.getByText("아이스 라떼 5,000원")).toHaveCount(0);
+
+  // Switch to Trash tab
+  await page.getByRole("button", { name: "View trash" }).click();
+  await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText("In trash");
+
+  // Restore from trash
+  await page.getByRole("button", { name: "Restore" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+
+  // Switch back to All tab
+  await page.getByRole("button", { name: "All", exact: true }).click();
+  await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
 });
