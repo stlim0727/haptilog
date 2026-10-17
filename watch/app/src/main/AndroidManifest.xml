@@ -39,6 +39,7 @@
             android:value="true" />
 
         <!-- Main Wear OS UI Activity -->
+        <activity android:name=".presentation.SettingsActivity" android:exported="false" />
         <activity android:name=".presentation.WebAccessActivity" android:exported="false" />
         <activity
             android:name=".presentation.MainActivity"

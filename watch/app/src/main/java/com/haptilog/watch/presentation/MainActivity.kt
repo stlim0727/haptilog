@@ -184,7 +184,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                var cloudEnabled by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
                 val isRecording by VoiceRecordingService.isRecording.collectAsState()
                 val elapsedSeconds by VoiceRecordingService.elapsedDurationSeconds.collectAsState()
                 val recordings by repository.recordings.collectAsState()
@@ -219,15 +218,8 @@ class MainActivity : ComponentActivity() {
                         repository.refresh()
                     },
                     cloudConfigured = CloudClient.configured,
-                    cloudEnabled = cloudEnabled,
                     onWebAccess = { if (!isRecording) startActivity(Intent(this, WebAccessActivity::class.java)) },
-                    onSync = {
-                        if (CloudClient.configured) {
-                            if (cloudEnabled) RecordingSyncWorker.disable(this) else RecordingSyncWorker.enable(this)
-                            cloudEnabled = !cloudEnabled
-                            Toast.makeText(this, if (cloudEnabled) "Cloud sync enabled; local audio is kept" else "Cloud sync paused", Toast.LENGTH_LONG).show()
-                        } else Toast.makeText(this, "Cloud sync is not set up yet", Toast.LENGTH_LONG).show()
-                    },
+                    onSettings = { if (!isRecording) startActivity(Intent(this, SettingsActivity::class.java)) },
                     onDeleteRecording = { id ->
                         if (playingId == id) audioPlayer.stop()
                         repository.deleteRecording(id)
@@ -262,9 +254,8 @@ fun HaptiLogScreen(
     onExport: (RecordingItem) -> Unit,
     onRetry: (RecordingItem) -> Unit,
     cloudConfigured: Boolean,
-    cloudEnabled: Boolean,
-    onSync: () -> Unit,
-    onWebAccess: () -> Unit
+    onWebAccess: () -> Unit,
+    onSettings: () -> Unit
 ) {
     val listState = rememberScalingLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -304,6 +295,22 @@ fun HaptiLogScreen(
                     isRecording = isRecording,
                     elapsedSeconds = elapsedSeconds,
                     onToggleRecording = onToggleRecording
+                )
+            }
+
+            // Navigation stays ahead of the unbounded recording list.
+            item {
+                CompactChip(
+                    enabled = !isRecording && cloudConfigured,
+                    onClick = onWebAccess,
+                    label = { Text("Web access", fontSize = 12.sp) }
+                )
+            }
+            item {
+                CompactChip(
+                    enabled = !isRecording,
+                    onClick = onSettings,
+                    label = { Text("Settings & help", fontSize = 12.sp) }
                 )
             }
 
@@ -349,34 +356,6 @@ fun HaptiLogScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                 }
-            }
-
-            // 5. Cloud Sync Footer (Subtle & Quiet)
-            item {
-                Spacer(modifier = Modifier.height(10.dp))
-                CompactChip(
-                    onClick = onSync,
-                    label = {
-                        Text(
-                            text = if (!cloudConfigured) "로컬 전용 보관" else if (cloudEnabled) "클라우드 동기화 켜짐" else "클라우드 동기화 일시정지",
-                            fontSize = 10.sp,
-                            color = Color(0xFF8E8E93)
-                        )
-                    },
-                    colors = ChipDefaults.chipColors(
-                        backgroundColor = Color(0xFF161618),
-                        contentColor = Color(0xFF8E8E93)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-
-            item {
-                CompactChip(
-                    enabled = cloudConfigured && !isRecording,
-                    onClick = onWebAccess,
-                    label = { Text("Web access", fontSize = 12.sp) }
-                )
             }
 
             // 6. Bottom Safe Area Spacing
