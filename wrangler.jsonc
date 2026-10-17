@@ -4,7 +4,7 @@
   "compatibility_date": "2026-10-16",
   "previews": {},
   "build": {
-    "command": "npm --prefix web ci && npm --prefix web run prepare:deploy"
+    "command": "npm --prefix web ci --ignore-scripts && npm --prefix web run prepare:deploy"
   },
   "assets": {
     "directory": "./web/dist",
@@ -13,7 +13,7 @@
   "workers_dev": true,
   "env": {
     "production": {
-      "name": "haptilog",
+      "name": "haptilog-web",
       "workers_dev": false,
       "routes": [
         {

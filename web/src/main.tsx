@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import React, { Fragment, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
@@ -238,6 +238,7 @@ function App() {
     setBusy(false);
   }
   const [toast, setToast] = useState<{ message: string; undoId?: string } | null>(null);
+  const pendingTrashUpdates = useRef<Map<string, Promise<unknown>>>(new Map());
 
   async function moveToTrash(id: string) {
     if (!supabase) return;
@@ -245,15 +246,20 @@ function App() {
     setRecords((prev) =>
       prev.map((rec) => (rec.id === id ? { ...rec, deleted_at: now } : rec)),
     );
-    setToast({ message: "Recording moved to trash.", undoId: id });
-    const { error } = await supabase
-      .from("recordings")
-      .update({ deleted_at: now })
-      .eq("id", id);
-    if (error) {
-      setError("Could not move recording to trash. Try again.");
-      void load();
-    }
+    setToast({ message: t.toast_moved_trash, undoId: id });
+    const writePromise = (async () => {
+      const { error } = await supabase
+        .from("recordings")
+        .update({ deleted_at: now })
+        .eq("id", id);
+      if (error) {
+        setError(t.save_error);
+        void load();
+      }
+    })();
+    pendingTrashUpdates.current.set(id, writePromise);
+    await writePromise;
+    pendingTrashUpdates.current.delete(id);
   }
 
   async function restoreRecording(id: string) {
@@ -262,51 +268,57 @@ function App() {
       prev.map((rec) => (rec.id === id ? { ...rec, deleted_at: null } : rec)),
     );
     setToast(null);
+    const pending = pendingTrashUpdates.current.get(id);
+    if (pending) await pending.catch(() => {});
     const { error } = await supabase
       .from("recordings")
       .update({ deleted_at: null })
       .eq("id", id);
     if (error) {
-      setError("Could not restore recording. Try again.");
+      setError(t.save_error);
       void load();
     }
   }
 
   async function deletePermanently(id: string) {
     if (!supabase) return;
-    if (
-      !window.confirm(
-        "Permanently delete this recording? This cannot be undone.",
-      )
-    )
-      return;
-    setRecords((prev) => prev.filter((rec) => rec.id !== id));
+    if (!window.confirm(t.confirm_delete)) return;
+    const rec = records.find((r) => r.id === id);
+    setRecords((prev) => prev.filter((r) => r.id !== id));
     if (selected === id) setSelected(null);
-    const { error } = await supabase.from("recordings").delete().eq("id", id);
+    if (rec?.audio_path) {
+      await supabase.storage.from("recordings").remove([rec.audio_path]).catch(() => {});
+    }
+    const { error } = await supabase
+      .from("recordings")
+      .delete()
+      .eq("id", id)
+      .not("deleted_at", "is", null);
     if (error) {
-      setError("Could not delete recording. Try again.");
+      setError(t.save_error);
       void load();
     }
   }
 
   async function emptyTrash() {
     if (!supabase) return;
-    const trashedIds = records.filter((r) => r.deleted_at).map((r) => r.id);
-    if (!trashedIds.length) return;
-    if (
-      !window.confirm(
-        `Permanently delete all ${trashedIds.length} recordings in trash?`,
-      )
-    )
-      return;
+    const trashed = records.filter((r) => r.deleted_at);
+    if (!trashed.length) return;
+    if (!window.confirm(t.confirm_empty_trash(trashed.length))) return;
+    const trashedIds = trashed.map((r) => r.id);
     setRecords((prev) => prev.filter((rec) => !rec.deleted_at));
     setSelected(null);
+    const audioPaths = trashed.map((r) => r.audio_path).filter((p): p is string => Boolean(p));
+    if (audioPaths.length > 0) {
+      await supabase.storage.from("recordings").remove(audioPaths).catch(() => {});
+    }
     const { error } = await supabase
       .from("recordings")
       .delete()
-      .in("id", trashedIds);
+      .in("id", trashedIds)
+      .not("deleted_at", "is", null);
     if (error) {
-      setError("Could not empty trash. Try again.");
+      setError(t.save_error);
       void load();
     }
   }
@@ -318,7 +330,6 @@ function App() {
   const filtered = records.filter((r) => {
     const isTrashed = Boolean(r.deleted_at);
     if (isTrashView !== isTrashed) return false;
-    if (isTrashView) return true;
     const e = latest(r);
     const day = localDate(r.recorded_at),
       today = localDate(new Date().toISOString());
@@ -327,7 +338,7 @@ function App() {
         (date === "today"
           ? day === today
           : day.slice(0, 7) === today.slice(0, 7))) &&
-      (category === "All" || e?.intent_type === category.toUpperCase()) &&
+      (isTrashView || category === "All" || e?.intent_type === category.toUpperCase()) &&
       (!search ||
         `${e?.summary ?? ""} ${e?.transcript ?? ""}`
           .toLowerCase()
@@ -335,11 +346,21 @@ function App() {
     );
   });
   const active = filtered.find((r) => r.id === selected) ?? filtered[0];
-  const totalSeconds = activeRecords.reduce(
+  const dateFilteredActiveRecords = activeRecords.filter((r) => {
+    const day = localDate(r.recorded_at),
+      today = localDate(new Date().toISOString());
+    return (
+      date === "all" ||
+      (date === "today"
+        ? day === today
+        : day.slice(0, 7) === today.slice(0, 7))
+    );
+  });
+  const totalSeconds = dateFilteredActiveRecords.reduce(
     (n, r) => n + (r.duration_seconds ?? 0),
     0,
   );
-  const summary = totals(activeRecords);
+  const summary = totals(dateFilteredActiveRecords);
   const ready = activeRecords.filter((r) => processingState(r) === "Ready").length;
   function exportCsv() {
     const url = URL.createObjectURL(
@@ -404,7 +425,7 @@ function App() {
                 className="undo-button"
                 onClick={() => restoreRecording(toast.undoId!)}
               >
-                Undo
+                {t.undo}
               </button>
             )}
             <button
@@ -419,62 +440,64 @@ function App() {
       )}
       {checking ? (
         <main className="loading">
-          <LoaderCircle className="spin" /> Opening your space…
+          <LoaderCircle className="spin" /> {t.opening_space}
         </main>
       ) : !connection ? (
         <main className="pair-page">
           <section className="pair-story">
             <span className="eyebrow">
-              <span className="red-dot" /> FROM YOUR WRIST, TO HERE
+              <span className="red-dot" /> {t.from_wrist}
             </span>
             <h1>
-              Your voice.
-              <br />A little <em>clearer.</em>
+              {t.hero_title.split("\n").map((line, i) => (
+                <Fragment key={i}>
+                  {i > 0 && <br />}
+                  {line}
+                </Fragment>
+              ))}
             </h1>
             <p>
-              That passing thought. The coffee on the corner.
-              <br />A moment worth keeping. Come back to it here.
+              {t.hero_subtitle.split("\n").map((line, i) => (
+                <Fragment key={i}>
+                  {i > 0 && <br />}
+                  {line}
+                </Fragment>
+              ))}
             </p>
             <div className="voice-card">
               <span className="voice-glyph">
                 <AudioLines size={38} />
               </span>
               <div>
-                <span className="eyebrow">CAPTURE IN THE MOMENT</span>
-                <p>Review at your own pace.</p>
+                <span className="eyebrow">{t.capture_moment}</span>
+                <p>{t.review_pace}</p>
               </div>
               <span className="voice-line" />
             </div>
             <div className="pair-promises">
               <span>
-                <Headphones size={16} /> Your original audio, always
+                <Headphones size={16} /> {t.promise_audio}
               </span>
               <span>
-                <ShieldCheck size={16} /> Only the browsers you connect
+                <ShieldCheck size={16} /> {t.promise_browser}
               </span>
             </div>
           </section>
           <section className="pair-card">
-            <span className="step-label">YOUR WATCH → YOUR BROWSER</span>
-            <h2>Make the connection.</h2>
-            <p>
-              On your watch, open <strong>Web access</strong> and tap{" "}
-              <strong>Create code</strong>. Enter what you see below.
-            </p>
+            <span className="step-label">{t.step_label}</span>
+            <h2>{t.connect_title}</h2>
+            <p>{t.connect_desc}</p>
             {!supabase ? (
               <div className="setup-note">
                 <CircleHelp size={20} />
                 <div>
-                  <strong>This portal is ready for setup.</strong>
-                  <p>
-                    Configure the Supabase URL and publishable key to connect
-                    your watch.
-                  </p>
+                  <strong>{t.portal_setup_ready}</strong>
+                  <p>{t.portal_setup_desc}</p>
                 </div>
               </div>
             ) : (
               <form onSubmit={pair}>
-                <label htmlFor="watch-id">Watch ID</label>
+                <label htmlFor="watch-id">{t.watch_id}</label>
                 <input
                   id="watch-id"
                   autoComplete="off"
@@ -487,7 +510,7 @@ function App() {
                   maxLength={13}
                 />
                 <label htmlFor="code">
-                  Access code <span>Expires after 5 minutes</span>
+                  {t.access_code} <span>{t.expires_in}</span>
                 </label>
                 <input
                   id="code"
@@ -504,7 +527,7 @@ function App() {
                   maxLength={6}
                 />
                 <button className="primary-button" disabled={busy}>
-                  {busy ? "Connecting…" : "Connect my watch"}
+                  {busy ? t.connecting : t.connect_btn}
                   <ArrowRight size={18} />
                 </button>
               </form>
@@ -512,9 +535,12 @@ function App() {
             <div className="pair-footnote">
               <Link2 size={15} />
               <span>
-                No phone. No password. Just your watch.
-                <br />
-                Disconnect this browser any time.
+                {t.pair_footnote.split("\n").map((line, i) => (
+                  <Fragment key={i}>
+                    {i > 0 && <br />}
+                    {line}
+                  </Fragment>
+                ))}
               </span>
             </div>
           </section>
@@ -523,20 +549,20 @@ function App() {
         <main className="workspace">
           <div className="page-heading">
             <div>
-              <span className="eyebrow">YOUR EVENING REVIEW</span>
+              <span className="eyebrow">{t.evening_review}</span>
               <h1>
-                A day, in your own words<span>.</span>
+                {t.workspace_title}
               </h1>
-              <p>Listen back. Find the details. Pick up a thought.</p>
+              <p>{t.workspace_subtitle}</p>
             </div>
             <div className="heading-actions">
               <label className="date-picker">
                 <CalendarDays size={16} />
                 <span className="sr-only">Date range</span>
                 <select value={date} onChange={(e) => setDate(e.target.value)}>
-                  <option value="all">All time</option>
-                  <option value="today">Today</option>
-                  <option value="month">This month</option>
+                  <option value="all">{t.all_time}</option>
+                  <option value="today">{t.today}</option>
+                  <option value="month">{t.this_month}</option>
                 </select>
               </label>
               <button
@@ -545,13 +571,13 @@ function App() {
                 disabled={!filtered.length}
               >
                 <ArrowDownToLine size={16} />
-                Export CSV
+                {t.export_csv}
               </button>
             </div>
           </div>
           <div className="metrics">
             <section>
-              <span className="metric-label">SPENDING · SELECTED PERIOD</span>
+              <span className="metric-label">{t.spending_label}</span>
               <strong>
                 {Object.keys(summary.grouped).length
                   ? Object.entries(summary.grouped).map(([c, n]) => (
@@ -561,31 +587,31 @@ function App() {
               </strong>
               <small>
                 {summary.incomplete
-                  ? `${summary.incomplete} expense${summary.incomplete > 1 ? "s" : ""} need amount or currency`
-                  : "Each currency counted separately"}
+                  ? t.spending_incomplete(summary.incomplete)
+                  : t.spending_count}
               </small>
             </section>
             <section>
-              <span className="metric-label">MOMENTS CAPTURED</span>
+              <span className="metric-label">{t.moments_label}</span>
               <strong>
                 {activeRecords.length}
-                <span className="metric-unit"> recordings</span>
+                <span className="metric-unit"> {t.recordings_unit}</span>
               </strong>
               <small>
-                {Math.floor(totalSeconds / 60)}m {totalSeconds % 60}s captured
+                {lang === "ko"
+                  ? `${Math.floor(totalSeconds / 60)}분 ${totalSeconds % 60}초 녹음됨`
+                  : `${Math.floor(totalSeconds / 60)}m ${totalSeconds % 60}s captured`}
               </small>
             </section>
             <section>
-              <span className="metric-label">READY TO REVIEW</span>
+              <span className="metric-label">{t.ready_label}</span>
               <strong>
                 {ready}
                 <span className="metric-unit"> / {activeRecords.length}</span>
               </strong>
               <small>
                 <span className="status-dot" />{" "}
-                {activeRecords.length - ready
-                  ? `${activeRecords.length - ready} awaiting attention or analysis`
-                  : "Your uploaded moments, at a glance"}
+                {t.awaiting_label(activeRecords.length - ready)}
               </small>
             </section>
           </div>
@@ -593,9 +619,9 @@ function App() {
             <Activity size={14} />
             <span>
               {lastChecked
-                ? `Cloud checked ${lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                : "Checking cloud…"}{" "}
-              · Watch offline queue unknown
+                ? t.cloud_checked(lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))
+                : t.checking_cloud}{" "}
+              · {t.watch_queue_unknown}
             </span>
             <button
               onClick={() => {
@@ -609,22 +635,21 @@ function App() {
           </div>
           {truncated && (
             <p className="limit-note">
-              Showing the most recent 500 recordings. Totals and exports cover
-              only these loaded recordings. Dates use your browser’s timezone.
+              {t.showing_limit_note}
             </p>
           )}
           <div className="review-layout">
             <section className="map-section" aria-label="Recording map view">
               <div className="map-heading">
                 <div>
-                  <h2>Your voices, by place</h2>
-                  <p>Select a pin to open a recording. Date, category and search filters apply.</p>
+                  <h2>{t.map_heading}</h2>
+                  <p>{t.map_desc}</p>
                 </div>
                 <button className="secondary-button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
-                  <MapPin size={16} />{showMap ? "Hide map" : "Show map"}
+                  <MapPin size={16} />{showMap ? t.hide_map : t.show_map}
                 </button>
               </div>
-              {showMap && <MapBoundary><Suspense fallback={<p>Loading map…</p>}>
+              {showMap && <MapBoundary><Suspense fallback={<p>{t.loading_map}</p>}>
                 <RecordingMap recordings={filtered} selectedId={active?.id ?? null} onSelect={(id, revealDetails) => {
                   setSelected(id);
                   if (revealDetails) requestAnimationFrame(() => document.querySelector(".inspector")?.scrollIntoView({ block: "start", behavior: "smooth" }));
@@ -633,14 +658,14 @@ function App() {
             </section>
             <section className="feed" aria-label="Recordings">
               <div className="feed-heading">
-                <h2>{isTrashView ? "Trash" : "Your moments"}</h2>
+                <h2>{isTrashView ? t.trash : t.your_moments}</h2>
                 <div className="feed-heading-right">
                   {isTrashView && trashedCount > 0 && (
                     <button
                       className="text-button empty-trash-btn"
                       onClick={emptyTrash}
                     >
-                      Empty trash
+                      {t.empty_trash}
                     </button>
                   )}
                   <span>{filtered.length}</span>
@@ -651,13 +676,21 @@ function App() {
                 role="group"
                 aria-label="Recording category"
               >
-                {["All", "Expense", "Travel", "Workout", "Memo"].map((c) => (
+                {(
+                  [
+                    ["All", t.all_cat],
+                    ["Expense", t.expense_cat],
+                    ["Travel", t.travel_cat],
+                    ["Workout", t.workout_cat],
+                    ["Memo", t.memo_cat],
+                  ] as const
+                ).map(([c, label]) => (
                   <button
                     key={c}
                     className={category === c ? "active" : ""}
                     onClick={() => setCategory(c)}
                   >
-                    {c}
+                    {label}
                   </button>
                 ))}
                 <button
@@ -665,30 +698,30 @@ function App() {
                   onClick={() => setCategory("Trash")}
                   aria-label="View trash"
                 >
-                  <Trash2 size={13} /> Trash {trashedCount > 0 ? `(${trashedCount})` : ""}
+                  <Trash2 size={13} /> {t.trash} {trashedCount > 0 ? `(${trashedCount})` : ""}
                 </button>
               </div>
               <input
                 className="search"
                 type="search"
                 aria-label="Search transcripts"
-                placeholder="Find a thought…"
+                placeholder={t.search_placeholder}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
               {!loaded ? (
                 <div className="empty">
                   <LoaderCircle className="spin" />
-                  <h3>Finding your moments…</h3>
+                  <h3>{t.finding_moments}</h3>
                 </div>
               ) : !filtered.length ? (
                 <div className="empty">
                   {isTrashView ? (
                     <>
                       <Trash2 size={30} />
-                      <h3>Trash is empty.</h3>
+                      <h3>{t.empty_trash_title}</h3>
                       <p>
-                        Deleted moments will appear here until permanently removed.
+                        {t.empty_trash_desc}
                       </p>
                     </>
                   ) : (
@@ -696,16 +729,16 @@ function App() {
                       <Mic size={30} />
                       <h3>
                         {records.length
-                          ? "Nothing here just yet."
-                          : "Your first moment starts on your wrist."}
+                          ? t.empty_active_title
+                          : t.empty_first_title}
                       </h3>
                       <p>
                         {records.length
-                          ? "Try another date, category, or search."
-                          : "Record a thought on your watch and enable cloud sync. It will appear here after upload."}
+                          ? t.empty_active_desc
+                          : t.empty_first_desc}
                       </p>
                       <small>
-                        Original audio stays on your watch. No demo recordings here.
+                        {t.demo_note}
                       </small>
                     </>
                   )}
@@ -738,7 +771,7 @@ function App() {
                           </span>
                         </span>
                         <strong>
-                          {e?.summary || "A moment, waiting to be heard"}
+                          {e?.summary || (lang === "ko" ? "기다리는 음성 기록" : "A moment, waiting to be heard")}
                         </strong>
                         <span className="record-bottom">
                           <span
@@ -754,7 +787,7 @@ function App() {
                               {money(x.amount, x.currency)}
                             </span>
                           ) : (
-                            <span>{r.duration_seconds ?? "—"} sec</span>
+                            <span>{r.duration_seconds ?? "—"} {lang === "ko" ? "초" : "sec"}</span>
                           )}
                           <ChevronRight size={14} />
                         </span>
@@ -782,31 +815,32 @@ function App() {
                   <span className="empty-orbit">
                     <AudioLines size={36} />
                   </span>
-                  <h2>A closer listen.</h2>
+                  <h2>{t.closer_listen_title}</h2>
                   <p>
-                    Select a moment to hear the original,
-                    <br />
-                    read the transcript, and explore the details.
+                    {t.closer_listen_desc.split("\n").map((line, i) => (
+                      <Fragment key={i}>
+                        {i > 0 && <br />}
+                        {line}
+                      </Fragment>
+                    ))}
                   </p>
                 </div>
               )}
             </section>
           </div>
           <p className="timezone-note">
-            Dates and daily totals use{" "}
-            {Intl.DateTimeFormat().resolvedOptions().timeZone}. Only uploaded
-            recordings are visible here.
+            {t.timezone_note(Intl.DateTimeFormat().resolvedOptions().timeZone)}
           </p>
         </main>
       )}
       <footer>
         <span>
-          HaptiLog · A little less to remember. ·{" "}
+          HaptiLog · {lang === "ko" ? "기억의 짐을 덜어주는 음성 기록." : "A little less to remember."} ·{" "}
           <a href="/privacy.html" target="_blank" rel="noopener noreferrer">
-            Privacy Policy
+            {t.privacy_policy}
           </a>
         </span>
-        <span>CAPTURE QUIETLY. COME BACK CLEARLY.</span>
+        <span>{t.footer_quiet}</span>
       </footer>
     </>
   );
@@ -868,7 +902,7 @@ function Inspector({
       .download(r.audio_path);
     if (!mounted.current) return;
     if (error || !data)
-      onError("Original audio could not be loaded. Try again when connected.");
+      onError(t.audio_load_error);
     else {
       objectUrl.current = URL.createObjectURL(data);
       setAudioUrl(objectUrl.current);
@@ -902,7 +936,7 @@ function Inspector({
         { onConflict: "recording_id", defaultToNull: false },
       );
     if (mounted.current) {
-      if (error) onError("Changes were not saved. Try again when connected.");
+      if (error) onError(t.save_error);
       else await onChange();
       setSaving(false);
     }
@@ -917,7 +951,7 @@ function Inspector({
       !/^[A-Z]{3}$/.test(currency)
     ) {
       onError(
-        "Enter a non-negative amount and a three-letter currency, such as KRW.",
+        t.expense_validation,
       );
       return;
     }
@@ -938,9 +972,9 @@ function Inspector({
       {r.deleted_at && (
         <div className="trashed-banner" role="alert">
           <div>
-            <strong>In trash</strong>
+            <strong>{t.in_trash}</strong>
             <p>
-              Moved to trash on{" "}
+              {t.moved_to_trash_on}{" "}
               {new Date(r.deleted_at).toLocaleString([], {
                 month: "short",
                 day: "numeric",
@@ -954,19 +988,19 @@ function Inspector({
               className="secondary-button restore-btn"
               onClick={() => onRestore(r.id)}
             >
-              <RotateCcw size={14} /> Restore
+              <RotateCcw size={14} /> {t.restore}
             </button>
             <button
               className="danger-button"
               onClick={() => onDeletePermanently(r.id)}
             >
-              <Trash size={14} /> Delete permanently
+              <Trash size={14} /> {t.delete_permanently}
             </button>
           </div>
         </div>
       )}
       <div className="inspector-top">
-        <span className="eyebrow">THE ORIGINAL & THE DETAILS</span>
+        <span className="eyebrow">{t.original_details}</span>
         <div className="inspector-top-actions">
           <span className={`state-pill ${state === "Ready" ? "is-ready" : ""}`}>
             {state}
@@ -975,23 +1009,23 @@ function Inspector({
             <button
               className="trash-trigger"
               onClick={() => onMoveToTrash(r.id)}
-              title="Move recording to trash"
-              aria-label="Move recording to trash"
+              title={t.move_to_trash}
+              aria-label={lang === "en" ? "Move recording to trash" : t.move_to_trash}
             >
-              <Trash2 size={13} /> Move to trash
+              <Trash2 size={13} /> {t.move_to_trash}
             </button>
           )}
         </div>
       </div>
-      <h2>{e?.summary || "Your voice, preserved."}</h2>
+      <h2>{e?.summary || (lang === "ko" ? "보존된 음성 기록." : "Your voice, preserved.")}</h2>
       <p className="detail-time">
         {new Date(r.recorded_at).toLocaleString()} ·{" "}
-        {r.duration_seconds ?? "Unknown"} seconds
+        {r.duration_seconds ?? (lang === "ko" ? "알 수 없음" : "Unknown")} {lang === "ko" ? "초" : "seconds"}
       </p>
       <section className="audio-section">
         <div className="section-label">
-          <Headphones size={16} /> ORIGINAL AUDIO{" "}
-          <span>Always your source of truth</span>
+          <Headphones size={16} /> {t.original_audio}{" "}
+          <span>{t.audio_truth}</span>
         </div>
         {audioUrl ? (
           <>
@@ -1001,13 +1035,13 @@ function Inspector({
               src={audioUrl}
               onError={() =>
                 onError(
-                  "This audio could not be played by your browser. Download the original to inspect it.",
+                  t.audio_play_error,
                 )
               }
             />
             <div className="audio-actions">
               <label>
-                Speed{" "}
+                {t.speed}{" "}
                 <select
                   aria-label="Playback speed"
                   defaultValue="1"
@@ -1024,7 +1058,7 @@ function Inspector({
                 </select>
               </label>
               <a href={audioUrl} download={`haptilog-${r.id}.m4a`}>
-                <ArrowDownToLine size={14} /> Download .m4a
+                <ArrowDownToLine size={14} /> {t.download_audio}
               </a>
             </div>
           </>
@@ -1037,10 +1071,10 @@ function Inspector({
             <AudioLines size={30} />
             <span>
               {audioBusy
-                ? "Loading original…"
+                ? t.loading_audio
                 : r.audio_path
-                  ? "Load original audio"
-                  : "Audio not available yet"}
+                  ? t.load_audio
+                  : t.audio_unavailable}
             </span>
             <ArrowRight size={18} />
           </button>
@@ -1051,12 +1085,12 @@ function Inspector({
           <div>
             <strong>
               {retryBusy || state === "Processing"
-                ? "Listening for the details…"
-                : "Your audio comes first."}
+                ? t.listening_details
+                : t.audio_comes_first}
             </strong>
             <p>
               {state === "Processing" || retryBusy
-                ? "Analysis is in progress. You can still listen to the original."
+                ? t.analysis_in_progress
                 : analysisFailure(r.enrichment_status?.error_code)}
             </p>
           </div>
@@ -1066,17 +1100,17 @@ function Inspector({
             disabled={retryBusy || state === "Processing" || !r.audio_path}
           >
             <RefreshCw size={14} />
-            {retryBusy ? "Analysing…" : "Retry analysis"}
+            {retryBusy ? t.analysing : t.retry_analysis}
           </button>
         </div>
       )}
       {e && (
         <>
           <div className="section-label">
-            <Mic size={16} /> TRANSCRIPT{" "}
-            <span>AI generated · check against audio</span>
+            <Mic size={16} /> {t.transcript}{" "}
+            <span>{t.transcript_note}</span>
           </div>
-          <p className="transcript">{e.transcript || "No speech detected."}</p>
+          <p className="transcript">{e.transcript || t.no_speech}</p>
           {x && (
             <form
               className="expense-form"
@@ -1084,11 +1118,11 @@ function Inspector({
               onChange={() => setDirty(true)}
             >
               <div className="section-label">
-                EXPENSE DETAILS <span>Your corrections are kept</span>
+                {t.expense_details} <span>{t.expense_note}</span>
               </div>
               <div className="field-row">
                 <label>
-                  Amount
+                  {t.amount}
                   <input
                     type="number"
                     min="0"
@@ -1100,7 +1134,7 @@ function Inspector({
                   />
                 </label>
                 <label>
-                  Currency
+                  {t.currency}
                   <input
                     value={currency}
                     onChange={(event) =>
@@ -1114,7 +1148,7 @@ function Inspector({
                 </label>
               </div>
               <label>
-                Merchant
+                {t.merchant}
                 <input
                   value={merchant}
                   maxLength={200}
@@ -1123,7 +1157,7 @@ function Inspector({
                 />
               </label>
               <label>
-                Category
+                {t.category}
                 <input
                   value={category}
                   maxLength={100}
@@ -1133,13 +1167,13 @@ function Inspector({
               </label>
               <button className="secondary-button" disabled={saving || !dirty}>
                 <Check size={14} />
-                {saving ? "Saving…" : "Save corrections"}
+                {saving ? t.saving : t.save_corrections}
               </button>
             </form>
           )}
           {tasks.length > 0 && (
             <section className="tasks">
-              <div className="section-label">THOUGHTS TO FOLLOW UP</div>
+              <div className="section-label">{t.follow_up_thoughts}</div>
               {tasks.map((task, index) => (
                 <label key={`${task}:${index}`}>
                   <input
@@ -1160,15 +1194,15 @@ function Inspector({
             </section>
           )}
           <details className="structured">
-            <summary>All generated details</summary>
+            <summary>{t.all_details}</summary>
             <pre>{JSON.stringify(e.structured_data, null, 2)}</pre>
-            <small>Analysis version: {e.pipeline_version ?? "legacy"}</small>
+            <small>{t.analysis_version}: {e.pipeline_version ?? "legacy"}</small>
           </details>
         </>
       )}
       <section className="context">
         <div className="section-label">
-          <MapPin size={16} /> CAPTURED CONTEXT
+          <MapPin size={16} /> {t.captured_context}
         </div>
         {r.latitude != null && r.longitude != null ? (
           <>
@@ -1193,10 +1227,10 @@ function Inspector({
                 <dd>{r.speed != null ? `${r.speed} m/s` : "Unavailable"}</dd>
               </div>
             </dl>
-            <small>A location snapshot, recorded with your voice.</small>
+            <small>{t.location_snapshot}</small>
           </>
         ) : (
-          <p className="muted">No location was captured for this recording.</p>
+          <p className="muted">{t.no_location}</p>
         )}
       </section>
     </>

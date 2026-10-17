@@ -546,6 +546,12 @@ footer a:hover {
   padding: 0 20px;
   gap: 4px;
   border-bottom: 1px solid #28282f;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 .tabs button {
   background: transparent;
@@ -553,6 +559,8 @@ footer a:hover {
   padding: 0 9px 14px;
   font-size: 12px;
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .tabs button.active {
   color: #f08aa1;

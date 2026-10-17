@@ -96,8 +96,42 @@ export const translations = {
     closer_listen_title: "A closer listen.",
     closer_listen_desc:
       "Select a moment to hear the original,\nread the transcript, and explore the details.",
+    save_corrections: "Save corrections",
+    saving: "Saving…",
+    follow_up_thoughts: "THOUGHTS TO FOLLOW UP",
+    audio_unavailable: "Audio not available yet",
+    audio_play_error:
+      "This audio could not be played by your browser. Download the original to inspect it.",
+    audio_load_error:
+      "Original audio could not be loaded. Try again when connected.",
+    save_error: "Changes were not saved. Try again when connected.",
+    expense_validation:
+      "Enter a non-negative amount and a three-letter currency, such as KRW.",
+    listening_details: "Listening for the details…",
+    audio_comes_first: "Your audio comes first.",
+    analysis_in_progress:
+      "Analysis is in progress. You can still listen to the original.",
+    cloud_checked: (time: string) => `Cloud checked ${time}`,
+    watch_queue_unknown: "Watch offline queue unknown",
+    showing_limit_note:
+      "Showing the most recent 500 recordings. Totals and exports cover only these loaded recordings. Dates use your browser’s timezone.",
     privacy_policy: "Privacy Policy",
     footer_quiet: "CAPTURE QUIETLY. COME BACK CLEARLY.",
+    opening_space: "Opening your space…",
+    finding_moments: "Finding your moments…",
+    checking_cloud: "Checking cloud…",
+    portal_setup_ready: "This portal is ready for setup.",
+    portal_setup_desc:
+      "Configure the Supabase URL and publishable key to connect your watch.",
+    captured_context: "CAPTURED CONTEXT",
+    all_details: "All generated details",
+    analysis_version: "Analysis version",
+    demo_note:
+      "Original audio stays on your watch. No demo recordings here.",
+    timezone_note: (tz: string) =>
+      `Dates and daily totals use ${tz}. Only uploaded recordings are visible here.`,
+    location_snapshot: "A location snapshot, recorded with your voice.",
+    no_location: "No location was captured for this recording.",
   },
   ko: {
     brand_slogan: "잠시 생각을 정리하는 공간",
@@ -194,8 +228,42 @@ export const translations = {
     closer_listen_title: "자세히 듣고 살펴보기.",
     closer_listen_desc:
       "순간을 선택하여 원본 음성을 듣고,\n전사 텍스트와 세부 정보를 확인하세요.",
+    save_corrections: "수정 내용 저장",
+    saving: "저장 중…",
+    follow_up_thoughts: "확인 및 후속 조치할 생각",
+    audio_unavailable: "음성을 아직 사용할 수 없습니다",
+    audio_play_error:
+      "브라우저에서 음성을 재생할 수 없습니다. 원본을 다운로드하여 확인하세요.",
+    audio_load_error:
+      "원본 음성을 불러오지 못했습니다. 네트워크 연결 후 다시 시도해 주세요.",
+    save_error: "변경 사항이 저장되지 않았습니다. 네트워크 연결 후 다시 시도해 주세요.",
+    expense_validation:
+      "0 이상의 금액과 3자리 통화 코드(예: KRW)를 입력하세요.",
+    listening_details: "세부 정보를 분석하는 중…",
+    audio_comes_first: "원본 음성이 안전하게 보관되어 있습니다.",
+    analysis_in_progress:
+      "분석이 진행 중입니다. 원본 음성은 바로 들으실 수 있습니다.",
+    cloud_checked: (time: string) => `클라우드 확인 ${time}`,
+    watch_queue_unknown: "워치 오프라인 대기열 상태 알 수 없음",
+    showing_limit_note:
+      "최근 500개의 녹음 기록을 표시합니다. 통계 및 CSV 내보내기는 로드된 기록을 기준으로 계산됩니다. 날짜는 브라우저 시간대를 따릅니다.",
     privacy_policy: "개인정보처리방침",
     footer_quiet: "조용하게 기록하고, 선명하게 다시 만나다.",
+    opening_space: "공간을 여는 중…",
+    finding_moments: "기록을 찾는 중…",
+    checking_cloud: "클라우드 확인 중…",
+    portal_setup_ready: "포털 설정이 준비되었습니다.",
+    portal_setup_desc:
+      "워치를 연결하려면 Supabase URL과 공개 키를 구성하세요.",
+    captured_context: "기록 위치 정보",
+    all_details: "생성된 모든 세부 정보",
+    analysis_version: "분석 버전",
+    demo_note:
+      "원본 오디오는 워치에 안전하게 보관됩니다. 데모 녹음은 여기에 표시되지 않습니다.",
+    timezone_note: (tz: string) =>
+      `날짜 및 일일 합계는 ${tz} 기준입니다. 업로드된 녹음만 여기에 표시됩니다.`,
+    location_snapshot: "음성과 함께 기록된 위치 스냅샷입니다.",
+    no_location: "이 녹음에 대한 위치 정보가 없습니다.",
   },
 } as const;
 

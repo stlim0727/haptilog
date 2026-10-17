@@ -14,7 +14,9 @@ export function validateRequest(value: unknown) {
         !/^[A-Za-z0-9+/]+={0,2}$/.test(v.audio_base64))) ||
     (v.audio_mime !== undefined &&
       v.audio_mime !== "audio/mp4" &&
-      v.audio_mime !== "audio/m4a")
+      v.audio_mime !== "audio/m4a") ||
+    (v.language !== undefined &&
+      (typeof v.language !== "string" || !["ko", "en"].includes(v.language)))
   ) {
     throw new Error("Invalid request");
   }
@@ -22,10 +24,7 @@ export function validateRequest(value: unknown) {
     recording_id: v.recording_id,
     audio_base64: v.audio_base64 as string | undefined,
     audio_mime: (v.audio_mime as string | undefined) ?? "audio/mp4",
-    language:
-      typeof v.language === "string" && ["ko", "en"].includes(v.language)
-        ? (v.language as "ko" | "en")
-        : undefined,
+    language: v.language as "ko" | "en" | undefined,
   };
 }
 
