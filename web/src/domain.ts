@@ -28,7 +28,11 @@ export type Recording = {
   speed: number | null;
   accuracy: number | null;
   voice_enrichments: Enrichment[];
-  enrichment_status: { state: string; lease_until: string } | null;
+  enrichment_status: {
+    state: string;
+    lease_until: string;
+    error_code?: string | null;
+  } | null;
   recording_corrections: Correction | null;
 };
 export function latest(recording: Recording) {
@@ -38,11 +42,36 @@ export function latest(recording: Recording) {
 }
 export function processingState(r: Recording, now = Date.now()) {
   const status = r.enrichment_status;
-  if (status?.state === "PROCESSING")
+  if (status?.state === "PROCESSING") {
     return Date.parse(status.lease_until) > now ? "Processing" : "Interrupted";
+  }
   if (status?.state === "FAILED") return "Needs attention";
   if (latest(r)) return "Ready";
   return r.audio_path ? "Awaiting analysis" : "Audio unavailable";
+}
+export function analysisFailure(code?: string | null) {
+  switch (code) {
+    case "MODEL_UNAVAILABLE":
+      return "The analysis model is unavailable. Your audio is saved; retry after the service is updated.";
+    case "PROVIDER_RATE_LIMIT":
+      return "The AI service reached its quota or rate limit. Your audio is saved; try again later.";
+    case "PROVIDER_CONFIGURATION":
+      return "The AI service configuration needs attention. Your original audio is saved.";
+    case "PROVIDER_UNAVAILABLE":
+      return "The AI service is temporarily unavailable. Your audio is saved; try again later.";
+    case "INVALID_ANALYSIS":
+      return "The AI response could not be read. Your audio is saved; retry analysis.";
+    default:
+      return "Analysis did not complete. Your original audio is saved. Retry analysis to try again.";
+  }
+}
+export function hasLocation(
+  r: Pick<Recording, "latitude" | "longitude">,
+): r is Recording & { latitude: number; longitude: number } {
+  return typeof r.latitude === "number" && Number.isFinite(r.latitude) &&
+    Math.abs(r.latitude) <= 90 &&
+    typeof r.longitude === "number" && Number.isFinite(r.longitude) &&
+    Math.abs(r.longitude) <= 180;
 }
 export function expense(r: Recording) {
   const e = latest(r);
@@ -52,19 +81,15 @@ export function expense(r: Recording) {
   const amount = correction?.amount ?? data.amount;
   const currency = correction?.currency ?? data.currency;
   return {
-    amount:
-      typeof amount === "number" && Number.isFinite(amount) && amount >= 0
-        ? amount
-        : null,
-    currency:
-      typeof currency === "string" && /^[A-Z]{3}$/.test(currency)
-        ? currency
-        : null,
-    merchant:
-      correction?.merchant ??
+    amount: typeof amount === "number" && Number.isFinite(amount) && amount >= 0
+      ? amount
+      : null,
+    currency: typeof currency === "string" && /^[A-Z]{3}$/.test(currency)
+      ? currency
+      : null,
+    merchant: correction?.merchant ??
       (typeof data.merchant === "string" ? data.merchant : ""),
-    category:
-      correction?.category ??
+    category: correction?.category ??
       (typeof data.category === "string" ? data.category : ""),
   };
 }
@@ -84,7 +109,9 @@ export function totals(recordings: Recording[]) {
 }
 export function localDate(iso: string) {
   const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${
+    String(d.getDate()).padStart(2, "0")
+  }`;
 }
 export function money(amount: number, currency: string) {
   try {

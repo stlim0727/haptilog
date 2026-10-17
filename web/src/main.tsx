@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
@@ -22,6 +22,7 @@ import {
 import { supabase } from "./client";
 import {
   csv,
+  analysisFailure,
   expense,
   latest,
   localDate,
@@ -32,6 +33,16 @@ import {
 } from "./domain";
 import type { Correction, Recording } from "./domain";
 import "./style.css";
+const RecordingMap = lazy(() => import("./RecordingMap"));
+class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    return this.state.failed
+      ? <p role="alert">Map unavailable. Your recordings are still in the list. Reload the page to try again.</p>
+      : this.props.children;
+  }
+}
 
 type Connection = {
   session_id: string;
@@ -64,6 +75,7 @@ function App() {
   const [category, setCategory] = useState("All");
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [showMap, setShowMap] = useState(false);
   const generation = useRef(0);
   const refreshConnection = useCallback(async () => {
     if (!supabase) {
@@ -133,7 +145,7 @@ function App() {
     const { data, error } = await supabase
       .from("recordings")
       .select(
-        "*,voice_enrichments(*),enrichment_status(state,lease_until),recording_corrections(*)",
+        "*,voice_enrichments(*),enrichment_status(state,lease_until,error_code),recording_corrections(*)",
       )
       .eq("user_id", connection.owner_user_id)
       .order("recorded_at", { ascending: false })
@@ -478,6 +490,23 @@ function App() {
             </p>
           )}
           <div className="review-layout">
+            <section className="map-section" aria-label="Recording map view">
+              <div className="map-heading">
+                <div>
+                  <h2>Your voices, by place</h2>
+                  <p>Select a pin to open a recording. Date, category and search filters apply.</p>
+                </div>
+                <button className="secondary-button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
+                  <MapPin size={16} />{showMap ? "Hide map" : "Show map"}
+                </button>
+              </div>
+              {showMap && <MapBoundary><Suspense fallback={<p>Loading map…</p>}>
+                <RecordingMap recordings={filtered} selectedId={active?.id ?? null} onSelect={(id, revealDetails) => {
+                  setSelected(id);
+                  if (revealDetails) requestAnimationFrame(() => document.querySelector(".inspector")?.scrollIntoView({ block: "start", behavior: "smooth" }));
+                }} />
+              </Suspense></MapBoundary>}
+            </section>
             <section className="feed" aria-label="Recordings">
               <div className="feed-heading">
                 <h2>Your moments</h2>
@@ -680,10 +709,11 @@ function Inspector({
       body: { recording_id: r.id },
     });
     if (mounted.current) {
-      if (error)
-        onError(
-          "Analysis did not complete. Your original audio is kept. Wait briefly before retrying.",
-        );
+      if (error) {
+        let failureCode: string | undefined;
+        try { failureCode = (await error.context?.json())?.code; } catch { /* Network errors have no response body. */ }
+        onError(analysisFailure(failureCode));
+      }
       await onChange();
       setRetryBusy(false);
     }
@@ -811,7 +841,7 @@ function Inspector({
             <p>
               {state === "Processing" || retryBusy
                 ? "Analysis is in progress. You can still listen to the original."
-                : "Analysis is not complete. Retry when you’re ready; your recording stays safe."}
+                : analysisFailure(r.enrichment_status?.error_code)}
             </p>
           </div>
           <button

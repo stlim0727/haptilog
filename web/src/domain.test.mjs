@@ -1,6 +1,26 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { csv, expense, totals, processingState, latest } from "./domain.ts";
+import {
+  analysisFailure,
+  csv,
+  expense,
+  hasLocation,
+  latest,
+  processingState,
+  totals,
+} from "./domain.ts";
+test("map includes real zero coordinates and rejects missing or invalid GPS", () => {
+  assert.equal(hasLocation({ latitude: 0, longitude: 0 }), true);
+  for (const latitude of [null, undefined, NaN, Infinity, 91]) {
+    assert.equal(hasLocation({ latitude, longitude: 1 }), false);
+  }
+  assert.equal(hasLocation({ latitude: 37, longitude: 181 }), false);
+});
+test("analysis errors distinguish quota and model configuration without exposing provider details", () => {
+  assert.match(analysisFailure("PROVIDER_RATE_LIMIT"), /quota or rate limit/);
+  assert.match(analysisFailure("MODEL_UNAVAILABLE"), /model is unavailable/);
+  assert.match(analysisFailure(null), /original audio is saved/);
+});
 const rec = (amount = 5000, currency = "KRW") => ({
   id: "r",
   recorded_at: "2026-10-16T01:00:00Z",

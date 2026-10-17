@@ -16,9 +16,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.material.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.haptilog.watch.BuildConfig
 import com.haptilog.watch.sync.CloudClient
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,6 +45,8 @@ class WebAccessActivity : ComponentActivity() {
                 var busy by remember { mutableStateOf(false) }
                 var error by remember { mutableStateOf<String?>(null) }
                 var remaining by remember { mutableStateOf(0L) }
+                var connected by remember { mutableStateOf(false) }
+                var browsersLoaded by remember { mutableStateOf(false) }
                 suspend fun cloud(action: String): JSONObject = withContext(Dispatchers.IO) {
                     val client = CloudClient(this@WebAccessActivity)
                     val (token, _) = client.authenticate()
@@ -70,50 +75,87 @@ class WebAccessActivity : ComponentActivity() {
                 }
                 BackHandler { cancel() }
                 LaunchedEffect(code) {
-                    if (code != null) {
-                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                        val wakeUntil = System.currentTimeMillis() + 60_000
-                        val expiresAt = Instant.parse(code!!.getString("expires_at")).toEpochMilli()
-                        while (System.currentTimeMillis() < expiresAt) {
-                            remaining = ((expiresAt - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
-                            if (System.currentTimeMillis() >= wakeUntil) window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                            delay(1000)
+                    val issued = code ?: return@LaunchedEffect
+                    val expires = issued.getString("expires_at")
+                    val expiresAt = Instant.parse(expires).toEpochMilli()
+                    lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        try {
+                            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                            val wakeUntil = System.currentTimeMillis() + 60_000
+                            coroutineScope {
+                                launch {
+                                    while (System.currentTimeMillis() < expiresAt) {
+                                        remaining = ((expiresAt - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+                                        if (System.currentTimeMillis() >= wakeUntil) window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                                        delay(1000)
+                                    }
+                                    remaining = 0
+                                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                                }
+                                launch {
+                                    while (code === issued) {
+                                        try {
+                                            val fresh = refreshConnections()
+                                            if (code === issued) {
+                                                connections = fresh
+                                                browsersLoaded = true
+                                                if (fresh.any { pairedDuringCode(expires, it.getString("created_at")) }) {
+                                                    connected = true
+                                                    code = null
+                                                    error = null
+                                                    break
+                                                }
+                                            }
+                                        } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled
+                                        } catch (_: Exception) { /* Retain the code during temporary network loss. */ }
+                                        if (System.currentTimeMillis() >= expiresAt) break
+                                        delay(5000)
+                                    }
+                                }
+                            }
+                        } finally {
+                            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         }
-                        remaining = 0
                     }
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 }
                 DisposableEffect(Unit) { onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) } }
                 ScalingLazyColumn(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
                     item { Text("Web access", fontSize = 18.sp) }
                     item { Text(BuildConfig.WEB_PORTAL_URL.removePrefix("https://"), fontSize = 13.sp, textAlign = TextAlign.Center) }
                     item { Text("Connect a browser to review your recordings. No phone needed.", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                    if (connected) item { Text("Browser connected", fontSize = 17.sp, textAlign = TextAlign.Center) }
                     if (code != null) {
                         item { Text(code!!.getString("watch_id"), fontSize = 16.sp, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center) }
                         item { Text(if (remaining > 0) code!!.getString("code").chunked(3).joinToString(" ") else "Expired", fontSize = 27.sp, fontFamily = FontFamily.Monospace) }
-                        item { Text("${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')} remaining", fontSize = 12.sp) }
+                        if (remaining > 0) item { Text("${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')} remaining", fontSize = 12.sp) }
                     }
                     item {
                         Chip(enabled = !busy && CloudClient.configured, onClick = {
                             scope.launch {
                                 busy = true; error = null
-                                try { code = cloud("issue") }
+                                try {
+                                    val issued = cloud("issue")
+                                    remaining = ((Instant.parse(issued.getString("expires_at")).toEpochMilli() - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+                                    connected = false
+                                    code = issued
+                                }
                                 catch (_: Exception) { error = "Cannot create code. Check Wi-Fi; wait a minute before retrying." }
                                 finally { busy = false }
                             }
-                        }, label = { Text(if (busy) "Connecting…" else if (code == null) "Create code" else "New code") })
+                        }, label = { Text(if (busy) "Connecting…" else if (connected) "Pair another browser" else if (code == null) "Create code" else "Create new code") })
                     }
                     if (error != null) item { Text(error!!, fontSize = 12.sp, textAlign = TextAlign.Center) }
                     item {
                         Chip(enabled = !busy, onClick = {
                             scope.launch {
                                 busy = true; error = null
-                                try { connections = refreshConnections() }
+                                try { connections = refreshConnections(); browsersLoaded = true }
                                 catch (_: Exception) { error = "Cannot load browsers. Check connection." }
                                 finally { busy = false }
                             }
                         }, label = { Text("Browsers") })
                     }
+                    if (browsersLoaded && connections.isEmpty()) item { Text("No connected browsers", fontSize = 12.sp, textAlign = TextAlign.Center) }
                     for (connection in connections) {
                         item {
                             Chip(enabled = !busy, onClick = {
