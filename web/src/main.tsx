@@ -35,6 +35,8 @@ import {
   totals,
 } from "./domain";
 import type { Correction, Recording } from "./domain";
+import { translations, getInitialLanguage } from "./i18n";
+import type { Language, TranslationKeys } from "./i18n";
 import "./style.css";
 const RecordingMap = lazy(() => import("./RecordingMap"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
@@ -79,6 +81,14 @@ function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const t = translations[lang];
+
+  function toggleLang() {
+    const next = lang === "en" ? "ko" : "en";
+    setLang(next);
+    localStorage.setItem("haptilog_language", next);
+  }
   const generation = useRef(0);
   const refreshConnection = useCallback(async () => {
     if (!supabase) {
@@ -345,8 +355,16 @@ function App() {
     <>
       <header className="topbar">
         <Brand />
-        <span className="top-label">A LITTLE SPACE TO REFLECT</span>
+        <span className="top-label">{t.brand_slogan}</span>
         <div className="top-right">
+          <button
+            className="lang-switch-btn"
+            onClick={toggleLang}
+            title={lang === "en" ? "한국어로 변경" : "Switch to English"}
+            aria-label="Toggle language"
+          >
+            {lang === "en" ? "KO" : "EN"}
+          </button>
           {connection ? (
             <>
               <span className="watch-label">
@@ -354,8 +372,8 @@ function App() {
               </span>
               <button
                 className="icon-button"
-                title="Disconnect browser"
-                aria-label="Disconnect browser"
+                title={t.disconnect}
+                aria-label={t.disconnect}
                 disabled={busy}
                 onClick={disconnect}
               >
@@ -364,7 +382,7 @@ function App() {
             </>
           ) : (
             <span className="watch-label">
-              <Watch size={15} /> Made for your wrist. Open on the web.
+              <Watch size={15} /> {t.wrist_promise}
             </span>
           )}
         </div>
@@ -756,6 +774,8 @@ function App() {
                   onMoveToTrash={moveToTrash}
                   onRestore={restoreRecording}
                   onDeletePermanently={deletePermanently}
+                  lang={lang}
+                  t={t}
                 />
               ) : (
                 <div className="inspector-empty">
@@ -798,6 +818,8 @@ function Inspector({
   onMoveToTrash,
   onRestore,
   onDeletePermanently,
+  lang,
+  t,
 }: {
   recording: Recording;
   onChange: () => Promise<void>;
@@ -805,6 +827,8 @@ function Inspector({
   onMoveToTrash: (id: string) => Promise<void>;
   onRestore: (id: string) => Promise<void>;
   onDeletePermanently: (id: string) => Promise<void>;
+  lang: Language;
+  t: TranslationKeys;
 }) {
   const e = latest(r),
     x = expense(r),
@@ -856,7 +880,7 @@ function Inspector({
     onError("");
     setRetryBusy(true);
     const { error } = await supabase.functions.invoke("voice-enrich", {
-      body: { recording_id: r.id },
+      body: { recording_id: r.id, language: lang },
     });
     if (mounted.current) {
       if (error) {

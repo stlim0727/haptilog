@@ -304,3 +304,16 @@ test("analysis readiness probe never performs a paid request or leaks configurat
   assert.equal(unavailable.status, 503);
   assert.deepEqual(await unavailable.json(), { ready: false });
 });
+
+test("language option customizes the provider system instruction", async () => {
+  const { handler, calls } = fixture();
+  const r = await handler(
+    request({ recording_id: payload.recording_id, language: "ko" }),
+  );
+  assert.equal(r.status, 200);
+  assert.ok(
+    calls.input.systemInstruction.parts[0].text.includes(
+      "한국어로 요약 및 세부사항 작성",
+    ),
+  );
+});

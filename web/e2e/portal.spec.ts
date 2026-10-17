@@ -137,7 +137,7 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
         lease_until: "2026-10-16T12:00:00Z",
       };
       body = {};
-      expect(req.postDataJSON()).toEqual({ recording_id: baseRecording.id });
+      expect(req.postDataJSON()).toMatchObject({ recording_id: baseRecording.id });
     } else if (path.includes("/storage/v1/object/")) {
       state.audioLoads++;
       return route.fulfill({
@@ -345,4 +345,23 @@ test("moves a recording to trash with undo and restores from the trash tab", asy
   // Switch back to All tab
   await page.getByRole("button", { name: "All", exact: true }).click();
   await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
+});
+
+test("toggles language between English and Korean and persists in localStorage", async ({ page }) => {
+  await fixture(page);
+  await page.goto("/");
+  await expect(page.locator(".top-label")).toHaveText("A LITTLE SPACE TO REFLECT");
+
+  // Click language switch to toggle to Korean
+  await page.getByRole("button", { name: "Toggle language" }).click();
+  await expect(page.locator(".top-label")).toHaveText("잠시 생각을 정리하는 공간");
+  await expect(page.getByRole("button", { name: "Toggle language" })).toHaveText("EN");
+
+  // Reload and check persistence
+  await page.reload();
+  await expect(page.locator(".top-label")).toHaveText("잠시 생각을 정리하는 공간");
+
+  // Toggle back to English
+  await page.getByRole("button", { name: "Toggle language" }).click();
+  await expect(page.locator(".top-label")).toHaveText("A LITTLE SPACE TO REFLECT");
 });
