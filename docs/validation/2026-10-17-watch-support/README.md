@@ -2,9 +2,9 @@
 
 The UX director reviewed the source and round-watch screenshots using clarity, restraint, and discoverability as criteria. This is a design review inspired by those principles, not a review by Jony Ive.
 
-The previous layout placed Web access after every recording. The revised layout keeps the record control primary and places Web access and Settings & help ahead of the recording list. Web access is also available inside Settings. Settings shows the installed version name and build number offline. Open Play Store delegates update availability to the watch store rather than asserting that an update was checked.
+The previous layout placed Web access after every recording. After a second UX review, the revised layout keeps the record control primary and places only Settings & help ahead of the recording list. Web access has one predictable home near the top of Settings; its redundant main-screen shortcut was removed. The original main.png and initial.png captures show the superseded two-shortcut proposal. Final captures main-simplified.png and main-simplified-scrolled.png show Record → Settings & help → Recent recordings, with no duplicate Web access entry. The simplified main screen also passed assembleDebug and lintDebug. Settings shows the installed version name and build number offline. Open Play Store delegates update availability to the watch store rather than asserting that an update was checked.
 
-The initial screen keeps the full Record control visible. Scrolling reveals navigation before the first recording. The screenshots are from a diagnostic debug build (1.1.0, build 1), not evidence of an installed Play release.
+The original initial-screen capture keeps the full Record control visible. Scrolling reveals Settings before the first recording. The screenshots are from a diagnostic debug build (1.1.0, build 1), not evidence of an installed Play release.
 
 ## Reporting contract
 

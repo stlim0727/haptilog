@@ -7,7 +7,6 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.haptilog.watch.data.RecordingExport
-import com.haptilog.watch.sync.CloudClient
 import com.haptilog.watch.sync.RecordingSyncWorker
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -217,8 +216,6 @@ class MainActivity : ComponentActivity() {
                         RecordingSyncWorker.retry(this, item.id)
                         repository.refresh()
                     },
-                    cloudConfigured = CloudClient.configured,
-                    onWebAccess = { if (!isRecording) startActivity(Intent(this, WebAccessActivity::class.java)) },
                     onSettings = { if (!isRecording) startActivity(Intent(this, SettingsActivity::class.java)) },
                     onDeleteRecording = { id ->
                         if (playingId == id) audioPlayer.stop()
@@ -253,8 +250,6 @@ fun HaptiLogScreen(
     onDeleteRecording: (String) -> Unit,
     onExport: (RecordingItem) -> Unit,
     onRetry: (RecordingItem) -> Unit,
-    cloudConfigured: Boolean,
-    onWebAccess: () -> Unit,
     onSettings: () -> Unit
 ) {
     val listState = rememberScalingLazyListState()
@@ -299,13 +294,6 @@ fun HaptiLogScreen(
             }
 
             // Navigation stays ahead of the unbounded recording list.
-            item {
-                CompactChip(
-                    enabled = !isRecording && cloudConfigured,
-                    onClick = onWebAccess,
-                    label = { Text("Web access", fontSize = 12.sp) }
-                )
-            }
             item {
                 CompactChip(
                     enabled = !isRecording,
