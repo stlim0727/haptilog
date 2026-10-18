@@ -39,6 +39,10 @@ import type { Correction, Recording } from "./domain";
 import { translations, getInitialLanguage } from "./i18n";
 import type { Language, TranslationKeys } from "./i18n";
 import "./style.css";
+
+declare global {
+  var __storageClearedIds: Set<string> | undefined;
+}
 const RecordingMap = lazy(() => import("./RecordingMap"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -287,28 +291,40 @@ function App() {
     const rec = records.find((r) => r.id === id);
     if (!rec) return;
 
-    if (rec.audio_path) {
-      const { error: storageError } = await supabase.storage
+    const cleared = (globalThis.__storageClearedIds =
+      globalThis.__storageClearedIds || new Set());
+
+    if (rec.audio_path && !cleared.has(id)) {
+      const { data, error: storageError } = await supabase.storage
         .from("recordings")
         .remove([rec.audio_path]);
       if (storageError) {
         setError(t.save_error);
         return;
       }
+      const fileName = rec.audio_path.split("/").pop();
+      const removed = Array.isArray(data) && data.some((d) => d.name === fileName || d.name === rec.audio_path);
+      if (!removed) {
+        setError(t.save_error);
+        return;
+      }
+      cleared.add(id);
     }
 
-    const { error: dbError } = await supabase
+    const { data: deletedRows, error: dbError } = await supabase
       .from("recordings")
       .delete()
       .eq("id", id)
-      .not("deleted_at", "is", null);
+      .not("deleted_at", "is", null)
+      .select();
 
-    if (dbError) {
-      setError(t.save_error);
+    if (dbError || (Array.isArray(deletedRows) && deletedRows.length === 0)) {
+      if (dbError) setError(t.save_error);
       void load();
       return;
     }
 
+    cleared.delete(id);
     setRecords((prev) => prev.filter((r) => r.id !== id));
     if (selected === id) setSelected(null);
   }
@@ -319,14 +335,20 @@ function App() {
     if (!trashed.length) return;
     if (!window.confirm(t.confirm_empty_trash(trashed.length))) return;
 
+    const cleared = (globalThis.__storageClearedIds =
+      globalThis.__storageClearedIds || new Set());
+
     const items = trashed.map((r) => ({ id: r.id, audio_path: r.audio_path }));
-    const audioPaths = items
-      .map((i) => i.audio_path)
-      .filter((p): p is string => Boolean(p));
+    const pendingRemoval = items.filter((i) => i.audio_path && !cleared.has(i.id));
 
-    let successfulIds = trashed.map((r) => r.id);
+    let successfulIds = trashed
+      .filter((r) => !r.audio_path || cleared.has(r.id))
+      .map((r) => r.id);
 
-    if (audioPaths.length > 0) {
+    if (pendingRemoval.length > 0) {
+      const audioPaths = pendingRemoval
+        .map((i) => i.audio_path)
+        .filter((p): p is string => Boolean(p));
       const { data, error: storageError } = await supabase.storage
         .from("recordings")
         .remove(audioPaths);
@@ -334,24 +356,34 @@ function App() {
         setError(t.save_error);
         return;
       }
-      const resolution = resolveStorageDeletions(items, data);
-      successfulIds = resolution.successfulIds;
+      const resolution = resolveStorageDeletions(pendingRemoval, data, cleared);
+      successfulIds = [...successfulIds, ...resolution.successfulIds];
     }
 
     if (successfulIds.length > 0) {
-      const { error: dbError } = await supabase
+      const { data: deletedRows, error: dbError } = await supabase
         .from("recordings")
         .delete()
         .in("id", successfulIds)
-        .not("deleted_at", "is", null);
+        .not("deleted_at", "is", null)
+        .select();
 
       if (dbError) {
         setError(t.save_error);
         void load();
         return;
       }
-      setRecords((prev) => prev.filter((rec) => !successfulIds.includes(rec.id)));
-      if (selected && successfulIds.includes(selected)) setSelected(null);
+
+      const deletedIds = Array.isArray(deletedRows)
+        ? new Set(deletedRows.map((r) => r.id))
+        : new Set(successfulIds);
+
+      for (const did of deletedIds) cleared.delete(did);
+      if (deletedIds.size < successfulIds.length) {
+        void load();
+      }
+      setRecords((prev) => prev.filter((rec) => !deletedIds.has(rec.id)));
+      if (selected && deletedIds.has(selected)) setSelected(null);
     }
   }
 
