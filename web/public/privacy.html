@@ -115,6 +115,7 @@
         HaptiLog is designed around <strong>local-first capture</strong> and <strong>privacy by design</strong>. Audio memos are recorded only when explicitly initiated by the user, stored locally on watch flash memory, and never sold or shared with advertising third parties.
       </div>
 
+      <p><strong>Adults 18+:</strong> HaptiLog is intended for adults. Optional cloud synchronization and AI processing require an explicit declaration that you are at least 18 and consent to processing. This declaration is not independent age verification. Declining leaves watch recording local. Turning cloud sync off stops future watch synchronization and queues server consent withdrawal when online; requests already sent may finish. Existing cloud copies remain until deleted in the portal or through a support request.</p>
       <h2>1. Information We Collect and Process</h2>
 
       <h3>A. Audio Recordings (Microphone)</h3>
@@ -164,6 +165,7 @@
         <li><strong>Access Control:</strong> Data stored in our database is protected using PostgreSQL Row-Level Security (RLS) ensuring each user can access only their own records.</li>
         <li><strong>Web Pairing Security:</strong> Web portal connections authenticate using short-lived HMAC-verified codes and cryptographically scoped session tokens.</li>
         <li><strong>Local Deletion:</strong> Deleting a recording on the watch removes its local files. It does not delete an already uploaded cloud copy. Revoking a browser connection removes its future access, but does not delete cloud recordings or copies already downloaded.</li>
+        <li><strong>Cloud Consent:</strong> When you enable cloud features, we record your adult declaration, consent version, and consent/withdrawal time against your anonymous cloud identity. This is optional and is not a date-of-birth or identity check.</li>
         <li><strong>Retention:</strong> Local recordings remain until you delete them or remove the app's data. Cloud recordings, location snapshots, transcripts, summaries, and corrections remain until permanently deleted through the portal or removed following a verified request. Moving a recording to Trash is reversible and does not delete its stored audio. Support and crash reports are retained for troubleshooting and manually removed when no longer needed; there is no automatic 90-day deletion schedule.</li>
       </ul>
 

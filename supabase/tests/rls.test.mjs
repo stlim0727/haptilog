@@ -45,6 +45,13 @@ assert.ok(checkedUpgrade, 'Existing portal installations need a follow-up privil
 await db.exec(`delete from public.recordings where id='${upgradeRecording}';`);
 await db.exec(`grant all on public.recordings, public.voice_enrichments, storage.objects to service_role;
 set role authenticated; set request.jwt.claim.sub='${owner}';`);
+await assert.rejects(db.exec(`insert into public.recordings(id,user_id) values('${rec}','${owner}');`));
+await assert.rejects(db.exec(`select public.set_cloud_consent(true,false);`), /Adult declaration required/);
+await db.exec(`select public.set_cloud_consent(true,true);`);
+await assert.rejects(db.exec(`update public.cloud_consents set enabled=false;`), /permission denied/);
+await db.exec(`select public.set_cloud_consent(false,false);`);
+await assert.rejects(db.exec(`insert into storage.objects(bucket_id,name) values('recordings','${owner}/unconsented.m4a');`));
+await db.exec(`select public.set_cloud_consent(true,true);`);
 await db.exec(`insert into public.recordings(id,user_id,audio_path) values ('${rec}','${owner}','${owner}/${rec}.m4a');`);
 await assert.rejects(db.exec(`insert into public.recordings(user_id) values ('${other}');`));
 await assert.rejects(db.exec(`update public.recordings set user_id='${other}',audio_path='${other}/${rec}.m4a' where id='${rec}';`));

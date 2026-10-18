@@ -63,6 +63,7 @@ const baseRecording = {
   recording_corrections: null,
 };
 async function fixture(page: Page, { connected = true, failed = false } = {}) {
+  page.on("dialog", dialog => dialog.accept());
   const state = {
     paired: connected,
     recording: structuredClone(baseRecording) as any,
@@ -94,6 +95,7 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
       path = new URL(req.url()).pathname;
     let body: unknown;
     if (path.endsWith("/signup")) body = session;
+    else if (path.endsWith("/set_cloud_consent")) return route.fulfill({ status: 204 });
     else if (path.endsWith("/logout")) return route.fulfill({ status: 204 });
     else if (path.endsWith("/watch-access")) {
       state.paired = true;
@@ -377,4 +379,13 @@ test("restore reports a zero-row claim conflict and reloads server state", async
   await expect(page.getByText("Changes were not saved. Try again when connected.")).toBeVisible();
   await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
   expect(state.recording.deleted_at).not.toBeNull();
+});
+
+test("declining adult cloud consent does not invoke AI", async ({ page }) => {
+  const state = await fixture(page, { failed: true });
+  page.removeAllListeners("dialog");
+  page.on("dialog", dialog => dialog.dismiss());
+  await page.goto("/");
+  await page.getByRole("button", { name: "Retry analysis" }).click();
+  expect(state.retry).toBe(0);
 });

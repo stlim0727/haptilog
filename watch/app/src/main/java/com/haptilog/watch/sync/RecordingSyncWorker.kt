@@ -17,7 +17,7 @@ import kotlinx.coroutines.sync.withLock
 class RecordingSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     companion object {
         private val syncMutex = Mutex()
-        fun enabled(context: Context) = context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).getBoolean("enabled", false)
+        fun enabled(context: Context) = CloudConsent.accepted(context) && context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).getBoolean("enabled", false)
         fun retry(context: Context, id: String) {
             if (!RecordingFiles.validId(id)) return
             val file = File(RecordingFiles.dir(context), "sync_$id.json")

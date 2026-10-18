@@ -900,8 +900,18 @@ function Inspector({
   }
   async function retry() {
     if (!supabase) return;
+    const consentText = lang === "ko"
+      ? "AI 분석은 만 18세 이상만 사용할 수 있습니다. 음성과 녹음 시각이 Supabase 및 Google Gemini에서 처리됩니다. 민감한 내용은 보내지 마세요. 개인정보처리방침: https://haptilog.keepory.app/privacy.html\n만 18세 이상이며 이 처리에 동의합니까? 워치에서도 동의가 필요합니다."
+      : "AI analysis is for adults 18+. Audio and recording time are processed by Supabase and Google Gemini. Do not submit sensitive content. Privacy: https://haptilog.keepory.app/privacy.html\nAre you 18+ and do you consent? The watch owner must also consent.";
+    if (!window.confirm(consentText)) return;
     onError("");
     setRetryBusy(true);
+    const { error: consentError } = await supabase.rpc("set_cloud_consent", { p_enabled: true, p_adult: true });
+    if (consentError) {
+      onError(t.save_error);
+      setRetryBusy(false);
+      return;
+    }
     const { error } = await supabase.functions.invoke("voice-enrich", {
       body: { recording_id: r.id, language: lang },
     });
@@ -909,7 +919,7 @@ function Inspector({
       if (error) {
         let failureCode: string | undefined;
         try { failureCode = (await error.context?.json())?.code; } catch { /* Network errors have no response body. */ }
-        onError(analysisFailure(failureCode));
+        onError(failureCode === "CONSENT_REQUIRED" ? (lang === "ko" ? "워치 설정에서 만 18세 이상 클라우드 이용 동의가 필요합니다." : "Adult cloud consent is required in watch Settings.") : analysisFailure(failureCode));
       }
       await onChange();
       setRetryBusy(false);
