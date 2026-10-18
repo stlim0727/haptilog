@@ -109,8 +109,13 @@ await assert.rejects(db.exec(`update public.recordings set latitude=37.5665 wher
 assert.equal((await db.query(`delete from public.recordings where id='${rec}' returning id`)).rows.length, 0);
 // Nor can it delete its audio file while active
 assert.equal((await db.query(`delete from storage.objects where name='${owner}/${rec}.m4a' returning name`)).rows.length, 0);
-// Once moved to trash, audio deletion and recording hard-delete are permitted
+// Active recording cannot be claimed for purge
+await assert.rejects(db.exec(`update public.recordings set purging_at=now() where id='${rec}';`), /Cannot claim permanent deletion on an active recording/);
+// Once moved to trash, claiming purge and hard-delete are permitted
 await db.exec(`update public.recordings set deleted_at=now() where id='${rec}';`);
+await db.exec(`update public.recordings set purging_at=now() where id='${rec}';`);
+// Once claimed, restore is blocked
+await assert.rejects(db.exec(`update public.recordings set deleted_at=null where id='${rec}';`), /Cannot restore a recording that is currently being permanently deleted/);
 await db.exec(`delete from storage.objects where name='${owner}/${rec}.m4a';`);
 assert.equal((await db.query(`delete from public.recordings where id='${rec}' returning id`)).rows.length, 1);
 // Re-insert for remaining connection tests

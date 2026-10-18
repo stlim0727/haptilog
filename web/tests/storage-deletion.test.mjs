@@ -20,10 +20,12 @@ function fixture(mode) {
     id: "r1",
     audio_path: "owner/sample.m4a",
     deleted_at: "2026-10-17T00:00:00Z",
+    purging_at: null,
   };
   let ui = [{ ...row }],
     dbCalls = 0,
-    storageCalls = 0;
+    storageCalls = 0,
+    audioExists = true;
   const errors = [];
   const supabase = {
     storage: {
@@ -31,7 +33,7 @@ function fixture(mode) {
         remove: async () => {
           storageCalls++;
           if (mode === "empty") return { data: [], error: null };
-          if (mode === "restore") row.deleted_at = null;
+          audioExists = false;
           return {
             data: mode === "retry" && storageCalls > 1
               ? []
@@ -42,6 +44,39 @@ function fixture(mode) {
       }),
     },
     from: () => ({
+      update: (patch) => {
+        let matched = true;
+        const q = {
+          eq: (col, val) => {
+            if (row[col] !== val) matched = false;
+            return q;
+          },
+          in: (col, vals) => {
+            if (!vals.includes(row[col])) matched = false;
+            return q;
+          },
+          not: (col, op, val) => {
+            if (op === "is" && val === null && row[col] === null) matched = false;
+            return q;
+          },
+          is: (col, val) => {
+            if (row[col] !== val) matched = false;
+            return q;
+          },
+          select: async () => {
+            if (mode === "restore") {
+              row.deleted_at = null;
+              matched = false;
+            }
+            if (matched) {
+              Object.assign(row, patch);
+              return { data: [row], error: null };
+            }
+            return { data: [], error: null };
+          },
+        };
+        return q;
+      },
       delete: () => {
         dbCalls++;
         const q = {
@@ -87,7 +122,9 @@ function fixture(mode) {
     },
     () => {},
     (e) => errors.push(e),
-    async () => {},
+    async () => {
+      ui = [{ ...row }];
+    },
     resolveStorageDeletions,
   );
   return {
@@ -98,6 +135,9 @@ function fixture(mode) {
     },
     get ui() {
       return ui;
+    },
+    get audioExists() {
+      return audioExists;
     },
     errors,
   };
@@ -112,6 +152,7 @@ test("single: empty Storage result must not authorize DB deletion", async () => 
 test("bulk: retry after Storage success and DB failure must retry DB completion", async () => {
   const f = fixture("retry");
   await f.emptyTrash();
+  globalThis.__storageClearedIds = undefined;
   await f.emptyTrash();
   assert.equal(f.dbCalls, 2);
 });
@@ -121,4 +162,5 @@ test("restore racing Storage deletion: zero-row DB result must not report UI suc
   await f.deletePermanently("r1");
   assert.equal(f.row.deleted_at, null);
   assert.equal(f.ui.length, 1);
+  assert.ok(f.row.deleted_at !== null || f.audioExists);
 });

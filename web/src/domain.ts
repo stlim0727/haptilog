@@ -35,6 +35,7 @@ export type Recording = {
   } | null;
   recording_corrections: Correction | null;
   deleted_at?: string | null;
+  purging_at?: string | null;
 };
 export function latest(recording: Recording) {
   return [...recording.voice_enrichments].sort(
@@ -168,7 +169,7 @@ export function csv(recordings: Recording[]) {
 }
 
 export function resolveStorageDeletions(
-  items: Array<{ id: string; audio_path: string | null }>,
+  items: Array<{ id: string; audio_path: string | null; purging_at?: string | null }>,
   removedObjects: Array<{ name: string }> | null,
   cleared: Set<string> = new Set(),
 ): { successfulIds: string[]; failedIds: string[] } {
@@ -178,7 +179,7 @@ export function resolveStorageDeletions(
   const failedIds: string[] = [];
 
   for (const item of items) {
-    if (!item.audio_path || cleared.has(item.id)) {
+    if (!item.audio_path || item.purging_at || cleared.has(item.id)) {
       successfulIds.push(item.id);
       continue;
     }

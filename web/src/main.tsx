@@ -278,7 +278,8 @@ function App() {
     const { error } = await supabase
       .from("recordings")
       .update({ deleted_at: null })
-      .eq("id", id);
+      .eq("id", id)
+      .is("purging_at", null);
     if (error) {
       setError(t.save_error);
       void load();
@@ -294,6 +295,21 @@ function App() {
     const cleared = (globalThis.__storageClearedIds =
       globalThis.__storageClearedIds || new Set());
 
+    if (!rec.purging_at && !cleared.has(id)) {
+      const { data: claimedRows, error: claimError } = await supabase
+        .from("recordings")
+        .update({ purging_at: new Date().toISOString() })
+        .eq("id", id)
+        .not("deleted_at", "is", null)
+        .select();
+
+      if (claimError || (Array.isArray(claimedRows) && claimedRows.length === 0)) {
+        if (claimError) setError(t.save_error);
+        void load();
+        return;
+      }
+    }
+
     if (rec.audio_path && !cleared.has(id)) {
       const { data, error: storageError } = await supabase.storage
         .from("recordings")
@@ -304,7 +320,7 @@ function App() {
       }
       const fileName = rec.audio_path.split("/").pop();
       const removed = Array.isArray(data) && data.some((d) => d.name === fileName || d.name === rec.audio_path);
-      if (!removed) {
+      if (!removed && !rec.purging_at) {
         setError(t.save_error);
         return;
       }
@@ -338,12 +354,36 @@ function App() {
     const cleared = (globalThis.__storageClearedIds =
       globalThis.__storageClearedIds || new Set());
 
-    const items = trashed.map((r) => ({ id: r.id, audio_path: r.audio_path }));
-    const pendingRemoval = items.filter((i) => i.audio_path && !cleared.has(i.id));
+    const items = trashed.map((r) => ({ id: r.id, audio_path: r.audio_path, purging_at: r.purging_at }));
+    const unclaimed = items.filter((i) => !i.purging_at && !cleared.has(i.id));
 
-    let successfulIds = trashed
-      .filter((r) => !r.audio_path || cleared.has(r.id))
-      .map((r) => r.id);
+    if (unclaimed.length > 0) {
+      const unclaimedIds = unclaimed.map((i) => i.id);
+      const { data: claimedRows, error: claimError } = await supabase
+        .from("recordings")
+        .update({ purging_at: new Date().toISOString() })
+        .in("id", unclaimedIds)
+        .not("deleted_at", "is", null)
+        .select();
+
+      if (claimError) {
+        setError(t.save_error);
+        void load();
+        return;
+      }
+      const claimedSet = new Set(Array.isArray(claimedRows) ? claimedRows.map((r) => r.id) : []);
+      for (const item of items) {
+        if (claimedSet.has(item.id)) {
+          item.purging_at = new Date().toISOString();
+        }
+      }
+    }
+
+    const validItems = items.filter((i) => i.purging_at || cleared.has(i.id) || !i.audio_path);
+    const pendingRemoval = validItems.filter((i) => i.audio_path && !cleared.has(i.id) && !i.purging_at);
+    const alreadyClearedIds = validItems.filter((i) => i.purging_at || !i.audio_path || cleared.has(i.id)).map((i) => i.id);
+
+    let successfulIds = [...alreadyClearedIds];
 
     if (pendingRemoval.length > 0) {
       const audioPaths = pendingRemoval
@@ -357,7 +397,7 @@ function App() {
         return;
       }
       const resolution = resolveStorageDeletions(pendingRemoval, data, cleared);
-      successfulIds = [...successfulIds, ...resolution.successfulIds];
+      successfulIds = Array.from(new Set([...successfulIds, ...resolution.successfulIds]));
     }
 
     if (successfulIds.length > 0) {
