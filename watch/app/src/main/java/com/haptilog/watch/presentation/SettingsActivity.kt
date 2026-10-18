@@ -32,6 +32,7 @@ import androidx.wear.compose.material.*
 import com.haptilog.watch.BuildConfig
 import com.haptilog.watch.support.AppReports
 import com.haptilog.watch.support.ReportUploadWorker
+import com.haptilog.watch.sync.CloudConsent
 import com.haptilog.watch.sync.CloudClient
 import com.haptilog.watch.sync.RecordingSyncWorker
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +50,7 @@ class SettingsActivity : ComponentActivity() {
                 val focus = remember { FocusRequester() }
                 var cloud by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
                 var crashes by remember { mutableStateOf(AppReports.crashReportsEnabled(this)) }
+                var consenting by rememberSaveable { mutableStateOf(false) }
                 var reporting by rememberSaveable { mutableStateOf(false) }
                 var description by rememberSaveable { mutableStateOf("") }
                 var busy by remember { mutableStateOf(false) }
@@ -61,8 +63,8 @@ class SettingsActivity : ComponentActivity() {
                     lifecycle.addObserver(observer)
                     onDispose { lifecycle.removeObserver(observer) }
                 }
-                BackHandler(enabled = reporting && !busy) { reporting = false; notice = null }
-                LaunchedEffect(reporting) { list.scrollToItem(0); focus.requestFocus() }
+                BackHandler(enabled = (reporting || consenting) && !busy) { reporting = false; consenting = false; notice = null }
+                LaunchedEffect(reporting, consenting) { list.scrollToItem(0); focus.requestFocus() }
                 Scaffold(positionIndicator = { PositionIndicator(scalingLazyListState = list) }) {
                     ScalingLazyColumn(
                         state = list,
@@ -75,7 +77,25 @@ class SettingsActivity : ComponentActivity() {
                         item { Text(if (reporting) "Report an issue" else "Settings & help", fontSize = 18.sp, textAlign = TextAlign.Center) }
                         item { Text("HaptiLog ${BuildConfig.VERSION_NAME}\nBuild ${BuildConfig.VERSION_CODE}", fontSize = 14.sp, textAlign = TextAlign.Center) }
                         notice?.let { message -> item { Text(message, fontSize = 12.sp, textAlign = TextAlign.Center) } }
-                        if (reporting) {
+                        if (consenting) {
+                            item { Text("Adults 18+ · Optional cloud AI", fontSize = 16.sp, textAlign = TextAlign.Center) }
+                            item { Text("Enabling uploads existing completed recordings and future recordings, including audio and saved location, to Supabase. Audio and recording time go to Google Gemini for transcription and organization. Location and internal IDs are excluded from Gemini metadata. Avoid sensitive recordings. AI results can be wrong.", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                            item { Text("Turning off stops future sync and queues server consent withdrawal when online. Cloud copies stay until deleted in the portal. Requests already sent may finish. Local recording remains available without cloud consent.", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                            item { Text("Privacy: haptilog.keepory.app/privacy.html", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                            item { Chip(enabled = !busy, label = { Text(if (busy) "Connecting…" else "I am 18+ · Agree & enable") }, onClick = {
+                                busy = true
+                                scope.launch {
+                                    try {
+                                        withContext(Dispatchers.IO) { CloudConsent.enable(this@SettingsActivity) }
+                                        cloud = true
+                                        consenting = false
+                                        notice = "Cloud enabled. Existing completed recordings may upload."
+                                    } catch (_: Exception) { notice = "Could not enable cloud. Check your connection and retry." }
+                                    finally { busy = false }
+                                }
+                            }) }
+                            item { CompactChip(enabled = !busy, label = { Text("Decline · Keep local only") }, onClick = { consenting = false }) }
+                        } else if (reporting) {
                             item { Text("Tap to describe the problem.", fontSize = 12.sp, textAlign = TextAlign.Center) }
                             item {
                                 BasicTextField(
@@ -122,10 +142,13 @@ class SettingsActivity : ComponentActivity() {
                                 }, label = { Text("Web access") })
                             }
                             item {
-                                ToggleChip(checked = cloud, enabled = CloudClient.configured,
+                                ToggleChip(checked = cloud, enabled = CloudClient.configured && !busy,
                                     onCheckedChange = { enabled ->
-                                        if (enabled) RecordingSyncWorker.enable(this@SettingsActivity) else RecordingSyncWorker.disable(this@SettingsActivity)
-                                        cloud = enabled
+                                        if (enabled) consenting = true else {
+                                            CloudConsent.disable(this@SettingsActivity)
+                                            cloud = false
+                                            notice = "Sync stopped. Server withdrawal will be sent when online. Cloud copies remain until deleted."
+                                        }
                                     }, label = { Text("Cloud sync") },
                                     toggleControl = { Switch(checked = cloud) })
                             }
@@ -137,6 +160,10 @@ class SettingsActivity : ComponentActivity() {
                                     } catch (_: ActivityNotFoundException) { notice = "Play Store unavailable on this watch." }
                                 }, label = { Text("Open Play Store") })
                             }
+                            item { Chip(onClick = {
+                                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://haptilog.keepory.app/privacy.html"))) }
+                                catch (_: ActivityNotFoundException) { notice = "Privacy policy: https://haptilog.keepory.app/privacy.html" }
+                            }, label = { Text("Privacy policy") }) }
                             item { Text("Check for updates in the store.", fontSize = 12.sp, textAlign = TextAlign.Center) }
                             item { Chip(onClick = { reporting = true; notice = null }, label = { Text("Report an issue") }) }
                             item {

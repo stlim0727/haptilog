@@ -109,6 +109,18 @@ export function createHandler(deps: Dependencies) {
       const admin = deps.createClient(url, serviceKey, {
         auth: { persistSession: false },
       });
+      // Both the recording owner and a paired browser caller must explicitly
+      // consent. Editable JWT metadata and client headers are not authority.
+      const requiredUsers = [...new Set([user.id, recording.user_id])];
+      const consentStatus = async () => {
+        const { data: consents, error } = await admin.from("cloud_consents")
+          .select("user_id,enabled,policy_version,adult_attested_at").in("user_id", requiredUsers);
+        if (error) return "CONSENT_UNAVAILABLE";
+        return requiredUsers.every((id) => consents?.some((c) => c.user_id === id && c.enabled && c.adult_attested_at && c.policy_version === "2026-10-18"))
+          ? null : "CONSENT_REQUIRED";
+      };
+      const consentFailure = await consentStatus();
+      if (consentFailure) return reply(consentFailure === "CONSENT_UNAVAILABLE" ? 503 : 403, { error: "Adult cloud consent required", code: consentFailure });
       const basePipelineVersion = deps.env("PIPELINE_VERSION") || "v1";
       const pipelineVersion = input.language
         ? `${basePipelineVersion}:${input.language}`
@@ -213,7 +225,11 @@ export function createHandler(deps: Dependencies) {
                     data: audioBase64,
                   },
                 },
-                { text: `Recording context: ${JSON.stringify(recording)}` },
+                {
+                  text: `Recording context: ${JSON.stringify({
+                    recorded_at: recording.recorded_at,
+                  })}`,
+                },
               ],
             },
           ],
@@ -235,6 +251,9 @@ export function createHandler(deps: Dependencies) {
           },
         }),
       };
+      // Recheck after downloading audio, immediately before the paid egress.
+      const withdrawn = await consentStatus();
+      if (withdrawn) return reply(withdrawn === "CONSENT_UNAVAILABLE" ? 503 : 403, { error: "Cloud consent unavailable or withdrawn", code: withdrawn });
       let response = await deps.fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${
           encodeURIComponent(

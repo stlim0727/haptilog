@@ -106,7 +106,7 @@
       <header>
         <h1>HaptiLog Privacy Policy</h1>
         <div class="meta">
-          <strong>Effective Date:</strong> October 17, 2026 &bull; 
+          <strong>Effective Date:</strong> October 18, 2026 &bull;
           <strong>Application:</strong> HaptiLog for Wear OS (<code>com.haptilog.watch</code>) &amp; Web Portal
         </div>
       </header>
@@ -115,6 +115,7 @@
         HaptiLog is designed around <strong>local-first capture</strong> and <strong>privacy by design</strong>. Audio memos are recorded only when explicitly initiated by the user, stored locally on watch flash memory, and never sold or shared with advertising third parties.
       </div>
 
+      <p><strong>Adults 18+:</strong> HaptiLog is intended for adults. Optional cloud synchronization and AI processing require an explicit declaration that you are at least 18 and consent to processing. This declaration is not independent age verification. Declining leaves watch recording local. Turning cloud sync off stops future watch synchronization and queues server consent withdrawal when online; requests already sent may finish. Existing cloud copies remain until deleted in the portal or through a support request.</p>
       <h2>1. Information We Collect and Process</h2>
 
       <h3>A. Audio Recordings (Microphone)</h3>
@@ -141,14 +142,19 @@
         Diagnostic reporting is <strong>off by default</strong>. If you explicitly opt in through Watch Settings:
       </p>
       <ul>
-        <li>Only high-level uncaught JVM exception class names, app build version, device model, and Android OS level are collected to fix bugs.</li>
+        <li>Uncaught JVM exception class names, limited HaptiLog code locations (class, method, and line number), app build version, device manufacturer/model, and Android OS level are collected to fix bugs. Reports are linked to your anonymous cloud user ID.</li>
         <li><strong>Strict Exclusions:</strong> Crash reports <em>never</em> contain audio data, transcripts, GPS coordinates, file paths, device IDs, or exception message strings.</li>
       </ul>
+
+      <h3>D. Support Reports and Cloud Identity</h3>
+      <p>When you choose to send an issue report from Watch Settings, we collect the description you enter, a report ID, app/build version, device manufacturer/model, Android API level, and an anonymous cloud user ID. Issue submission is optional and separate from the crash-report switch. Do not include sensitive personal information in your description.</p>
+      <p>Optional cloud features use an automatically generated anonymous user ID and authenticated sessions to protect your recordings, pair browsers, and associate support reports. You do not need to provide a name, email address, or password to use the watch app. Synchronized transcripts, structured summaries, and corrections are stored with the source recording.</p>
+      <p>If you choose to record purchase or workout notes and enable cloud processing, their contents may include purchase history (such as amounts, currencies, and merchants) or fitness information (such as exercise observations). HaptiLog organizes these into expense and workout notes. It does not connect to a bank, process payments, measure vital signs, or provide financial or medical advice.</p>
 
       <h2>2. How We Use and Share Information</h2>
       <p>We use captured data exclusively to deliver HaptiLog's core voice logging, transcription, and contextual organization features:</p>
       <ul>
-        <li><strong>AI Transcription &amp; Structuring:</strong> Processed via Google Gemini Multimodal APIs through secure edge functions.</li>
+        <li><strong>AI Transcription &amp; Structuring:</strong> Audio data and recording timestamps are sent to Google Gemini APIs through our backend for transcription and organization. GPS coordinates, user identifiers, and internal storage paths are strictly excluded from AI provider requests. Cloud sync is off by default on the watch; enabling it can upload previously saved completed recordings as well as new ones. Spoken content within the audio recording is transcribed and processed as data by the model.</li>
         <li><strong>No Advertising or Profiling:</strong> We do not serve advertisements, sell user data, or share personal information with data brokers or tracking networks.</li>
         <li><strong>Map Display:</strong> When reviewing locations on the web portal, map tiles are provided by OpenStreetMap. Only the displayed map coordinates and page origin are sent to tile servers; no user voice, audio, or transcript data is transmitted.</li>
       </ul>
@@ -158,8 +164,15 @@
         <li><strong>Encryption in Transit:</strong> All communications between the watch, web portal, and cloud services use TLS/HTTPS encryption.</li>
         <li><strong>Access Control:</strong> Data stored in our database is protected using PostgreSQL Row-Level Security (RLS) ensuring each user can access only their own records.</li>
         <li><strong>Web Pairing Security:</strong> Web portal connections authenticate using short-lived HMAC-verified codes and cryptographically scoped session tokens.</li>
-        <li><strong>User Deletion:</strong> You can delete recordings or revoke web browser access at any time directly through the app and web portal.</li>
+        <li><strong>Local Deletion:</strong> Deleting a recording on the watch removes its local files. It does not delete an already uploaded cloud copy. Revoking a browser connection removes its future access, but does not delete cloud recordings or copies already downloaded.</li>
+        <li><strong>Cloud Consent:</strong> When you enable cloud features, we record your adult declaration, consent version, and consent/withdrawal time against your anonymous cloud identity. This is optional and is not a date-of-birth or identity check.</li>
+        <li><strong>Retention:</strong> Local recordings remain until you delete them or remove the app's data. Cloud recordings, location snapshots, transcripts, summaries, and corrections remain until permanently deleted through the portal or removed following a verified request. Moving a recording to Trash is reversible and does not delete its stored audio. Support and crash reports are retained for troubleshooting and manually removed when no longer needed; there is no automatic 90-day deletion schedule.</li>
       </ul>
+
+      <h3 id="delete-data">Request deletion of HaptiLog cloud data</h3>
+      <p>In a connected web portal, move a recording to Trash and use <strong>Delete permanently</strong> to request deletion of that recording and its associated content. For all cloud data, anonymous identity, support reports, or help with a deletion that did not complete, use the email process below.</p>
+      <p>Email <a href="mailto:support@keepory.app?subject=HaptiLog%20data%20deletion">support@keepory.app</a> with the subject <strong>HaptiLog data deletion</strong>. Specify whether you want all cloud data deleted or particular recordings or reports removed. Include your portal user identifier or a support report ID if available so we can locate your data. Never send a password, pairing code, or session token. We may ask you to verify control of the associated watch or browser before deleting data.</p>
+      <p>A verified request can cover uploaded audio, location metadata, transcripts, summaries, corrections, support/crash reports, and the associated anonymous cloud identity. Disconnecting a browser or uninstalling the watch app alone does not request cloud deletion. We will explain any data that must be retained and the applicable period when handling your request.</p>
 
       <h2>4. Permissions Used by HaptiLog</h2>
       <ul>

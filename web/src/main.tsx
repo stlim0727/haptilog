@@ -23,6 +23,7 @@ import {
   Watch,
 } from "lucide-react";
 import { supabase } from "./client";
+import { purgeRecordings } from "./purge";
 import {
   csv,
   analysisFailure,
@@ -38,6 +39,7 @@ import type { Correction, Recording } from "./domain";
 import { translations, getInitialLanguage } from "./i18n";
 import type { Language, TranslationKeys } from "./i18n";
 import "./style.css";
+
 const RecordingMap = lazy(() => import("./RecordingMap"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -270,57 +272,42 @@ function App() {
     setToast(null);
     const pending = pendingTrashUpdates.current.get(id);
     if (pending) await pending.catch(() => {});
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("recordings")
       .update({ deleted_at: null })
-      .eq("id", id);
-    if (error) {
+      .eq("id", id)
+      .is("purging_at", null)
+      .select("id");
+    if (error || !data?.length) {
       setError(t.save_error);
+      void load();
+    }
+  }
+
+  async function completePurge(ids: string[]) {
+    if (!supabase) return;
+    try {
+      const deleted = new Set(await purgeRecordings(supabase, ids));
+      setRecords((prev) => prev.filter((rec) => !deleted.has(rec.id)));
+      if (selected && deleted.has(selected)) setSelected(null);
+      if (deleted.size !== ids.length) setError(t.save_error);
+    } catch {
+      setError(t.save_error);
+    } finally {
+      // Refresh claims and partial results even after a lost response.
       void load();
     }
   }
 
   async function deletePermanently(id: string) {
-    if (!supabase) return;
     if (!window.confirm(t.confirm_delete)) return;
-    const rec = records.find((r) => r.id === id);
-    setRecords((prev) => prev.filter((r) => r.id !== id));
-    if (selected === id) setSelected(null);
-    if (rec?.audio_path) {
-      await supabase.storage.from("recordings").remove([rec.audio_path]).catch(() => {});
-    }
-    const { error } = await supabase
-      .from("recordings")
-      .delete()
-      .eq("id", id)
-      .not("deleted_at", "is", null);
-    if (error) {
-      setError(t.save_error);
-      void load();
-    }
+    await completePurge([id]);
   }
 
   async function emptyTrash() {
-    if (!supabase) return;
-    const trashed = records.filter((r) => r.deleted_at);
-    if (!trashed.length) return;
-    if (!window.confirm(t.confirm_empty_trash(trashed.length))) return;
-    const trashedIds = trashed.map((r) => r.id);
-    setRecords((prev) => prev.filter((rec) => !rec.deleted_at));
-    setSelected(null);
-    const audioPaths = trashed.map((r) => r.audio_path).filter((p): p is string => Boolean(p));
-    if (audioPaths.length > 0) {
-      await supabase.storage.from("recordings").remove(audioPaths).catch(() => {});
-    }
-    const { error } = await supabase
-      .from("recordings")
-      .delete()
-      .in("id", trashedIds)
-      .not("deleted_at", "is", null);
-    if (error) {
-      setError(t.save_error);
-      void load();
-    }
+    const ids = records.filter((r) => r.deleted_at).map((r) => r.id);
+    if (!ids.length || !window.confirm(t.confirm_empty_trash(ids.length))) return;
+    await completePurge(ids);
   }
 
   const isTrashView = category === "Trash";
@@ -913,8 +900,18 @@ function Inspector({
   }
   async function retry() {
     if (!supabase) return;
+    const consentText = lang === "ko"
+      ? "AI 분석은 만 18세 이상만 사용할 수 있습니다. 음성과 녹음 시각이 Supabase 및 Google Gemini에서 처리됩니다. 민감한 내용은 보내지 마세요. 개인정보처리방침: https://haptilog.keepory.app/privacy.html\n만 18세 이상이며 이 처리에 동의합니까? 워치에서도 동의가 필요합니다."
+      : "AI analysis is for adults 18+. Audio and recording time are processed by Supabase and Google Gemini. Do not submit sensitive content. Privacy: https://haptilog.keepory.app/privacy.html\nAre you 18+ and do you consent? The watch owner must also consent.";
+    if (!window.confirm(consentText)) return;
     onError("");
     setRetryBusy(true);
+    const { error: consentError } = await supabase.rpc("set_cloud_consent", { p_enabled: true, p_adult: true });
+    if (consentError) {
+      onError(t.save_error);
+      setRetryBusy(false);
+      return;
+    }
     const { error } = await supabase.functions.invoke("voice-enrich", {
       body: { recording_id: r.id, language: lang },
     });
@@ -922,7 +919,7 @@ function Inspector({
       if (error) {
         let failureCode: string | undefined;
         try { failureCode = (await error.context?.json())?.code; } catch { /* Network errors have no response body. */ }
-        onError(analysisFailure(failureCode));
+        onError(failureCode === "CONSENT_REQUIRED" ? (lang === "ko" ? "워치 설정에서 만 18세 이상 클라우드 이용 동의가 필요합니다." : "Adult cloud consent is required in watch Settings.") : analysisFailure(failureCode));
       }
       await onChange();
       setRetryBusy(false);

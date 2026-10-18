@@ -23,6 +23,9 @@ const request = (body = payload, token = "valid") =>
     body: JSON.stringify(body),
   });
 function fixture({
+  consent = true,
+  revokeBeforeProvider = false,
+  consentError = false,
   owner = true,
   auth = true,
   insertError = null,
@@ -36,6 +39,7 @@ function fixture({
   audioError = false,
   ownerId = "caller",
 } = {}) {
+  let consentReads = 0;
   const calls = {
     fetch: 0,
     urls: [],
@@ -77,6 +81,10 @@ function fixture({
         }),
       },
       from: (table) => ({
+        in(_key, ids) {
+          consentReads++;
+          return Promise.resolve({ data: consent && !(revokeBeforeProvider && consentReads > 1) ? ids.map(user_id => ({ user_id, enabled: true, adult_attested_at: "now", policy_version: "2026-10-18" })) : [], error: consentError ? "unavailable" : null });
+        },
         select() {
           return this;
         },
@@ -95,6 +103,7 @@ function fixture({
                 id: payload.recording_id,
                 user_id: ownerId,
                 latitude: 37,
+                recorded_at: "2026-10-18T06:00:00Z",
                 audio_path: stored
                   ? `${ownerId}/${payload.recording_id}.m4a`
                   : null,
@@ -357,4 +366,49 @@ test("rejects unsupported language values before provider call", async () => {
     assert.equal(r.status, 400);
     assert.equal(calls.fetch, 0);
   }
+});
+
+test("context pruning: sensitive IDs, storage paths, and coordinates are never sent to Gemini", async () => {
+  const { handler, calls } = fixture({
+    ownerId: "confidential-caller-uuid",
+  });
+  const res = await handler(request());
+  assert.equal(res.status, 200);
+  assert.equal(calls.fetch, 1);
+
+  const contextPart = calls.input.contents[0].parts.find((p) =>
+    typeof p.text === "string" && p.text.startsWith("Recording context:")
+  );
+  assert.ok(contextPart, "Recording context part must exist");
+
+  const rawJson = contextPart.text.replace("Recording context:", "").trim();
+  const parsed = JSON.parse(rawJson);
+
+  assert.deepEqual(Object.keys(parsed), ["recorded_at"]);
+  assert.equal("user_id" in parsed, false);
+  assert.equal("id" in parsed, false);
+  assert.equal("audio_path" in parsed, false);
+  assert.equal("latitude" in parsed, false);
+  assert.equal("longitude" in parsed, false);
+  assert.equal("altitude" in parsed, false);
+  assert.equal("speed" in parsed, false);
+});
+
+test("unconsented owner or browser cannot invoke paid AI or download audio", async () => {
+  const { handler, calls } = fixture({ consent: false, ownerId: "watch-owner" });
+  const response = await handler(request());
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).code, "CONSENT_REQUIRED");
+  assert.equal(calls.fetch, 0); assert.equal(calls.audio, 0);
+});
+test("consent lookup errors fail closed before provider calls", async () => {
+  const { handler, calls } = fixture({ consentError: true });
+  assert.equal((await handler(request())).status, 503);
+  assert.equal(calls.fetch, 0);
+});
+
+test("withdrawal during preparation blocks the pending provider request", async () => {
+ const {handler,calls}=fixture({revokeBeforeProvider:true});
+ assert.equal((await handler(request())).status,403);
+ assert.equal(calls.fetch,0);
 });

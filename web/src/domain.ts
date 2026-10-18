@@ -35,6 +35,7 @@ export type Recording = {
   } | null;
   recording_corrections: Correction | null;
   deleted_at?: string | null;
+  purging_at?: string | null;
 };
 export function latest(recording: Recording) {
   return [...recording.voice_enrichments].sort(
