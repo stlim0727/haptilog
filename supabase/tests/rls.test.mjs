@@ -111,15 +111,27 @@ assert.equal((await db.query(`delete from public.recordings where id='${rec}' re
 assert.equal((await db.query(`delete from storage.objects where name='${owner}/${rec}.m4a' returning name`)).rows.length, 0);
 // Active recording cannot be claimed for purge
 await assert.rejects(db.exec(`update public.recordings set purging_at=now() where id='${rec}';`), /Cannot claim permanent deletion on an active recording/);
-// Once moved to trash, claiming purge and hard-delete are permitted
+// Old/direct clients cannot hard-delete even trashed rows.
+// A privileged finalizer must see both the claim and authoritative object absence.
 await db.exec(`update public.recordings set deleted_at=now() where id='${rec}';`);
+assert.equal((await db.query(`delete from public.recordings where id='${rec}' returning id`)).rows.length, 0);
+assert.equal((await db.query(`select * from public.finalize_recording_purges(array['${rec}'::uuid])`)).rows.length, 0);
 await db.exec(`update public.recordings set purging_at=now() where id='${rec}';`);
+// A claim alone does not imply Storage completion (including after restart).
+assert.equal((await db.query(`select * from public.finalize_recording_purges(array['${rec}'::uuid])`)).rows.length, 0);
+
+// An owner cannot hide a remaining object by changing the claimed audio path.
+await db.exec(`set request.jwt.claim.sub='${owner}';`);
+await assert.rejects(db.exec(`update public.recordings set audio_path=null where id='${rec}';`), /source identity/);
+await db.exec(`set request.jwt.claim.sub='${browser}';`);
 // Once claimed, clearing the purge claim directly is blocked
 await assert.rejects(db.exec(`update public.recordings set purging_at=null where id='${rec}';`), /Cannot|purge|claim/);
 // Once claimed, restore is blocked
 await assert.rejects(db.exec(`update public.recordings set deleted_at=null where id='${rec}';`), /Cannot restore a recording that is currently being permanently deleted/);
 await db.exec(`delete from storage.objects where name='${owner}/${rec}.m4a';`);
-assert.equal((await db.query(`delete from public.recordings where id='${rec}' returning id`)).rows.length, 1);
+assert.equal((await db.query(`delete from public.recordings where id='${rec}' returning id`)).rows.length, 0);
+assert.equal((await db.query(`select * from public.finalize_recording_purges(array['${rec}'::uuid])`)).rows[0].id, rec);
+assert.equal((await db.query(`select * from public.finalize_recording_purges(array['${rec}'::uuid])`)).rows.length, 0);
 // Re-insert for remaining connection tests
 await db.exec(`reset role; set role service_role;
   insert into public.recordings(id,user_id,audio_path) values ('${rec}','${owner}','${owner}/${rec}.m4a');
@@ -136,6 +148,7 @@ await db.exec(`update public.portal_connections set revoked_at=now() where sessi
 assert.equal((await db.query('select * from public.recordings')).rows.length,0);
 assert.equal((await db.query('select * from storage.objects')).rows.length,0);
 await assert.rejects(db.exec(`update public.portal_connections set revoked_at=null where session_id='${session}';`));
+assert.equal((await db.query(`select * from public.finalize_recording_purges(array['${rec}'::uuid])`)).rows.length, 0);
 // Five failures invalidate the code and prevent issuance during the lockout.
 await db.exec(`reset role; set role service_role; update private.watch_access set issued_at=now()-interval '2 minutes';`);
 await db.query(`select public.issue_watch_code('${owner}','second-code')`);
@@ -163,6 +176,7 @@ await assert.rejects(db.exec(`delete from public.app_reports;`));
 await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,description,diagnostics) values(gen_random_uuid(),'${owner}','issue',repeat('x',1001),'{}');`));
 await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,diagnostics) values(gen_random_uuid(),'${owner}','crash',jsonb_build_object('oversize',repeat('x',8192)));`));
 await db.exec(`set role anon;`);
+await assert.rejects(db.exec(`select * from public.finalize_recording_purges(array['${rec}'::uuid]);`), /permission denied/);
 await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,diagnostics) values(gen_random_uuid(),'${owner}','crash','{}');`));
 await assert.rejects(db.exec(`select * from public.app_reports;`));
 await db.exec(`set role authenticated; set request.jwt.claim.sub='${other}';`);

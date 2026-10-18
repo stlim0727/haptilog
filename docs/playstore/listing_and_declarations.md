@@ -14,7 +14,7 @@ Target: Wear OS 3+ (API 30–35)
 
 ### Short Description (간단한 설명, 최대 80자)
 - **한국어**: `화면을 보지 않고 햅틱 진동으로 기록하는 스마트워치 음성 메모` (34자)
-- **English**: `Eyes-free, haptic-assisted Wear OS voice recorder with GPS context.` (66자)
+- **English**: `Wear OS voice memos with haptic feedback and optional location context.`
 
 ### Full Description (전체 설명, 최대 4000자)
 

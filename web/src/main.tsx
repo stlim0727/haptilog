@@ -23,6 +23,7 @@ import {
   Watch,
 } from "lucide-react";
 import { supabase } from "./client";
+import { purgeRecordings } from "./purge";
 import {
   csv,
   analysisFailure,
@@ -31,7 +32,6 @@ import {
   localDate,
   money,
   processingState,
-  resolveStorageDeletions,
   taskItems,
   totals,
 } from "./domain";
@@ -40,9 +40,6 @@ import { translations, getInitialLanguage } from "./i18n";
 import type { Language, TranslationKeys } from "./i18n";
 import "./style.css";
 
-declare global {
-  var __storageClearedIds: Set<string> | undefined;
-}
 const RecordingMap = lazy(() => import("./RecordingMap"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -275,151 +272,42 @@ function App() {
     setToast(null);
     const pending = pendingTrashUpdates.current.get(id);
     if (pending) await pending.catch(() => {});
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("recordings")
       .update({ deleted_at: null })
       .eq("id", id)
-      .is("purging_at", null);
-    if (error) {
+      .is("purging_at", null)
+      .select("id");
+    if (error || !data?.length) {
       setError(t.save_error);
       void load();
     }
   }
 
-  async function deletePermanently(id: string) {
+  async function completePurge(ids: string[]) {
     if (!supabase) return;
-    if (!window.confirm(t.confirm_delete)) return;
-    const rec = records.find((r) => r.id === id);
-    if (!rec) return;
-
-    const cleared = (globalThis.__storageClearedIds =
-      globalThis.__storageClearedIds || new Set());
-
-    const wasPurging = Boolean(rec.purging_at);
-
-    if (!wasPurging && !cleared.has(id)) {
-      const { data: claimedRows, error: claimError } = await supabase
-        .from("recordings")
-        .update({ purging_at: new Date().toISOString() })
-        .eq("id", id)
-        .not("deleted_at", "is", null)
-        .select();
-
-      if (claimError || (Array.isArray(claimedRows) && claimedRows.length === 0)) {
-        if (claimError) setError(t.save_error);
-        void load();
-        return;
-      }
-    }
-
-    if (rec.audio_path && !cleared.has(id)) {
-      const { data, error: storageError } = await supabase.storage
-        .from("recordings")
-        .remove([rec.audio_path]);
-      if (storageError) {
-        setError(t.save_error);
-        return;
-      }
-      const fileName = rec.audio_path.split("/").pop();
-      const removed = Array.isArray(data) && data.some((d) => d.name === fileName || d.name === rec.audio_path);
-      if (!removed && !wasPurging) {
-        setError(t.save_error);
-        return;
-      }
-      cleared.add(id);
-    }
-
-    const { data: deletedRows, error: dbError } = await supabase
-      .from("recordings")
-      .delete()
-      .eq("id", id)
-      .not("deleted_at", "is", null)
-      .select();
-
-    if (dbError || (Array.isArray(deletedRows) && deletedRows.length === 0)) {
-      if (dbError) setError(t.save_error);
+    try {
+      const deleted = new Set(await purgeRecordings(supabase, ids));
+      setRecords((prev) => prev.filter((rec) => !deleted.has(rec.id)));
+      if (selected && deleted.has(selected)) setSelected(null);
+      if (deleted.size !== ids.length) setError(t.save_error);
+    } catch {
+      setError(t.save_error);
+    } finally {
+      // Refresh claims and partial results even after a lost response.
       void load();
-      return;
     }
+  }
 
-    cleared.delete(id);
-    setRecords((prev) => prev.filter((r) => r.id !== id));
-    if (selected === id) setSelected(null);
+  async function deletePermanently(id: string) {
+    if (!window.confirm(t.confirm_delete)) return;
+    await completePurge([id]);
   }
 
   async function emptyTrash() {
-    if (!supabase) return;
-    let trashed = records.filter((r) => r.deleted_at);
-    if (!trashed.length) return;
-    if (!window.confirm(t.confirm_empty_trash(trashed.length))) return;
-
-    const cleared = (globalThis.__storageClearedIds =
-      globalThis.__storageClearedIds || new Set());
-
-    const wasPurgingIds = new Set(trashed.filter((r) => r.purging_at).map((r) => r.id));
-    const unclaimed = trashed.filter((r) => !r.purging_at && !cleared.has(r.id));
-
-    if (unclaimed.length > 0) {
-      const unclaimedIds = unclaimed.map((i) => i.id);
-      const { data: claimedRows, error: claimError } = await supabase
-        .from("recordings")
-        .update({ purging_at: new Date().toISOString() })
-        .in("id", unclaimedIds)
-        .not("deleted_at", "is", null)
-        .select();
-
-      if (claimError) {
-        setError(t.save_error);
-        void load();
-        return;
-      }
-      const claimedSet = new Set(Array.isArray(claimedRows) ? claimedRows.map((r) => r.id) : []);
-      trashed = trashed.filter((r) => r.purging_at || claimedSet.has(r.id));
-    }
-
-    const pendingRemoval = trashed.filter((r) => r.audio_path && !cleared.has(r.id));
-    let successfulIds = trashed.filter((r) => !r.audio_path || cleared.has(r.id)).map((r) => r.id);
-
-    if (pendingRemoval.length > 0) {
-      const audioPaths = pendingRemoval
-        .map((i) => i.audio_path)
-        .filter((p): p is string => Boolean(p));
-      const { data, error: storageError } = await supabase.storage
-        .from("recordings")
-        .remove(audioPaths);
-      if (storageError) {
-        setError(t.save_error);
-        return;
-      }
-      const resolution = resolveStorageDeletions(pendingRemoval, data, cleared, wasPurgingIds);
-      successfulIds = Array.from(new Set([...successfulIds, ...resolution.successfulIds]));
-    }
-
-    if (successfulIds.length > 0) {
-      const { data: deletedRows, error: dbError } = await supabase
-        .from("recordings")
-        .delete()
-        .in("id", successfulIds)
-        .not("deleted_at", "is", null)
-        .select();
-
-      if (dbError) {
-        setError(t.save_error);
-        void load();
-        return;
-      }
-
-      const deletedIds = Array.isArray(deletedRows)
-        ? new Set(deletedRows.map((r) => r.id))
-        : new Set(successfulIds);
-
-      for (const did of deletedIds) cleared.delete(did);
-      if (deletedIds.size < successfulIds.length) {
-        void load();
-      }
-      setRecords((prev) => prev.filter((rec) => !deletedIds.has(rec.id)));
-      if (selected && deletedIds.has(selected)) setSelected(null);
-    }
+    const ids = records.filter((r) => r.deleted_at).map((r) => r.id);
+    if (!ids.length || !window.confirm(t.confirm_empty_trash(ids.length))) return;
+    await completePurge(ids);
   }
 
   const isTrashView = category === "Trash";

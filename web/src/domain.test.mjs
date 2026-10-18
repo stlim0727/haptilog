@@ -7,7 +7,6 @@ import {
   hasLocation,
   latest,
   processingState,
-  resolveStorageDeletions,
   totals,
 } from "./domain.ts";
 test("map includes real zero coordinates and rejects missing or invalid GPS", () => {
@@ -73,27 +72,4 @@ test("CSV quotes multiline values and neutralizes spreadsheet formulas", () => {
   const r = rec();
   r.voice_enrichments[0].transcript = '=HYPERLINK("bad")\nnext';
   assert.match(csv([r]), /"'=HYPERLINK\(""bad""\)\nnext"/);
-});
-
-test("resolveStorageDeletions distinguishes removed files, missing paths and partial failures", () => {
-  const items = [
-    { id: "1", audio_path: "user/audio1.m4a" },
-    { id: "2", audio_path: "user/audio2.m4a" },
-    { id: "3", audio_path: null },
-  ];
-
-  assert.deepEqual(
-    resolveStorageDeletions(items, [{ name: "audio1.m4a" }, { name: "audio2.m4a" }]),
-    { successfulIds: ["1", "2", "3"], failedIds: [] },
-  );
-
-  assert.deepEqual(
-    resolveStorageDeletions(items, [{ name: "audio1.m4a" }]),
-    { successfulIds: ["1", "3"], failedIds: ["2"] },
-  );
-
-  assert.deepEqual(
-    resolveStorageDeletions(items, []),
-    { successfulIds: ["3"], failedIds: ["1", "2"] },
-  );
 });
