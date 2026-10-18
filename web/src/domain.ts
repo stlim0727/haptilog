@@ -166,3 +166,27 @@ export function csv(recordings: Recording[]) {
       .join("\r\n")
   );
 }
+
+export function resolveStorageDeletions(
+  items: Array<{ id: string; audio_path: string | null }>,
+  removedObjects: Array<{ name: string }> | null,
+): { successfulIds: string[]; failedIds: string[] } {
+  const removedNames = new Set((removedObjects ?? []).map((o) => o.name));
+  const successfulIds: string[] = [];
+  const failedIds: string[] = [];
+
+  for (const item of items) {
+    if (!item.audio_path) {
+      successfulIds.push(item.id);
+      continue;
+    }
+    const fileName = item.audio_path.split("/").pop();
+    if ((fileName && removedNames.has(fileName)) || removedNames.has(item.audio_path)) {
+      successfulIds.push(item.id);
+    } else {
+      failedIds.push(item.id);
+    }
+  }
+
+  return { successfulIds, failedIds };
+}

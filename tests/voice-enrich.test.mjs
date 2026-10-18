@@ -95,6 +95,7 @@ function fixture({
                 id: payload.recording_id,
                 user_id: ownerId,
                 latitude: 37,
+                recorded_at: "2026-10-18T06:00:00Z",
                 audio_path: stored
                   ? `${ownerId}/${payload.recording_id}.m4a`
                   : null,
@@ -357,4 +358,30 @@ test("rejects unsupported language values before provider call", async () => {
     assert.equal(r.status, 400);
     assert.equal(calls.fetch, 0);
   }
+});
+
+test("context pruning: sensitive IDs, storage paths, and coordinates are never sent to Gemini", async () => {
+  const { handler, calls } = fixture({
+    ownerId: "confidential-caller-uuid",
+  });
+  const res = await handler(request());
+  assert.equal(res.status, 200);
+  assert.equal(calls.fetch, 1);
+
+  const contextPart = calls.input.contents[0].parts.find((p) =>
+    typeof p.text === "string" && p.text.startsWith("Recording context:")
+  );
+  assert.ok(contextPart, "Recording context part must exist");
+
+  const rawJson = contextPart.text.replace("Recording context:", "").trim();
+  const parsed = JSON.parse(rawJson);
+
+  assert.deepEqual(Object.keys(parsed), ["recorded_at"]);
+  assert.equal("user_id" in parsed, false);
+  assert.equal("id" in parsed, false);
+  assert.equal("audio_path" in parsed, false);
+  assert.equal("latitude" in parsed, false);
+  assert.equal("longitude" in parsed, false);
+  assert.equal("altitude" in parsed, false);
+  assert.equal("speed" in parsed, false);
 });

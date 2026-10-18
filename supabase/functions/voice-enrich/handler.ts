@@ -213,7 +213,11 @@ export function createHandler(deps: Dependencies) {
                     data: audioBase64,
                   },
                 },
-                { text: `Recording context: ${JSON.stringify(recording)}` },
+                {
+                  text: `Recording context: ${JSON.stringify({
+                    recorded_at: recording.recorded_at,
+                  })}`,
+                },
               ],
             },
           ],

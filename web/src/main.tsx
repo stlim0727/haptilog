@@ -31,6 +31,7 @@ import {
   localDate,
   money,
   processingState,
+  resolveStorageDeletions,
   taskItems,
   totals,
 } from "./domain";
@@ -284,20 +285,32 @@ function App() {
     if (!supabase) return;
     if (!window.confirm(t.confirm_delete)) return;
     const rec = records.find((r) => r.id === id);
-    setRecords((prev) => prev.filter((r) => r.id !== id));
-    if (selected === id) setSelected(null);
-    if (rec?.audio_path) {
-      await supabase.storage.from("recordings").remove([rec.audio_path]).catch(() => {});
+    if (!rec) return;
+
+    if (rec.audio_path) {
+      const { error: storageError } = await supabase.storage
+        .from("recordings")
+        .remove([rec.audio_path]);
+      if (storageError) {
+        setError(t.save_error);
+        return;
+      }
     }
-    const { error } = await supabase
+
+    const { error: dbError } = await supabase
       .from("recordings")
       .delete()
       .eq("id", id)
       .not("deleted_at", "is", null);
-    if (error) {
+
+    if (dbError) {
       setError(t.save_error);
       void load();
+      return;
     }
+
+    setRecords((prev) => prev.filter((r) => r.id !== id));
+    if (selected === id) setSelected(null);
   }
 
   async function emptyTrash() {
@@ -305,21 +318,40 @@ function App() {
     const trashed = records.filter((r) => r.deleted_at);
     if (!trashed.length) return;
     if (!window.confirm(t.confirm_empty_trash(trashed.length))) return;
-    const trashedIds = trashed.map((r) => r.id);
-    setRecords((prev) => prev.filter((rec) => !rec.deleted_at));
-    setSelected(null);
-    const audioPaths = trashed.map((r) => r.audio_path).filter((p): p is string => Boolean(p));
+
+    const items = trashed.map((r) => ({ id: r.id, audio_path: r.audio_path }));
+    const audioPaths = items
+      .map((i) => i.audio_path)
+      .filter((p): p is string => Boolean(p));
+
+    let successfulIds = trashed.map((r) => r.id);
+
     if (audioPaths.length > 0) {
-      await supabase.storage.from("recordings").remove(audioPaths).catch(() => {});
+      const { data, error: storageError } = await supabase.storage
+        .from("recordings")
+        .remove(audioPaths);
+      if (storageError) {
+        setError(t.save_error);
+        return;
+      }
+      const resolution = resolveStorageDeletions(items, data);
+      successfulIds = resolution.successfulIds;
     }
-    const { error } = await supabase
-      .from("recordings")
-      .delete()
-      .in("id", trashedIds)
-      .not("deleted_at", "is", null);
-    if (error) {
-      setError(t.save_error);
-      void load();
+
+    if (successfulIds.length > 0) {
+      const { error: dbError } = await supabase
+        .from("recordings")
+        .delete()
+        .in("id", successfulIds)
+        .not("deleted_at", "is", null);
+
+      if (dbError) {
+        setError(t.save_error);
+        void load();
+        return;
+      }
+      setRecords((prev) => prev.filter((rec) => !successfulIds.includes(rec.id)));
+      if (selected && successfulIds.includes(selected)) setSelected(null);
     }
   }
 
