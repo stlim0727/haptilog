@@ -114,6 +114,8 @@ await assert.rejects(db.exec(`update public.recordings set purging_at=now() wher
 // Once moved to trash, claiming purge and hard-delete are permitted
 await db.exec(`update public.recordings set deleted_at=now() where id='${rec}';`);
 await db.exec(`update public.recordings set purging_at=now() where id='${rec}';`);
+// Once claimed, clearing the purge claim directly is blocked
+await assert.rejects(db.exec(`update public.recordings set purging_at=null where id='${rec}';`), /Cannot|purge|claim/);
 // Once claimed, restore is blocked
 await assert.rejects(db.exec(`update public.recordings set deleted_at=null where id='${rec}';`), /Cannot restore a recording that is currently being permanently deleted/);
 await db.exec(`delete from storage.objects where name='${owner}/${rec}.m4a';`);

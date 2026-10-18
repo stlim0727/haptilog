@@ -22,7 +22,7 @@ function fixture(mode) {
     deleted_at: "2026-10-17T00:00:00Z",
     purging_at: null,
   };
-  let ui = [{ ...row }],
+  let ui = [row],
     dbCalls = 0,
     storageCalls = 0,
     audioExists = true;
@@ -118,12 +118,15 @@ function fixture(mode) {
     ui,
     "r1",
     (f) => {
-      ui = f(ui);
+      const next = f(ui);
+      ui.length = 0;
+      ui.push(...next);
     },
     () => {},
     (e) => errors.push(e),
     async () => {
-      ui = [{ ...row }];
+      ui.length = 0;
+      ui.push(row);
     },
     resolveStorageDeletions,
   );
@@ -142,6 +145,20 @@ function fixture(mode) {
     errors,
   };
 }
+
+test("bulk: normal emptyTrash removes audio and deletes row", async () => {
+  const f = fixture("normal");
+  await f.emptyTrash();
+  assert.equal(f.dbCalls, 1);
+  assert.equal(f.audioExists, false);
+});
+
+test("single: normal deletePermanently removes audio and deletes row", async () => {
+  const f = fixture("normal");
+  await f.deletePermanently("r1");
+  assert.equal(f.dbCalls, 1);
+  assert.equal(f.audioExists, false);
+});
 
 test("single: empty Storage result must not authorize DB deletion", async () => {
   const f = fixture("empty");

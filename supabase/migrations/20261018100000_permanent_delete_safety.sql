@@ -26,6 +26,11 @@ begin
     end if;
   end if;
 
+  -- Block clearing purging_at once claimed
+  if old.purging_at is not null and new.purging_at is null then
+    raise exception 'Cannot clear purge claim on a recording being permanently deleted';
+  end if;
+
   -- Block restoring a recording if it has already been claimed for permanent deletion
   if old.purging_at is not null and new.deleted_at is null then
     raise exception 'Cannot restore a recording that is currently being permanently deleted';

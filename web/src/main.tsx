@@ -295,7 +295,9 @@ function App() {
     const cleared = (globalThis.__storageClearedIds =
       globalThis.__storageClearedIds || new Set());
 
-    if (!rec.purging_at && !cleared.has(id)) {
+    const wasPurging = Boolean(rec.purging_at);
+
+    if (!wasPurging && !cleared.has(id)) {
       const { data: claimedRows, error: claimError } = await supabase
         .from("recordings")
         .update({ purging_at: new Date().toISOString() })
@@ -320,7 +322,7 @@ function App() {
       }
       const fileName = rec.audio_path.split("/").pop();
       const removed = Array.isArray(data) && data.some((d) => d.name === fileName || d.name === rec.audio_path);
-      if (!removed && !rec.purging_at) {
+      if (!removed && !wasPurging) {
         setError(t.save_error);
         return;
       }
@@ -347,15 +349,15 @@ function App() {
 
   async function emptyTrash() {
     if (!supabase) return;
-    const trashed = records.filter((r) => r.deleted_at);
+    let trashed = records.filter((r) => r.deleted_at);
     if (!trashed.length) return;
     if (!window.confirm(t.confirm_empty_trash(trashed.length))) return;
 
     const cleared = (globalThis.__storageClearedIds =
       globalThis.__storageClearedIds || new Set());
 
-    const items = trashed.map((r) => ({ id: r.id, audio_path: r.audio_path, purging_at: r.purging_at }));
-    const unclaimed = items.filter((i) => !i.purging_at && !cleared.has(i.id));
+    const wasPurgingIds = new Set(trashed.filter((r) => r.purging_at).map((r) => r.id));
+    const unclaimed = trashed.filter((r) => !r.purging_at && !cleared.has(r.id));
 
     if (unclaimed.length > 0) {
       const unclaimedIds = unclaimed.map((i) => i.id);
@@ -372,18 +374,11 @@ function App() {
         return;
       }
       const claimedSet = new Set(Array.isArray(claimedRows) ? claimedRows.map((r) => r.id) : []);
-      for (const item of items) {
-        if (claimedSet.has(item.id)) {
-          item.purging_at = new Date().toISOString();
-        }
-      }
+      trashed = trashed.filter((r) => r.purging_at || claimedSet.has(r.id));
     }
 
-    const validItems = items.filter((i) => i.purging_at || cleared.has(i.id) || !i.audio_path);
-    const pendingRemoval = validItems.filter((i) => i.audio_path && !cleared.has(i.id) && !i.purging_at);
-    const alreadyClearedIds = validItems.filter((i) => i.purging_at || !i.audio_path || cleared.has(i.id)).map((i) => i.id);
-
-    let successfulIds = [...alreadyClearedIds];
+    const pendingRemoval = trashed.filter((r) => r.audio_path && !cleared.has(r.id));
+    let successfulIds = trashed.filter((r) => !r.audio_path || cleared.has(r.id)).map((r) => r.id);
 
     if (pendingRemoval.length > 0) {
       const audioPaths = pendingRemoval
@@ -396,7 +391,7 @@ function App() {
         setError(t.save_error);
         return;
       }
-      const resolution = resolveStorageDeletions(pendingRemoval, data, cleared);
+      const resolution = resolveStorageDeletions(pendingRemoval, data, cleared, wasPurgingIds);
       successfulIds = Array.from(new Set([...successfulIds, ...resolution.successfulIds]));
     }
 
