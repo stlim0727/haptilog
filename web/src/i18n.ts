@@ -123,6 +123,7 @@ export const translations = {
     portal_setup_desc:
       "Configure the Supabase URL and publishable key to connect your watch.",
     captured_context: "CAPTURED CONTEXT",
+    open_in_maps: "Open in Google Maps",
     all_details: "All generated details",
     analysis_version: "Analysis version",
     demo_note:
@@ -254,6 +255,7 @@ export const translations = {
     portal_setup_desc:
       "워치를 연결하려면 Supabase URL과 공개 키를 구성하세요.",
     captured_context: "기록 위치 정보",
+    open_in_maps: "Google 지도에서 보기",
     all_details: "생성된 모든 세부 정보",
     analysis_version: "분석 버전",
     demo_note:
