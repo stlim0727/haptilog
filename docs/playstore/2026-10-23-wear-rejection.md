@@ -24,7 +24,11 @@ These checks do not establish Play approval. Full live pairing/revocation, cloud
 
 ## Current-main integration
 
-The PR is based on current main, including the recording-detail and map-link changes. The earlier screenshots document the first implementation, before that port. New verification of this source is recorded below as it completes.
+The PR is based on current main, including the recording-detail and map-link changes. The earlier screenshots document the first implementation, before that port. The current-main implementation passed `assembleDebug lintDebug testDebugUnitTest` with all **31** tests passing. PR CI also passed Wear OS, backend/migrations, portal/browser tests, and the Cloudflare build. Automated code review completed without findings on commit `102efbd`.
+
+New emulator evidence is in `docs/validation/2026-10-23-wear-policy/current-main/`. The new offline emulator recording was given synthetic derived summary/transcript text to exercise details; its original audio and capture metadata were unchanged across force-stop/restart (SHA-256 comparison recorded alongside screenshots). The current-main list and detail flow were inspected at 192dp with 2× fonts. Earlier screenshots outside that directory still document the first implementation.
+
+No cloud upload was performed for the new recording. Live provider operations, physical rotary/haptic calibration, and Google Play approval are not established by the emulator checks.
 
 ## Release follow-up
 
