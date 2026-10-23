@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -139,7 +140,7 @@ fun RecordingDetailScreen(
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
-    val listState = rememberScalingLazyListState()
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
 
@@ -156,11 +157,13 @@ fun RecordingDetailScreen(
     val (categoryName, dotColor) = recordingCategory(item.intentType)
 
     Scaffold(
-        timeText = { TimeText() },
+        timeText = { if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText() },
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
     ) {
         ScalingLazyColumn(
             state = listState,
+            autoCentering = null,
+            contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
@@ -175,7 +178,6 @@ fun RecordingDetailScreen(
                 },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            item { Spacer(modifier = Modifier.height(26.dp)) }
 
             item {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

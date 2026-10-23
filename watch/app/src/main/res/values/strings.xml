@@ -1,0 +1,12 @@
+<resources>
+    <string name="record_start">Record</string>
+    <string name="record_stop">Stop</string>
+    <string name="record_start_accessibility">Start recording</string>
+    <string name="record_stop_accessibility">Stop recording</string>
+    <string name="recording_state">Recording</string>
+    <string name="recording_idle">Ready to record</string>
+    <string name="settings_title">Settings</string>
+    <string name="recent_recordings">Recent recordings</string>
+    <string name="no_recordings">No recordings yet</string>
+    <string name="first_recording_hint">Tap Record to save your first note</string>
+</resources>
