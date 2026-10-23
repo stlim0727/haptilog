@@ -110,6 +110,22 @@ await assert.rejects(db.exec(`insert into public.recordings(user_id) values('${o
 await db.exec(`insert into public.recording_corrections(recording_id,amount,currency) values('${rec}',5000,'KRW');`);
 await db.exec(`update public.recording_corrections set completed_tasks='["Buy coffee"]' where recording_id='${rec}';`);
 assert.equal((await db.query('select amount from public.recording_corrections')).rows[0].amount,'5000');
+// Text edits and their audit rows commit together; no-op saves do not add revisions.
+await db.exec(`update public.recording_corrections set transcript='Corrected text' where recording_id='${rec}';`);
+let revisions = (await db.query(`select * from public.recording_correction_history where recording_id='${rec}' order by id`)).rows;
+assert.equal(revisions.at(-1).before_value.transcript, null);
+assert.equal(revisions.at(-1).after_value.transcript, 'Corrected text');
+assert.equal(revisions.at(-1).editor_id, browser);
+const revisionCount = revisions.length;
+await db.exec(`update public.recording_corrections set transcript='Corrected text', updated_at=now() where recording_id='${rec}';`);
+assert.equal((await db.query(`select * from public.recording_correction_history where recording_id='${rec}'`)).rows.length, revisionCount);
+await db.exec(`update public.recording_corrections set transcript='' where recording_id='${rec}';`);
+assert.equal((await db.query(`select transcript from public.recording_corrections where recording_id='${rec}'`)).rows[0].transcript, '');
+await assert.rejects(db.exec(`update public.recording_corrections set transcript=repeat('x',50001) where recording_id='${rec}';`));
+await assert.rejects(db.exec(`insert into public.recording_correction_history(recording_id,after_value) values('${rec}','{}');`));
+await assert.rejects(db.exec(`update public.recording_correction_history set after_value='{}';`));
+await assert.rejects(db.exec(`delete from public.recording_correction_history;`));
+
 await db.exec(`update public.recordings set deleted_at=now() where id='${rec}';`);
 assert.ok((await db.query(`select deleted_at from public.recordings where id='${rec}'`)).rows[0].deleted_at);
 // Paired session can restore by setting deleted_at back to null
@@ -153,6 +169,7 @@ await db.exec(`set request.jwt.claims='{"session_id":"${secondSession}"}';`);
 assert.equal((await db.query('select * from public.recordings')).rows.length,0);
 assert.equal((await db.query('select * from storage.objects')).rows.length,0);
 assert.equal((await db.query('select * from public.recording_corrections')).rows.length,0);
+assert.equal((await db.query('select * from public.recording_correction_history')).rows.length,0);
 await assert.rejects(db.exec(`insert into public.recording_corrections(recording_id,amount) values('${rec}',7);`));
 await db.exec(`set request.jwt.claims='{"session_id":"${session}"}';`);
 // Logout explicitly revokes the grant, so still-valid JWTs lose access immediately.
@@ -204,5 +221,15 @@ await db.exec(`set role authenticated; set request.jwt.claim.sub='${other}';`);
 await assert.rejects(db.exec(`select * from public.app_reports;`));
 await db.exec(`reset role;`);
 assert.equal((await db.query(`select count(*)::int as n from public.app_reports where id='${report}'`)).rows[0].n, 1);
+// Permanent removal cascades to the complete correction history.
+await db.exec(`insert into public.recordings(id,user_id) values('${upgradeRecording}','${owner}');
+  set role authenticated; set request.jwt.claim.sub='${owner}';
+  insert into public.recording_corrections(recording_id,transcript) values('${upgradeRecording}','First edit');`);
+assert.equal((await db.query(`select * from public.recording_correction_history where recording_id='${upgradeRecording}'`)).rows.length, 1);
+await db.exec(`reset role; delete from public.recordings where id='${upgradeRecording}';`);
+assert.equal((await db.query(`select * from public.recording_correction_history where recording_id='${upgradeRecording}'`)).rows.length, 0);
+await db.exec(`set role anon;`);
+await assert.rejects(db.exec(`select * from public.recording_correction_history;`));
+await db.exec(`reset role;`);
 await db.close();
 console.log('PASS: pairing, expiry, replay, brute-force lockout, session binding, immediate revocation, corrections, and migrations, ownership isolation, storage upsert, privileged writes, retry uniqueness and lease expiry');
