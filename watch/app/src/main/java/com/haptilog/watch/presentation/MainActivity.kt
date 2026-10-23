@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -48,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -71,7 +73,6 @@ import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.ChipDefaults
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
@@ -190,6 +191,7 @@ class MainActivity : ComponentActivity() {
                 val recordings by repository.recordings.collectAsState()
                 val playingId by audioPlayer.playingId.collectAsState()
                 val isPlaying by audioPlayer.isPlaying.collectAsState()
+                var openDetailId by rememberSaveable { mutableStateOf<String?>(null) }
 
                 // Refresh recordings when recording completes
                 LaunchedEffect(isRecording) {
@@ -199,31 +201,50 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(openDetailId) {
+                    if (openDetailId != null) repository.refresh()
+                }
+
                 DisposableEffect(Unit) {
                     onDispose {
                         audioPlayer.release()
                     }
                 }
 
-                HaptiLogScreen(
-                    isRecording = isRecording,
-                    elapsedSeconds = elapsedSeconds,
-                    recordings = recordings,
-                    playingId = playingId,
-                    isPlaying = isPlaying,
-                    onToggleRecording = ::toggleRecording,
-                    onTogglePlay = { item -> audioPlayer.togglePlay(item.audioFile, item.id) },
-                    onExport = ::exportRecording,
-                    onRetry = { item ->
-                        RecordingSyncWorker.retry(this, item.id)
-                        repository.refresh()
-                    },
-                    onSettings = { if (!isRecording) startActivity(Intent(this, SettingsActivity::class.java)) },
-                    onDeleteRecording = { id ->
-                        if (playingId == id) audioPlayer.stop()
-                        repository.deleteRecording(id)
+                // A recording that is no longer on disk falls back to the list.
+                val detailItem = openDetailId?.let { id -> recordings.firstOrNull { it.id == id } }
+
+                if (detailItem != null) {
+                    // Playback has no control on the list, so leaving the detail screen must stop it.
+                    BackHandler {
+                        audioPlayer.stop()
+                        openDetailId = null
                     }
-                )
+                    RecordingDetailScreen(
+                        item = detailItem,
+                        isPlaying = playingId == detailItem.id && isPlaying,
+                        onTogglePlay = { audioPlayer.togglePlay(detailItem.audioFile, detailItem.id) },
+                        onExport = { exportRecording(detailItem) },
+                        onRetry = {
+                            RecordingSyncWorker.retry(this, detailItem.id)
+                            repository.refresh()
+                        },
+                        onDelete = {
+                            if (playingId == detailItem.id) audioPlayer.stop()
+                            repository.deleteRecording(detailItem.id)
+                            openDetailId = null
+                        }
+                    )
+                } else {
+                    HaptiLogScreen(
+                        isRecording = isRecording,
+                        elapsedSeconds = elapsedSeconds,
+                        recordings = recordings,
+                        onToggleRecording = ::toggleRecording,
+                        onOpenRecording = { item -> openDetailId = item.id },
+                        onSettings = { if (!isRecording) startActivity(Intent(this, SettingsActivity::class.java)) }
+                    )
+                }
             }
         }
     }
@@ -245,13 +266,8 @@ fun HaptiLogScreen(
     isRecording: Boolean,
     elapsedSeconds: Long,
     recordings: List<RecordingItem>,
-    playingId: String?,
-    isPlaying: Boolean,
     onToggleRecording: () -> Unit,
-    onTogglePlay: (RecordingItem) -> Unit,
-    onDeleteRecording: (String) -> Unit,
-    onExport: (RecordingItem) -> Unit,
-    onRetry: (RecordingItem) -> Unit,
+    onOpenRecording: (RecordingItem) -> Unit,
     onSettings: () -> Unit
 ) {
     val listState = rememberScalingLazyListState()
@@ -341,14 +357,7 @@ fun HaptiLogScreen(
                 }
             } else {
                 items(recordings, key = { it.id }) { item ->
-                    RecordingCard(
-                        item = item,
-                        isPlaying = (playingId == item.id && isPlaying),
-                        onTogglePlay = { onTogglePlay(item) },
-                        onDelete = { onDeleteRecording(item.id) },
-                        onExport = { onExport(item) },
-                        onRetry = { onRetry(item) }
-                    )
+                    RecordingCard(item = item, onOpen = { onOpenRecording(item) })
                     Spacer(modifier = Modifier.height(6.dp))
                 }
             }
@@ -492,11 +501,7 @@ fun EmptyRecordingsCard() {
 @Composable
 fun RecordingCard(
     item: RecordingItem,
-    isPlaying: Boolean,
-    onTogglePlay: () -> Unit,
-    onDelete: () -> Unit,
-    onExport: () -> Unit,
-    onRetry: () -> Unit
+    onOpen: () -> Unit
 ) {
     val timeFormatted = remember(item.startedAtTimestamp) {
         val diffMs = System.currentTimeMillis() - item.startedAtTimestamp
@@ -507,18 +512,15 @@ fun RecordingCard(
         }
     }
 
-    val cardBg = if (isPlaying) Color(0xFF221717) else Color(0xFF141416)
-    val borderColor = if (isPlaying) Color(0xFF4A2525) else Color(0xFF242426)
-
     Card(
-        onClick = onTogglePlay,
+        onClick = onOpen,
         modifier = Modifier
             .fillMaxWidth(0.92f)
             .padding(vertical = 2.dp)
-            .border(0.5.dp, borderColor, RoundedCornerShape(16.dp)),
+            .border(0.5.dp, Color(0xFF242426), RoundedCornerShape(16.dp)),
         backgroundPainter = CardDefaults.cardBackgroundPainter(
-            startBackgroundColor = cardBg,
-            endBackgroundColor = cardBg
+            startBackgroundColor = Color(0xFF141416),
+            endBackgroundColor = Color(0xFF141416)
         ),
         shape = RoundedCornerShape(16.dp)
     ) {
@@ -548,20 +550,12 @@ fun RecordingCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Category & Location (Clean Dot & Typography)
+            // Category
+            val (categoryName, dotColor) = recordingCategory(item.intentType)
             Row(
-                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Start
             ) {
-                val (categoryName, dotColor) = when (item.intentType) {
-                    "EXPENSE" -> "지출" to Color(0xFF34C759)
-                    "TRAVEL" -> "여행" to Color(0xFF0A84FF)
-                    "WORKOUT" -> "운동" to Color(0xFFFF9F0A)
-                    "MEMO" -> "메모" to Color(0xFFBF5AF2)
-                    else -> "대기" to Color(0xFF8E8E93)
-                }
-
                 Box(
                     modifier = Modifier
                         .size(5.dp)
@@ -574,21 +568,6 @@ fun RecordingCard(
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFFD1D1D6)
                 )
-
-                if (item.latitude != null && item.longitude != null) {
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "·",
-                        fontSize = 10.sp,
-                        color = Color(0xFF636366)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = String.format(Locale.US, "%.2f°, %.2f°", item.latitude, item.longitude),
-                        fontSize = 10.sp,
-                        color = Color(0xFF8E8E93)
-                    )
-                }
             }
 
             // Summary text if present
@@ -597,74 +576,11 @@ fun RecordingCard(
                 Text(
                     text = item.summary,
                     fontSize = 11.sp,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = Color(0xFFE5E5EA),
                     lineHeight = 14.sp
                 )
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // Actions row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Play / Stop button
-                CompactChip(
-                    onClick = onTogglePlay,
-                    label = {
-                        Text(
-                            text = if (isPlaying) "정지" else "재생",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    },
-                    colors = ChipDefaults.chipColors(
-                        backgroundColor = if (isPlaying) Color(0xFF442022) else Color(0xFF2C2C2E),
-                        contentColor = if (isPlaying) Color(0xFFFF453A) else Color(0xFFF5F5F7)
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (item.syncStatus == "ACTION_REQUIRED") {
-                        CompactChip(
-                            onClick = onRetry,
-                            label = { Text("재시도", fontSize = 10.sp) },
-                            colors = ChipDefaults.chipColors(
-                                backgroundColor = Color(0xFF2C2C2E),
-                                contentColor = Color(0xFFFF9F0A)
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-
-                    CompactChip(
-                        onClick = onExport,
-                        label = { Text("내보내기", fontSize = 10.sp) },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = Color(0xFF242426),
-                            contentColor = Color(0xFF8E8E93)
-                        ),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    CompactChip(
-                        onClick = onDelete,
-                        label = { Text("삭제", fontSize = 10.sp) },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = Color(0xFF241C1C),
-                            contentColor = Color(0xFFFF6961)
-                        ),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                }
             }
         }
     }
