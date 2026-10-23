@@ -75,7 +75,6 @@ function App() {
   const [loaded, setLoaded] = useState(false);
   const [truncated, setTruncated] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
-  const [watchId, setWatchId] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("all");
@@ -204,14 +203,14 @@ function App() {
         if (error) throw error;
       }
       const { error } = await supabase.functions.invoke("watch-access", {
-        body: { action: "redeem", watch_id: watchId, code },
+        body: { action: "redeem", code },
       });
       if (error) throw error;
       setCode("");
       await refreshConnection();
     } catch {
       setError(
-        "Could not connect. Check the ID and code on your watch. If you tried several times, wait before retrying.",
+        "Could not connect. Check the code on your watch. If you tried several times, wait before retrying.",
       );
     } finally {
       setBusy(false);
@@ -486,18 +485,6 @@ function App() {
               </div>
             ) : (
               <form onSubmit={pair}>
-                <label htmlFor="watch-id">{t.watch_id}</label>
-                <input
-                  id="watch-id"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  placeholder="HL-0123456789"
-                  value={watchId}
-                  onChange={(e) => setWatchId(e.target.value.toUpperCase())}
-                  required
-                  pattern="HL-[A-Fa-f0-9]{10}"
-                  maxLength={13}
-                />
                 <label htmlFor="code">
                   {t.access_code} <span>{t.expires_in}</span>
                 </label>

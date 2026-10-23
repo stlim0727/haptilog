@@ -125,7 +125,7 @@ class WebAccessActivity : ComponentActivity() {
                     item { Text("Connect a browser to review your recordings. No phone needed.", fontSize = 12.sp, textAlign = TextAlign.Center) }
                     if (connected) item { Text("Browser connected", fontSize = 17.sp, textAlign = TextAlign.Center) }
                     if (code != null) {
-                        item { Text(code!!.getString("watch_id"), fontSize = 16.sp, fontFamily = FontFamily.Monospace, textAlign = TextAlign.Center) }
+                        item { Text("Enter this code on the web", fontSize = 13.sp, textAlign = TextAlign.Center) }
                         item { Text(if (remaining > 0) code!!.getString("code").chunked(3).joinToString(" ") else "Expired", fontSize = 27.sp, fontFamily = FontFamily.Monospace) }
                         if (remaining > 0) item { Text("${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')} remaining", fontSize = 12.sp) }
                     }

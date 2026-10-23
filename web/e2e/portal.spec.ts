@@ -98,6 +98,7 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
     else if (path.endsWith("/set_cloud_consent")) return route.fulfill({ status: 204 });
     else if (path.endsWith("/logout")) return route.fulfill({ status: 204 });
     else if (path.endsWith("/watch-access")) {
+      expect(req.postDataJSON()).toEqual({ action: "redeem", code: "123456" });
       state.paired = true;
       body = { watch_id: connection.watch_id };
     } else if (path.endsWith("/portal_connections")) {
@@ -157,10 +158,10 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
   });
   return state;
 }
-test("pairs through ID/code and restores browser connection after reload", async ({ page }) => {
+test("pairs through code only and restores browser connection after reload", async ({ page }) => {
   await fixture(page, { connected: false });
   await page.goto("/");
-  await page.getByLabel("Watch ID", { exact: true }).fill("HL-0123456789");
+  await expect(page.getByLabel("Watch ID", { exact: true })).toHaveCount(0);
   await page.getByLabel("Access code").fill("123456");
   await page.getByRole("button", { name: "Connect my watch" }).click();
   await expect(
