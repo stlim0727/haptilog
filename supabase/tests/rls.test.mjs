@@ -86,13 +86,18 @@ const browser = '66666666-6666-4666-8666-666666666666';
 const session = '77777777-7777-4777-8777-777777777777';
 const secondSession = '88888888-8888-4888-8888-888888888888';
 await db.exec(`reset role; insert into auth.users values ('${browser}'); set role service_role;`);
+// Active code reservations must be unique across watches.
+const reserved = (await db.query(`select public.issue_watch_code('${other}','protected-code') as result`)).rows[0].result;
+assert.ok(reserved.watch_id);
+assert.equal((await db.query(`select public.issue_watch_code('${owner}','protected-code') as result`)).rows[0].result.error, 'code_collision');
+await db.query(`select public.cancel_watch_code('${other}')`);
 const issued = (await db.query(`select public.issue_watch_code('${owner}','protected-code') as result`)).rows[0].result;
 assert.match(issued.watch_id, /^HL-[A-F0-9]{10}$/);
 assert.equal((await db.query(`select public.issue_watch_code('${owner}','new-code') as result`)).rows[0].result.error, 'rate_limited');
 await assert.rejects(db.exec(`set role authenticated; select public.redeem_watch_code('${browser}','${session}','${issued.watch_id}','protected-code');`));
 await db.exec(`reset role; set role service_role;`);
-assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${session}','${issued.watch_id}','protected-code') as result`)).rows[0].result.watch_id, issued.watch_id);
-assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${secondSession}','${issued.watch_id}','protected-code') as result`)).rows[0].result.error, 'invalid_code');
+assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${session}','','protected-code') as result`)).rows[0].result.watch_id, issued.watch_id);
+assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${secondSession}','','protected-code') as result`)).rows[0].result.error, 'invalid_code');
 await db.exec(`reset role; set role authenticated; set request.jwt.claim.sub='${browser}'; set request.jwt.claims='{"session_id":"${session}"}';`);
 assert.equal((await db.query('select * from public.recordings')).rows.length,1);
 assert.equal((await db.query('select * from public.voice_enrichments')).rows.length,1);
@@ -165,10 +170,19 @@ assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${se
 await db.exec(`update private.watch_access set locked_until=null,issued_at=now()-interval '2 minutes'; update private.pair_attempts set attempts=0;`);
 await db.query(`select public.issue_watch_code('${owner}','expired-code')`);
 await db.exec(`update private.watch_access set expires_at=now()-interval '1 second';`);
-assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${session}','${issued.watch_id}','expired-code') as result`)).rows[0].result.error,'invalid_code');
+assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${session}','','expired-code') as result`)).rows[0].result.error,'invalid_code');
 // Unknown watch IDs are also charged to the browser attempt budget.
 for(let i=0;i<10;i++) await db.query(`select public.redeem_watch_code('${browser}','${session}','HL-FFFFFFFFFF','wrong')`);
 assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${session}','HL-FFFFFFFFFF','wrong') as result`)).rows[0].result.error,'rate_limited');
+// Code-only guesses share the same browser budget; cancellation removes capability.
+await db.exec(`update private.pair_attempts set attempts=0; update private.watch_access set issued_at=now()-interval '2 minutes';`);
+for(let i=0;i<10;i++)
+  assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${session}','','unknown-code') as result`)).rows[0].result.error, 'invalid_code');
+assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${session}','','unknown-code') as result`)).rows[0].result.error, 'rate_limited');
+await db.exec(`update private.pair_attempts set attempts=0;`);
+await db.query(`select public.issue_watch_code('${owner}','cancelled-code')`);
+await db.query(`select public.cancel_watch_code('${owner}')`);
+assert.equal((await db.query(`select public.redeem_watch_code('${browser}','${session}','','cancelled-code') as result`)).rows[0].result.error, 'invalid_code');
 // Repeated upload before metadata creation remains possible for the owner.
 await db.exec(`reset role; set role authenticated; set request.jwt.claim.sub='${owner}';`);
 await db.exec(`insert into storage.objects(bucket_id,name) values('recordings','${owner}/orphan.m4a');`);

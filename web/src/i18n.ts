@@ -16,8 +16,7 @@ export const translations = {
     step_label: "YOUR WATCH → YOUR BROWSER",
     connect_title: "Make the connection.",
     connect_desc:
-      "On your watch, open Web access and tap Create code. Enter what you see below.",
-    watch_id: "Watch ID",
+      "On your watch, open Web access and tap Create code. Enter the six-digit code below.",
     access_code: "Access code",
     expires_in: "Expires after 5 minutes",
     connect_btn: "Connect my watch",
@@ -148,8 +147,7 @@ export const translations = {
     step_label: "워치에서 → 브라우저로",
     connect_title: "워치와 연결하기",
     connect_desc:
-      "워치에서 '웹 접속'을 열고 '코드 생성'을 누른 후, 아래에 입력하세요.",
-    watch_id: "워치 ID",
+      "워치에서 '웹 접속'을 열고 '코드 생성'을 누른 후, 6자리 코드를 아래에 입력하세요.",
     access_code: "접속 코드",
     expires_in: "5분 후 만료",
     connect_btn: "워치 연결하기",

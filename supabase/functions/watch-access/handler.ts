@@ -131,21 +131,24 @@ export function createAccessHandler(deps: Dependencies) {
       if (!body || typeof body !== "object")
         return reply(400, { error: "Invalid request" });
       if (body.action === "issue") {
-        // The verifier is keyed to prevent offline guessing of the six-digit space.
-        // Database redemption also binds it to the selected watch and expiry.
-        let value;
-        do {
-          value = crypto.getRandomValues(new Uint32Array(1))[0];
-        } while (value >= 4294000000);
-        const code = (value % 1000000).toString().padStart(6, "0");
-        const { data, error } = await admin.rpc("issue_watch_code", {
-          p_owner: user.id,
-          p_hash: await codeHash(secret, "watch-access-v1", code),
-        });
-        if (error) return reply(500, { error: "Unable to create code" });
-        if (data?.error)
-          return reply(429, { error: "Wait before requesting another code" });
-        return reply(200, { ...data, code });
+        // Retry collisions; the database atomically reserves each active verifier.
+        for (let attempt = 0; attempt < 8; attempt++) {
+          let value;
+          do {
+            value = crypto.getRandomValues(new Uint32Array(1))[0];
+          } while (value >= 4294000000);
+          const code = (value % 1000000).toString().padStart(6, "0");
+          const { data, error } = await admin.rpc("issue_watch_code", {
+            p_owner: user.id,
+            p_hash: await codeHash(secret, "watch-access-v1", code),
+          });
+          if (error) return reply(500, { error: "Unable to create code" });
+          if (data?.error === "code_collision") continue;
+          if (data?.error)
+            return reply(429, { error: "Wait before requesting another code" });
+          return reply(200, { ...data, code });
+        }
+        return reply(503, { error: "Unable to create code. Try again." });
       }
       if (body.action === "cancel") {
         const { error } = await admin.rpc("cancel_watch_code", {
@@ -162,8 +165,8 @@ export function createAccessHandler(deps: Dependencies) {
             : "";
         const code =
           typeof body.code === "string" ? body.code.replace(/\s/g, "") : "";
-        if (!/^HL-[A-F0-9]{10}$/.test(watch) || !/^\d{6}$/.test(code))
-          return reply(400, { error: "Enter the watch ID and six-digit code" });
+        if ((watch !== "" && !/^HL-[A-F0-9]{10}$/.test(watch)) || !/^\d{6}$/.test(code))
+          return reply(400, { error: "Enter the six-digit code from your watch" });
         // Rate limiting and HMAC comparison must be atomic inside the database.
         const { data, error } = await admin.rpc("redeem_watch_code", {
           p_browser: user.id,

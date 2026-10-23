@@ -176,3 +176,25 @@ test("health reports readiness without exposing runtime credentials", async () =
   assert.equal(unavailable.status, 503);
   assert.deepEqual(await unavailable.json(), { ready: false });
 });
+
+test("code-only redemption resolves watch without an ID", async () => {
+  const { handler, calls } = fixture();
+  assert.equal((await handler(req({ action: "redeem", code: "123 456" }))).status, 200);
+  assert.equal(calls[0].input.p_watch, "");
+  assert.equal(calls[0].input.p_session, session);
+});
+
+test("issuance retries collisions with another random code", async () => {
+  let count = 0;
+  const { handler, calls } = fixture({ result: {
+    get error() { return ++count === 1 ? "code_collision" : undefined; },
+  } });
+  assert.equal((await handler(req({ action: "issue" }))).status, 200);
+  assert.equal(calls.length, 2);
+});
+
+test("persistent collisions stop after bounded retries", async () => {
+  const { handler, calls } = fixture({ result: { error: "code_collision" } });
+  assert.equal((await handler(req({ action: "issue" }))).status, 503);
+  assert.equal(calls.length, 8);
+});
