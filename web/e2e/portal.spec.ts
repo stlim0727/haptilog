@@ -1,4 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./fixtures";
 const browserId = "66666666-6666-4666-8666-666666666666";
 const sessionId = "77777777-7777-4777-8777-777777777777";
 const owner = "11111111-1111-4111-8111-111111111111";
@@ -95,6 +96,7 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
       path = new URL(req.url()).pathname;
     let body: unknown;
     if (path.endsWith("/signup")) body = session;
+    else if (path.endsWith("/notion-export")) body = { configured: false, connected: false, target: null, exports: [] };
     else if (path.endsWith("/set_cloud_consent")) return route.fulfill({ status: 204 });
     else if (path.endsWith("/logout")) return route.fulfill({ status: 204 });
     else if (path.endsWith("/watch-access")) {

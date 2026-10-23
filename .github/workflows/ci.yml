@@ -64,7 +64,7 @@ jobs:
           node-version: "22"
 
       - name: Test enrichment authorization and validation
-        run: node --experimental-strip-types --test tests/voice-enrich.test.mjs tests/watch-access.test.mjs
+        run: node --experimental-strip-types --test tests/voice-enrich.test.mjs tests/watch-access.test.mjs tests/notion-export.test.mjs
 
       - uses: denoland/setup-deno@v2
         with:
@@ -76,7 +76,7 @@ jobs:
           npm test --prefix supabase/tests
 
       - name: Typecheck Edge Function
-        run: deno check --lock=supabase/functions/deno.lock supabase/functions/voice-enrich/index.ts supabase/functions/watch-access/index.ts
+        run: deno check --lock=supabase/functions/deno.lock supabase/functions/voice-enrich/index.ts supabase/functions/watch-access/index.ts supabase/functions/notion-export/index.ts
 
   portal:
     name: Portal build and browser tests

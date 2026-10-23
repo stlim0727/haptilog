@@ -23,6 +23,7 @@ import {
   Watch,
 } from "lucide-react";
 import { supabase } from "./client";
+import { NotionExport } from "./NotionExport";
 import { purgeRecordings } from "./purge";
 import {
   csv,
@@ -79,7 +80,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("all");
   const [category, setCategory] = useState("All");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
   const [lang, setLang] = useState<Language>(getInitialLanguage);
@@ -551,6 +552,7 @@ function App() {
               </button>
             </div>
           </div>
+          {!isTrashView && <NotionExport key={connection.session_id} records={filtered} ko={lang === "ko"} />}
           <div className="metrics">
             <section>
               <span className="metric-label">{t.spending_label}</span>
