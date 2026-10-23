@@ -8,6 +8,7 @@ export type Enrichment = {
 };
 export type Correction = {
   recording_id: string;
+  transcript?: string | null;
   amount: number | null;
   currency: string | null;
   merchant: string | null;
@@ -41,6 +42,9 @@ export function latest(recording: Recording) {
   return [...recording.voice_enrichments].sort(
     (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
   )[0];
+}
+export function transcript(recording: Recording) {
+  return recording.recording_corrections?.transcript ?? latest(recording)?.transcript ?? "";
 }
 export function processingState(r: Recording, now = Date.now()) {
   const status = r.enrichment_status;
@@ -159,7 +163,7 @@ export function csv(recordings: Recording[]) {
           x?.currency,
           x?.merchant,
           e?.summary,
-          e?.transcript,
+          transcript(r),
         ];
       }),
     ]

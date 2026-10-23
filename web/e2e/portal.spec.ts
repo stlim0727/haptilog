@@ -71,6 +71,7 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
     retry: 0,
     retryFailure: null as string | null,
     corrections: [] as any[],
+    history: [] as any[],
     audioLoads: 0,
     additional: [] as any[],
   };
@@ -120,8 +121,13 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
         return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
       }
       body = [state.recording, ...state.additional].filter(Boolean);
+    } else if (path.endsWith("/recording_correction_history")) {
+      body = [...state.history].reverse();
     } else if (path.endsWith("/recording_corrections")) {
       const patch = req.postDataJSON();
+      state.history.push({ id: state.history.length + 1, created_at: new Date().toISOString(),
+        before_value: state.recording.recording_corrections,
+        after_value: { ...state.recording.recording_corrections, ...patch } });
       state.corrections.push(patch);
       state.recording.recording_corrections = {
         ...(state.recording.recording_corrections ?? {}),
@@ -160,6 +166,26 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
   });
   return state;
 }
+test("recording context links its saved location to Google Maps", async ({ page }) => {
+  await fixture(page);
+  await page.goto("/");
+  const link = page.getByRole("link", { name: "Open in Google Maps" });
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=37.541%2C127.056");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(page.getByText("37.54100, 127.05600", { exact: true })).toHaveCount(0);
+});
+
+test("recording without a location has no map link", async ({ page }) => {
+  const state = await fixture(page);
+  state.recording.latitude = null;
+  state.recording.longitude = null;
+  await page.goto("/");
+  await expect(page.getByText("No location was captured for this recording.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open in Google Maps" })).toHaveCount(0);
+});
+
 test("pairs through code only and restores browser connection after reload", async ({ page }) => {
   await fixture(page, { connected: false });
   await page.goto("/");
@@ -391,4 +417,25 @@ test("declining adult cloud consent does not invoke AI", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Retry analysis" }).click();
   expect(state.retry).toBe(0);
+});
+
+test("transcript edits preserve originals, can be cancelled, and expose history", async ({ page }) => {
+  const state = await fixture(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Edit transcript", exact: true }).click();
+  await page.getByRole("textbox", { name: "Transcript", exact: true }).fill("Discard this edit");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(state.corrections).toHaveLength(0);
+  await page.getByRole("button", { name: "Edit transcript", exact: true }).click();
+  await page.getByRole("textbox", { name: "Transcript", exact: true }).fill("Corrected coffee text");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.locator(".transcript-editor > p.transcript")).toHaveText("Corrected coffee text");
+  expect(state.corrections.at(-1).transcript).toBe("Corrected coffee text");
+  expect(state.recording.voice_enrichments[0].transcript).toBe(baseRecording.voice_enrichments[0].transcript);
+  await page.getByText("Original AI transcript", { exact: true }).click();
+  await expect(page.locator(".transcript-editor details").first()).toContainText(baseRecording.voice_enrichments[0].transcript);
+  await page.getByText("Edit history", { exact: true }).click();
+  await expect(page.locator(".transcript-editor article")).toContainText("Corrected coffee text");
+  await page.reload();
+  await expect(page.locator(".transcript-editor > p.transcript")).toHaveText("Corrected coffee text");
 });

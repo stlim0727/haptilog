@@ -8,6 +8,7 @@ import {
   latest,
   processingState,
   totals,
+  transcript,
 } from "./domain.ts";
 test("map includes real zero coordinates and rejects missing or invalid GPS", () => {
   assert.equal(hasLocation({ latitude: 0, longitude: 0 }), true);
@@ -72,4 +73,17 @@ test("CSV quotes multiline values and neutralizes spreadsheet formulas", () => {
   const r = rec();
   r.voice_enrichments[0].transcript = '=HYPERLINK("bad")\nnext';
   assert.match(csv([r]), /"'=HYPERLINK\(""bad""\)\nnext"/);
+});
+
+test("text corrections survive reanalysis and CSV honors an intentionally empty edit", () => {
+  const r = rec();
+  assert.equal(transcript(r), "Coffee");
+  r.recording_corrections = { transcript: "Edited text" };
+  r.voice_enrichments.push({ ...r.voice_enrichments[0], created_at: "2026-10-17T02:00:00Z", transcript: "Regenerated" });
+  assert.equal(transcript(r), "Edited text");
+  assert.match(csv([r]), /Edited text/);
+  assert.equal(latest(r).transcript, "Regenerated");
+  r.recording_corrections.transcript = "";
+  assert.equal(transcript(r), "");
+  assert.doesNotMatch(csv([r]), /Regenerated/);
 });

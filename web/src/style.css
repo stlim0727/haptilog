@@ -1288,3 +1288,19 @@ audio {
   color: #fca5a5;
 }
 
+.transcript-editor textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  margin: 8px 0 12px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border, #bbb);
+  border-radius: 8px;
+  resize: vertical;
+}
+.transcript-editor details { margin-top: 16px; }
+.transcript-editor summary { cursor: pointer; }
+.transcript-editor article { border-top: 1px solid var(--border, #bbb); padding: 12px 0; }

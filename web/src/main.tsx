@@ -24,16 +24,19 @@ import {
 } from "lucide-react";
 import { supabase } from "./client";
 import { NotionExport } from "./NotionExport";
+import { TranscriptEditor } from "./TranscriptEditor";
 import { purgeRecordings } from "./purge";
 import {
   csv,
   analysisFailure,
   expense,
+  hasLocation,
   latest,
   localDate,
   money,
   processingState,
   taskItems,
+  transcript,
   totals,
 } from "./domain";
 import type { Correction, Recording } from "./domain";
@@ -327,7 +330,7 @@ function App() {
           : day.slice(0, 7) === today.slice(0, 7))) &&
       (isTrashView || category === "All" || e?.intent_type === category.toUpperCase()) &&
       (!search ||
-        `${e?.summary ?? ""} ${e?.transcript ?? ""}`
+        `${e?.summary ?? ""} ${transcript(r)}`
           .toLowerCase()
           .includes(search.toLowerCase()))
     );
@@ -1096,9 +1099,11 @@ function Inspector({
         <>
           <div className="section-label">
             <Mic size={16} /> {t.transcript}{" "}
-            <span>{t.transcript_note}</span>
+            <span>{r.recording_corrections?.transcript != null
+              ? (lang === "ko" ? "사용자 편집 · 원본 보존" : "Edited · original preserved")
+              : t.transcript_note}</span>
           </div>
-          <p className="transcript">{e.transcript || t.no_speech}</p>
+          <TranscriptEditor recording={r} lang={lang} onChange={onChange} onError={onError} />
           {x && (
             <form
               className="expense-form"
@@ -1192,10 +1197,17 @@ function Inspector({
         <div className="section-label">
           <MapPin size={16} /> {t.captured_context}
         </div>
-        {r.latitude != null && r.longitude != null ? (
+        {hasLocation(r) ? (
           <>
             <p>
-              {r.latitude.toFixed(5)}, {r.longitude.toFixed(5)}
+              <a
+                className="secondary-button"
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.latitude},${r.longitude}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MapPin size={16} aria-hidden="true" /> {t.open_in_maps}
+              </a>
             </p>
             <dl>
               <div>
