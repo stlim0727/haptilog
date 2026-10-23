@@ -38,7 +38,6 @@ import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.material.PositionIndicator
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material.Text
@@ -165,6 +164,7 @@ fun RecordingDetailScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
+                .padding(horizontal = 18.dp)
                 .focusRequester(focusRequester)
                 .focusable()
                 .onRotaryScrollEvent { event ->
@@ -239,7 +239,7 @@ fun RecordingDetailScreen(
             }
 
             if (hasMapLocation(item)) item {
-                CompactChip(
+                FlexibleChip(
                     onClick = {
                         val latitude = item.latitude
                         val longitude = item.longitude
@@ -254,7 +254,7 @@ fun RecordingDetailScreen(
                             Toast.makeText(context, "지도를 열 수 있는 앱이 없습니다", Toast.LENGTH_LONG).show()
                         }
                     },
-                    label = { Text("지도 보기") },
+                    label = { Text(maxLines = Int.MAX_VALUE, text = "지도 보기") },
                     modifier = Modifier.fillMaxWidth(0.86f)
                 )
             }
@@ -276,9 +276,9 @@ fun RecordingDetailScreen(
             }
 
             if (item.syncStatus == "ACTION_REQUIRED") item {
-                CompactChip(
+                FlexibleChip(
                     onClick = onRetry,
-                    label = { Text("재시도", fontSize = 10.sp) },
+                    label = { Text(maxLines = Int.MAX_VALUE, text = "재시도", fontSize = 10.sp) },
                     colors = ChipDefaults.chipColors(
                         backgroundColor = Color(0xFF2C2C2E),
                         contentColor = Color(0xFFFF9F0A)
@@ -288,10 +288,10 @@ fun RecordingDetailScreen(
             }
 
             item {
-                CompactChip(
+                FlexibleChip(
                     onClick = onTogglePlay,
                     label = {
-                        Text(
+                        Text(maxLines = Int.MAX_VALUE,
                             text = if (isPlaying) "정지" else "재생",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Medium
@@ -306,22 +306,22 @@ fun RecordingDetailScreen(
             }
 
             item {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    CompactChip(
+                    FlexibleChip(
                         onClick = onExport,
-                        label = { Text("내보내기", fontSize = 10.sp) },
+                        label = { Text(maxLines = Int.MAX_VALUE, text = "내보내기", fontSize = 10.sp) },
                         colors = ChipDefaults.chipColors(
                             backgroundColor = Color(0xFF242426),
                             contentColor = Color(0xFF8E8E93)
                         ),
                         shape = RoundedCornerShape(10.dp)
                     )
-                    CompactChip(
+                    FlexibleChip(
                         onClick = onDelete,
-                        label = { Text("삭제", fontSize = 10.sp) },
+                        label = { Text(maxLines = Int.MAX_VALUE, text = "삭제", fontSize = 10.sp) },
                         colors = ChipDefaults.chipColors(
                             backgroundColor = Color(0xFF241C1C),
                             contentColor = Color(0xFFFF6961)
