@@ -28,6 +28,7 @@ import {
   csv,
   analysisFailure,
   expense,
+  hasLocation,
   latest,
   localDate,
   money,
@@ -1190,10 +1191,17 @@ function Inspector({
         <div className="section-label">
           <MapPin size={16} /> {t.captured_context}
         </div>
-        {r.latitude != null && r.longitude != null ? (
+        {hasLocation(r) ? (
           <>
             <p>
-              {r.latitude.toFixed(5)}, {r.longitude.toFixed(5)}
+              <a
+                className="secondary-button"
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.latitude},${r.longitude}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MapPin size={16} aria-hidden="true" /> {t.open_in_maps}
+              </a>
             </p>
             <dl>
               <div>

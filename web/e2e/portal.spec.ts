@@ -158,6 +158,26 @@ async function fixture(page: Page, { connected = true, failed = false } = {}) {
   });
   return state;
 }
+test("recording context links its saved location to Google Maps", async ({ page }) => {
+  await fixture(page);
+  await page.goto("/");
+  const link = page.getByRole("link", { name: "Open in Google Maps" });
+  await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=37.541%2C127.056");
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(page.getByText("37.54100, 127.05600", { exact: true })).toHaveCount(0);
+});
+
+test("recording without a location has no map link", async ({ page }) => {
+  const state = await fixture(page);
+  state.recording.latitude = null;
+  state.recording.longitude = null;
+  await page.goto("/");
+  await expect(page.getByText("No location was captured for this recording.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open in Google Maps" })).toHaveCount(0);
+});
+
 test("pairs through code only and restores browser connection after reload", async ({ page }) => {
   await fixture(page, { connected: false });
   await page.goto("/");
