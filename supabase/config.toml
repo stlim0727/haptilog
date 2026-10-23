@@ -394,3 +394,7 @@ verify_jwt = false
 [functions.watch-access]
 # Validates bearer with Auth getUser() before privileged pairing RPCs.
 verify_jwt = false
+
+[functions.notion-export]
+# The handler verifies Auth getUser() and the live paired browser grant.
+verify_jwt = false

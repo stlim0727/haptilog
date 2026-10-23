@@ -1,6 +1,9 @@
-import { test, expect } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "../e2e/fixtures";
 
 test("production headers allow map tiles with origin-only referrer", async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on("pageerror", error => pageErrors.push(error.message));
   const owner = "11111111-1111-4111-8111-111111111111";
   const browser = "66666666-6666-4666-8666-666666666666";
   const sessionId = "77777777-7777-4777-8777-777777777777";
@@ -13,6 +16,12 @@ test("production headers allow map tiles with origin-only referrer", async ({ pa
   }, { browser, sessionId });
   await page.route("https://haptilog-test.supabase.co/**", route => {
     const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/notion-export")) {
+      expect(route.request().postDataJSON()).toEqual({ action: "status" });
+      return route.fulfill({ contentType: "application/json", body: JSON.stringify({
+        configured: false, connected: false, target: null, exports: [],
+      }) });
+    }
     const data = path.endsWith("/portal_connections")
       ? [{ session_id: sessionId, browser_user_id: browser, owner_user_id: owner, watch_id: "HL-0123456789", expires_at: "2099-01-01T00:00:00Z" }]
       : [{ id: "33333333-3333-4333-8333-333333333333", user_id: owner, recorded_at: "2026-10-17T10:00:00Z", latitude: 37.541, longitude: 127.056, voice_enrichments: [], enrichment_status: null, recording_corrections: null, audio_path: null }];
@@ -30,6 +39,7 @@ test("production headers allow map tiles with origin-only referrer", async ({ pa
   expect(referrers.length).toBeGreaterThan(0);
   expect(referrers.every(value => value === "http://127.0.0.1:4179/")).toBe(true);
   await expect(page.getByRole("region", { name: "Map of recording locations" })).toBeVisible();
+  expect(pageErrors).toEqual([]);
 });
 
 test("privacy policy is accessible under production headers and linked from portal", async ({ page }) => {

@@ -1,0 +1,56 @@
+.notion-panel {
+  margin: 0 0 24px;
+}
+.notion-content {
+  margin-top: 12px;
+  padding: 20px;
+  border: 1px solid var(--border, #29292f);
+  border-radius: 12px;
+  background: var(--surface, #111115);
+}
+.notion-content p {
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+.notion-note,
+.notion-record small {
+  color: var(--text-secondary, #a1a1aa);
+  font-size: 13px;
+}
+.notion-actions,
+.notion-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+.notion-target p {
+  flex-basis: 100%;
+}
+.notion-target select {
+  max-width: 100%;
+  padding: 8px;
+}
+.notion-records {
+  max-height: 320px;
+  overflow: auto;
+}
+.notion-record {
+  padding: 12px 0;
+  border-top: 1px solid var(--border, #29292f);
+}
+.notion-record label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  cursor: pointer;
+}
+.notion-record input {
+  flex: 0 0 auto;
+}
+.notion-record small {
+  display: block;
+  margin: 5px 0 0 24px;
+  overflow-wrap: anywhere;
+}

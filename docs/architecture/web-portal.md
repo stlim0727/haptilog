@@ -79,3 +79,7 @@ cd web && npx playwright install chromium && npm run test:e2e
 ```
 
 Use `CHROME_PATH=/opt/google/chrome/chrome npm run test:e2e` to reuse a locally installed Chrome. Android build/unit checks remain `./gradlew assembleDebug testDebugUnitTest` from `watch/`.
+
+## Notion export
+
+The optional [Notion inbox export](notion-export.md) adds manual selection and delivery of recordings to one Notion destination, with OAuth credentials held only on the server. It is independent of recording upload and analysis.
