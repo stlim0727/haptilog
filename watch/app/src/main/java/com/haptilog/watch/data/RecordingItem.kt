@@ -1,5 +1,6 @@
 package com.haptilog.watch.data
 
+import org.json.JSONObject
 import java.io.File
 
 /**
@@ -21,5 +22,9 @@ data class RecordingItem(
     val accuracy: Float? = null,
     val intentType: String? = null,
     val summary: String? = null,
-    val transcript: String? = null
+    val transcript: String? = null,
+    val syncAttempts: Int = 0,
+    val syncError: String? = null,
+    val uploaded: Boolean = false,
+    val structuredData: JSONObject? = null
 )

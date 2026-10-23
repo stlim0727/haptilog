@@ -72,6 +72,7 @@ class RecordingRepository(private val context: Context) {
                 val intentType = derived?.optString("intent_type")
                 val summary = derived?.optString("summary")
                 val transcript = derived?.optString("transcript")
+                val structuredData = derived?.optJSONObject("structured_data")
 
                 RecordingItem(
                     id = id,
@@ -89,7 +90,11 @@ class RecordingRepository(private val context: Context) {
                     accuracy = acc,
                     intentType = intentType,
                     summary = summary,
-                    transcript = transcript
+                    transcript = transcript,
+                    syncAttempts = sync?.optInt("attempts", 0) ?: 0,
+                    syncError = sync?.optString("error")?.takeIf { it.isNotBlank() },
+                    uploaded = sync?.optBoolean("uploaded") ?: false,
+                    structuredData = structuredData
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
