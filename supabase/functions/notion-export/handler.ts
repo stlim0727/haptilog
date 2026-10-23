@@ -167,20 +167,30 @@ export function createNotionHandler(deps: Dependencies) {
       if (body.action === "status") {
         let exports: unknown[] = [];
         if (current?.data_source_id) {
-          const result = checked(
-            await db.from("notion_exports")
-              .select(
-                "recording_id,state,error_code,exported_at,recordings!inner(user_id)",
-              )
-              .eq("data_source_id", current.data_source_id).eq(
-                "recordings.user_id",
-                access.owner_user_id,
-              )
-              .limit(500),
+          // Match the portal's latest-500 capture window before filtering trash.
+          // Limiting checkpoints themselves can omit visible successes/failures.
+          const window = checked(
+            await db.from("recordings")
+              .select("id,deleted_at,purging_at")
+              .eq("user_id", access.owner_user_id)
+              .order("recorded_at", { ascending: false }).limit(500),
+          ).data ?? [];
+          const ids = window.filter((r) => !r.deleted_at && !r.purging_at).map(
+            (r) => r.id,
           );
-          exports = (result.data ?? []).map((
-            { recording_id, state, error_code, exported_at },
-          ) => ({ recording_id, state, error_code, exported_at }));
+          if (ids.length) {
+            const result = checked(
+              await db.from("notion_exports")
+                .select("recording_id,state,error_code,exported_at")
+                .eq("data_source_id", current.data_source_id).in(
+                  "recording_id",
+                  ids,
+                ),
+            );
+            exports = (result.data ?? []).map((
+              { recording_id, state, error_code, exported_at },
+            ) => ({ recording_id, state, error_code, exported_at }));
+          }
         }
         return reply(200, {
           configured,
@@ -352,17 +362,31 @@ export function createNotionHandler(deps: Dependencies) {
         };
         let response = await send();
         if (response.status === 401) {
-          tokens = {
-            ...tokens,
-            ...await oauth({
-              grant_type: "refresh_token",
-              refresh_token: tokens.refresh_token,
-            }),
-          };
-          await saveConnection({
-            token_cipher: await seal(tokens, encryptionKey!, session),
-          });
-          await guard();
+          try {
+            tokens = {
+              ...tokens,
+              ...await oauth({
+                grant_type: "refresh_token",
+                refresh_token: tokens.refresh_token,
+              }),
+            };
+            await saveConnection({
+              token_cipher: await seal(tokens, encryptionKey!, session),
+            });
+            await guard();
+          } catch (error) {
+            // The first create was explicitly rejected and no second POST was
+            // sent. Even a refresh timeout must allow creation after reconnect.
+            if (path === "pages" && method === "POST") {
+              throw new Failure(
+                error instanceof Error ? error.message : "NOTION_UNAVAILABLE",
+                error instanceof Failure ? error.status : 502,
+                true,
+              );
+            }
+            throw error;
+          }
+          // Outside the catch: a lost response to this POST is still ambiguous.
           response = await send();
         }
         if (!response.ok) {

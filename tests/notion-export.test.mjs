@@ -85,12 +85,19 @@ async function fixture(options = {}) {
     notes: "User note stays",
     block: null,
     rejectCreate: false,
+    expireCreate: false,
+    refreshFailure: null,
     loseCreate: false,
     noCreate: false,
     revokeBeforeWrite: false,
   };
   function from(table) {
-    let op = "select", patch, filters = [], ignoreDuplicates = false;
+    let op = "select",
+      patch,
+      filters = [],
+      ignoreDuplicates = false,
+      count = Infinity,
+      sort = null;
     const q = {
       select() {
         return q;
@@ -107,7 +114,16 @@ async function fixture(options = {}) {
         filters.push((r) => r[k] > v);
         return q;
       },
-      limit() {
+      in(k, values) {
+        filters.push((r) => values.includes(r[k]));
+        return q;
+      },
+      order(k, { ascending }) {
+        sort = { k, ascending };
+        return q;
+      },
+      limit(n) {
+        count = n;
         return q;
       },
       update(v) {
@@ -123,6 +139,13 @@ async function fixture(options = {}) {
       },
       async execute(single = false) {
         let rows = tables[table].filter((r) => filters.every((f) => f(r)));
+        if (sort) {
+          rows.sort((a, b) =>
+            (a[sort.k] < b[sort.k] ? -1 : a[sort.k] > b[sort.k] ? 1 : 0) *
+            (sort.ascending ? 1 : -1)
+          );
+        }
+        rows = rows.slice(0, count);
         if (op === "update") rows.forEach((r) => Object.assign(r, patch));
         if (op === "upsert") {
           let row = tables[table].find((r) =>
@@ -174,6 +197,10 @@ async function fixture(options = {}) {
       new Response(JSON.stringify(data), { status });
     if (path === "oauth/token") {
       remote.refreshed++;
+      if (remote.refreshFailure === "timeout") {
+        throw new Error("refresh timeout");
+      }
+      if (remote.refreshFailure === "reject") return json({}, 400);
       return json({
         access_token: "new-access",
         refresh_token: "new-refresh",
@@ -198,6 +225,10 @@ async function fixture(options = {}) {
       return json({ results: remote.pages, has_more: false });
     }
     if (path === "pages" && method === "POST") {
+      if (remote.expireCreate) {
+        remote.expireCreate = false;
+        return json({}, 401);
+      }
       if (remote.rejectCreate) {
         remote.rejectCreate = false;
         return json({}, 429);
@@ -517,4 +548,118 @@ test("Unicode chunks respect API string limits without losing emoji or Korean te
       }, "https://haptilog.keepory.app"),
     /CONTENT_TOO_LARGE/,
   );
+});
+
+test("create 401 followed by failed refresh permits exporting after reconnect", async () => {
+  for (const failure of ["reject", "timeout"]) {
+    const f = await fixture();
+    f.remote.expireCreate = true;
+    f.remote.refreshFailure = failure;
+    const failed = await f.call({
+      action: "export",
+      recording_id: recordingId,
+    });
+    assert.equal(
+      failed.body.error,
+      failure === "reject" ? "RECONNECT_REQUIRED" : "NOTION_UNAVAILABLE",
+    );
+    assert.equal(f.tables.notion_exports[0].create_pending, false);
+    assert.equal(f.remote.creates, 0);
+    assert.equal(f.remote.requests.filter((x) => x.path === "pages").length, 1);
+    f.remote.refreshFailure = null;
+    const auth = await f.call({ action: "authorize" });
+    const state = new URL(auth.body.url).searchParams.get("state");
+    assert.equal(
+      (await f.call({ action: "complete", state, code: "reconnect-code" }))
+        .status,
+      200,
+    );
+    assert.equal((await f.call({ action: "target", id: target })).status, 200);
+    assert.equal(
+      (await f.call({ action: "export", recording_id: recordingId })).status,
+      200,
+    );
+    assert.equal(f.remote.creates, 1);
+  }
+});
+
+test("lost create response after successful refresh remains ambiguous and recovers one page", async () => {
+  const f = await fixture();
+  f.remote.expireCreate = true;
+  f.remote.loseCreate = true;
+  assert.equal(
+    (await f.call({ action: "export", recording_id: recordingId })).status,
+    502,
+  );
+  assert.equal(f.tables.notion_exports[0].create_pending, true);
+  assert.equal(
+    (await f.call({ action: "export", recording_id: recordingId })).status,
+    200,
+  );
+  assert.equal(f.remote.creates, 1);
+});
+
+test("status retains current-window successes and failures beyond 500 older checkpoints", async () => {
+  const f = await fixture();
+  for (let i = 0; i < 501; i++) {
+    const id = `aaaaaaaa-aaaa-4aaa-8aaa-${i.toString(16).padStart(12, "0")}`;
+    f.tables.recordings.push({ id, user_id: owner, recorded_at: "2020-01-01" });
+    f.tables.notion_exports.push({
+      data_source_id: target,
+      recording_id: id,
+      state: "EXPORTED",
+    });
+  }
+  const visible = [
+    "bbbbbbbb-bbbb-4bbb-8bbb-000000000001",
+    "bbbbbbbb-bbbb-4bbb-8bbb-000000000002",
+  ];
+  for (const [index, id] of visible.entries()) {
+    f.tables.recordings.push({ id, user_id: owner, recorded_at: "2027-01-01" });
+    f.tables.notion_exports.push({
+      data_source_id: target,
+      recording_id: id,
+      state: index ? "FAILED" : "EXPORTED",
+      error_code: index ? "NOTION_UNAVAILABLE" : null,
+    });
+  }
+  const hidden = [
+    "cccccccc-cccc-4ccc-8ccc-000000000001",
+    "cccccccc-cccc-4ccc-8ccc-000000000002",
+    "cccccccc-cccc-4ccc-8ccc-000000000003",
+  ];
+  f.tables.recordings.push({
+    id: hidden[0],
+    user_id: owner,
+    recorded_at: "2028-01-01",
+    deleted_at: "2028-01-02",
+  }, {
+    id: hidden[1],
+    user_id: owner,
+    recorded_at: "2028-01-01",
+    purging_at: "2028-01-02",
+  }, { id: hidden[2], user_id: browser, recorded_at: "2028-01-01" });
+  for (const id of hidden) {
+    f.tables.notion_exports.push({
+      data_source_id: target,
+      recording_id: id,
+      state: "EXPORTED",
+    });
+  }
+  const result = await f.call({ action: "status" });
+  assert.equal(result.status, 200);
+  assert.equal(
+    result.body.exports.find((x) => x.recording_id === visible[0]).state,
+    "EXPORTED",
+  );
+  assert.equal(
+    result.body.exports.find((x) => x.recording_id === visible[1]).state,
+    "FAILED",
+  );
+  assert.ok(
+    hidden.every((id) =>
+      !result.body.exports.some((x) => x.recording_id === id)
+    ),
+  );
+  assert.ok(result.body.exports.length <= 500);
 });
