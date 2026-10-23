@@ -1,0 +1,3 @@
+Offline force-stop and restart: raw audio and capture metadata SHA-256 unchanged.
+6f0429091539d44b244f69f93bad666ced7ce86cbaf4851811c6747d788128ff  files/recordings/rec_430a549f-abfb-4237-b3bf-55d16e223b5a.m4a
+a9fb56ed6a0d2600da0fff6738664cc0ac5b9c5e575c874fd602bfb43aa8fa6b  files/recordings/meta_430a549f-abfb-4237-b3bf-55d16e223b5a.json

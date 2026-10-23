@@ -52,7 +52,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -69,7 +69,6 @@ import androidx.wear.compose.material.Button
 import androidx.wear.compose.material.ButtonDefaults
 import androidx.wear.compose.material.Card
 import androidx.wear.compose.material.CardDefaults
-import androidx.wear.compose.material.CompactChip
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -318,10 +317,11 @@ fun HaptiLogScreen(
 
             // Navigation stays ahead of the unbounded recording list.
             item {
-                CompactChip(
+                FlexibleChip(
                     enabled = !isRecording,
                     onClick = onSettings,
-                    label = { Text("Settings & help", fontSize = 12.sp) }
+                    label = { Text("Settings & help", fontSize = 12.sp, maxLines = Int.MAX_VALUE) },
+                    modifier = Modifier.fillMaxWidth(0.86f)
                 )
             }
 
@@ -387,15 +387,16 @@ fun RecordHeroSection(
         label = "edge_breathe"
     )
 
+    val discSize = maxOf(108f, 72f * LocalDensity.current.fontScale).dp
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(126.dp)
+        modifier = Modifier.size(discSize + 18.dp)
     ) {
         // Subtle 1px Edge Luminance breathing when recording
         if (isRecording) {
             Box(
                 modifier = Modifier
-                    .size(126.dp)
+                    .size(discSize + 18.dp)
                     .border(
                         width = 1.dp,
                         color = Color(0xFFFF3B30).copy(alpha = breatheAlpha),
@@ -408,7 +409,7 @@ fun RecordHeroSection(
         Button(
             onClick = onToggleRecording,
             modifier = Modifier
-                .size(108.dp)
+                .size(discSize)
                 .border(
                     width = 1.dp,
                     color = if (isRecording) Color(0xFFFF3B30).copy(alpha = 0.5f) else Color(0xFF2C2C2E),
@@ -530,11 +531,7 @@ fun RecordingCard(
                 .padding(horizontal = 10.dp, vertical = 8.dp)
         ) {
             // Header: Time & Duration
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = timeFormatted,
                     fontSize = 12.sp,
