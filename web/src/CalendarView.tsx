@@ -7,7 +7,7 @@ import {
   Clock,
 } from "lucide-react";
 import { CategoryBadge, CategoryIcon } from "./TimelineView";
-import { expense, hasLocation, latest, localDate, money } from "./domain";
+import { expense, hasLocation, latest, localDate, money, toLocalDateString } from "./domain";
 import type { Recording } from "./domain";
 import type { translations } from "./i18n";
 
@@ -23,10 +23,7 @@ export default function CalendarView({
   t: (typeof translations)["en"] | (typeof translations)["ko"];
 }) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [selectedDateKey, setSelectedDateKey] = useState<string>(() => {
-    const today = new Date();
-    return today.toISOString().slice(0, 10);
-  });
+  const [selectedDateKey, setSelectedDateKey] = useState<string>(() => toLocalDateString());
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth(); // 0-indexed
@@ -54,7 +51,7 @@ export default function CalendarView({
   const goToday = () => {
     const now = new Date();
     setCurrentDate(now);
-    setSelectedDateKey(now.toISOString().slice(0, 10));
+    setSelectedDateKey(toLocalDateString(now));
   };
 
   const dayCells = [];
@@ -148,7 +145,7 @@ export default function CalendarView({
             const isSelected = cell.dateKey === selectedDateKey;
             const isToday =
               cell.isCurrentMonth &&
-              cell.dateKey === new Date().toISOString().slice(0, 10);
+              cell.dateKey === toLocalDateString();
 
             // Extract distinct category types on this day
             const categories = new Set(

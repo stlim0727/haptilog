@@ -446,10 +446,18 @@ test("switches between List, Timeline & Map, and Calendar views seamlessly", asy
 
   // 1. Initial list view
   await expect(page.locator(".review-layout")).toBeVisible();
+  await expect(page.locator(".global-filters-bar")).toBeVisible();
   await expect(page.locator(".category-expense")).toBeVisible();
 
-  // 2. Switch to Timeline & Map view
+  // 2. Switch to Timeline & Map view (Option C: TimeSliderStrip + Timeline + Map)
   await page.getByRole("tab", { name: "Timeline & Map" }).click();
+  await expect(page.locator(".time-strip-container")).toBeVisible();
+  await expect(page.locator(".time-strip-card").first()).toBeVisible();
+  await page.locator(".time-strip-card").first().click();
+  await expect(page.locator(".time-strip-card").first()).toHaveClass(/selected/);
+  await page.locator(".time-strip-all-btn").click();
+  await expect(page.locator(".time-strip-all-btn")).toHaveClass(/active/);
+
   await expect(page.locator(".spatiotemporal-grid")).toBeVisible();
   await expect(page.locator(".timeline-container")).toBeVisible();
   await expect(page.locator(".recording-map")).toBeVisible();
