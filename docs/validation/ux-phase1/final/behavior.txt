@@ -1,0 +1,4 @@
+Synthetic derived text only. No cloud uploads.
+Delete cancel and offline force-stop/restart kept audio + capture metadata hashes unchanged.
+d14fa358f158f2207cc81e7575168d447ca8ef51c06f86294d6cdae03fcc479b  files/recordings/rec_9327b613-d0fd-4270-81f5-aa50fa503c4b.m4a
+c8df2843c04aa3c958721a3984f301dff04890759d2d5d8bee6159d2642455c6  files/recordings/meta_9327b613-d0fd-4270-81f5-aa50fa503c4b.json
