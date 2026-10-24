@@ -120,4 +120,30 @@ class RecordingSyncTest {
         }
         assertTrue(client.paths.isEmpty())
     }
+    @Test fun repositoryDeleteLeavesTombstoneEvenWhenSyncDisabled() {
+        val dir = RecordingFiles.dir(context)
+        // Explicitly disable cloud sync and revoke consent
+        context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", false)
+            .remove("consent_version")
+            .commit()
+        assertFalse(com.haptilog.watch.sync.RecordingSyncWorker.enabled(context))
+        assertFalse(com.haptilog.watch.sync.CloudConsent.accepted(context))
+
+        // But this recording was already uploaded
+        RecordingFiles.write(stateFile, JSONObject().put("uploaded", true).put("status", "SYNCED"))
+        val repo = RecordingRepository(context)
+        val deleted = repo.deleteRecording(id)
+
+        assertTrue(deleted)
+        val deleteFile = File(dir, "delete_$id.json")
+        assertTrue("Tombstone must be created for previously uploaded items even if sync is off", deleteFile.exists())
+        repo.close()
+
+        // And deleter can still process it independently of upload consent
+        val client = FakeCloud()
+        RecordingDeleter(context).delete(id, deleteFile, client)
+        assertEquals(1, client.paths.count { it.startsWith("/rest/v1/recordings") })
+        assertFalse(deleteFile.exists())
+    }
 }

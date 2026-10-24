@@ -11,6 +11,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import com.haptilog.watch.sync.CloudClient
 import com.haptilog.watch.sync.CloudConsent
+import com.haptilog.watch.sync.RecordingDeleteWorker
 import com.haptilog.watch.sync.RecordingDeleter
 import com.haptilog.watch.sync.RecordingSyncWorker
 import kotlinx.coroutines.cancel
@@ -144,7 +145,8 @@ class RecordingRepository(private val context: Context) {
             refresh()
 
             RecordingSyncWorker.schedule(context)
-            if (deleteFile.exists() && CloudClient.configured && CloudConsent.accepted(context)) {
+            RecordingDeleteWorker.schedule(context)
+            if (deleteFile.exists() && CloudClient.configured) {
                 scope.launch {
                     try {
                         withContext(Dispatchers.IO) {
@@ -152,7 +154,8 @@ class RecordingRepository(private val context: Context) {
                             RecordingDeleter(context).delete(id, deleteFile, client)
                         }
                     } catch (_: Exception) {
-                        // Offline or transient failure; sync worker retries with exponential backoff
+                        // Offline or transient failure; delete worker retries with exponential backoff
+                        RecordingDeleteWorker.schedule(context)
                     }
                 }
             }

@@ -77,4 +77,18 @@ class RecordingDetailFormatTest {
             syncStatusLabel(item("ACTION_REQUIRED", attempts = 6, error = "CONNECTION_OR_SESSION_ERROR")))
         assertEquals("대기", syncStatusLabel(item("")))
     }
+
+    @Test fun shouldTrashCloudCopyOnlyWhenInCloudAndConfigured() {
+        // Uploaded item with cloud configured must trash cloud copy
+        assertTrue(shouldTrashCloudCopy(item("PENDING_SYNC", uploaded = true), cloudConfigured = true))
+        assertTrue(shouldTrashCloudCopy(item("SYNCED", uploaded = false), cloudConfigured = true))
+        assertTrue(shouldTrashCloudCopy(item("SYNCING", uploaded = false), cloudConfigured = true))
+
+        // Not in cloud must not trash cloud copy
+        assertFalse(shouldTrashCloudCopy(item("PENDING_SYNC", uploaded = false), cloudConfigured = true))
+        assertFalse(shouldTrashCloudCopy(item("CAPTURE_FAILED", uploaded = false), cloudConfigured = true))
+
+        // When cloud is not configured, always local only
+        assertFalse(shouldTrashCloudCopy(item("SYNCED", uploaded = true), cloudConfigured = false))
+    }
 }

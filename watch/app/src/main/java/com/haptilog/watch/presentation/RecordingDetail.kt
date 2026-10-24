@@ -30,6 +30,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import com.haptilog.watch.R
+import com.haptilog.watch.sync.CloudClient
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -139,6 +140,10 @@ fun syncStatusLabel(item: RecordingItem): String {
     return parts.joinToString(" · ")
 }
 
+fun shouldTrashCloudCopy(item: RecordingItem, cloudConfigured: Boolean = CloudClient.configured): Boolean {
+    return cloudConfigured && (item.uploaded || item.syncStatus in listOf("SYNCED", "SYNCING"))
+}
+
 @Composable
 fun RecordingDetailScreen(
     item: RecordingItem,
@@ -187,7 +192,7 @@ fun RecordingDetailScreen(
             if (confirmingDelete) {
                 item { Text(stringResource(R.string.delete_confirm_title), fontSize = 18.sp,
                     modifier = Modifier.fillMaxWidth(0.9f)) }
-                item { Text(stringResource(if (item.uploaded || cloudEnabled) R.string.delete_confirm_scope else R.string.delete_confirm_scope_local_only), fontSize = 14.sp,
+                item { Text(stringResource(if (shouldTrashCloudCopy(item)) R.string.delete_confirm_scope else R.string.delete_confirm_scope_local_only), fontSize = 14.sp,
                     color = WatchColors.Muted, modifier = Modifier.fillMaxWidth(0.9f)) }
                 item { FlexibleChip(onClick = { confirmingDelete = false },
                     label = { Text(stringResource(R.string.cancel_action), maxLines = Int.MAX_VALUE) }) }
