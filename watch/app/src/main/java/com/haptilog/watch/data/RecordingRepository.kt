@@ -9,6 +9,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import com.haptilog.watch.sync.CloudClient
+import com.haptilog.watch.sync.CloudConsent
+import com.haptilog.watch.sync.RecordingDeleteWorker
+import com.haptilog.watch.sync.RecordingDeleter
+import com.haptilog.watch.sync.RecordingSyncWorker
 import kotlinx.coroutines.cancel
 import java.io.File
 import java.time.Instant
@@ -107,17 +112,53 @@ class RecordingRepository(private val context: Context) {
 
     fun deleteRecording(id: String): Boolean {
         if (!RecordingFiles.validId(id)) return false
-        com.haptilog.watch.sync.RecordingSyncWorker.schedule(context)
         var deleted = false
         try {
             val metaFile = File(recordingsDir, "meta_${id}.json")
             val audioFile = File(recordingsDir, "rec_${id}.m4a")
-            // Local deletion only; never claim that uploaded cloud data was deleted.
+            val syncFile = File(recordingsDir, "sync_$id.json")
+            val enrichFile = File(recordingsDir, "enrich_$id.json")
+
+            val syncData = if (syncFile.exists()) runCatching { RecordingFiles.read(syncFile) }.getOrNull() else null
+            val wasSyncedOrUploaded = syncData != null && (
+                syncData.optBoolean("uploaded") ||
+                syncData.optString("status") in listOf("SYNCED", "SYNCING", "PENDING_SYNC", "ACTION_REQUIRED")
+            )
+
+            val deleteFile = File(recordingsDir, "delete_$id.json")
+            if (wasSyncedOrUploaded || (CloudConsent.accepted(context) && CloudClient.configured)) {
+                val deleteData = JSONObject().apply {
+                    put("id", id)
+                    put("deleted_at", Instant.now().toString())
+                }
+                val tombstoneSaved = runCatching {
+                    RecordingFiles.write(deleteFile, deleteData)
+                    deleteFile.exists()
+                }.getOrDefault(false)
+                if (!tombstoneSaved) return false
+            }
+
             deleted = (!audioFile.exists() || audioFile.delete()) && (!metaFile.exists() || metaFile.delete())
             if (deleted) {
-                listOf("sync_$id.json", "enrich_$id.json").forEach { File(recordingsDir, it).delete() }
+                listOf(syncFile, enrichFile).forEach { if (it.exists()) it.delete() }
             }
             refresh()
+
+            RecordingSyncWorker.schedule(context)
+            RecordingDeleteWorker.schedule(context)
+            if (deleteFile.exists() && CloudClient.configured) {
+                scope.launch {
+                    try {
+                        withContext(Dispatchers.IO) {
+                            val client = CloudClient(context)
+                            RecordingDeleter(context).delete(id, deleteFile, client)
+                        }
+                    } catch (_: Exception) {
+                        // Offline or transient failure; delete worker retries with exponential backoff
+                        RecordingDeleteWorker.schedule(context)
+                    }
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }

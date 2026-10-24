@@ -34,6 +34,7 @@ object CloudConsent {
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build()
         WorkManager.getInstance(context).enqueueUniqueWork("cloud-consent-revocation", ExistingWorkPolicy.REPLACE, request)
+        RecordingDeleteWorker.schedule(context)
     }
 }
 

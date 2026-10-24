@@ -26,8 +26,10 @@
     <string name="no_map_app">No map app available on this watch</string>
     <string name="export_action">Export</string>
     <string name="delete_local">Delete from watch</string>
-    <string name="delete_confirm_title">Delete this recording from the watch?</string>
-    <string name="delete_confirm_scope">Deletes the audio and its details from this watch. Any cloud copy remains.</string>
+    <string name="delete_recording">Delete recording</string>
+    <string name="delete_confirm_title">Delete this recording?</string>
+    <string name="delete_confirm_scope">Deletes from this watch and moves cloud copies to the trash in the web portal.</string>
+    <string name="delete_confirm_scope_local_only">Deletes the audio and its details from this watch.</string>
     <string name="cancel_action">Cancel</string>
     <string name="delete_action">Delete</string>
     <string name="delete_failed">Could not fully delete. Remaining files were kept. Try again.</string>
