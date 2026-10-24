@@ -27,7 +27,7 @@ class RecordingDeleteWorker(context: Context, params: WorkerParameters) : Corout
                 .setConstraints(constraints)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork("recording-delete", ExistingWorkPolicy.KEEP, request)
+            WorkManager.getInstance(context).enqueueUniqueWork("recording-delete", ExistingWorkPolicy.APPEND_OR_REPLACE, request)
         }
     }
 

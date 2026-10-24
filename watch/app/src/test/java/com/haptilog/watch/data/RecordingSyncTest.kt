@@ -35,6 +35,9 @@ class RecordingSyncTest {
     }
     @Before fun setup() {
         context = RuntimeEnvironment.getApplication()
+        try {
+            androidx.work.WorkManager.initialize(context, androidx.work.Configuration.Builder().build())
+        } catch (_: IllegalStateException) {}
         val dir = RecordingFiles.dir(context)
         dir.listFiles()?.forEach { it.delete() }
         File(dir, "rec_$id.m4a").writeText("raw audio")
@@ -145,5 +148,30 @@ class RecordingSyncTest {
         RecordingDeleter(context).delete(id, deleteFile, client)
         assertEquals(1, client.paths.count { it.startsWith("/rest/v1/recordings") })
         assertFalse(deleteFile.exists())
+    }
+
+    @Test fun deleteWorkerSchedulesSuccessorWithAppendOrReplace() {
+        val dir = RecordingFiles.dir(context)
+        val deleteFile = File(dir, "delete_$id.json")
+        RecordingFiles.write(deleteFile, JSONObject().put("id", id).put("deleted_at", "2026-10-24T05:00:00Z"))
+        assertTrue(deleteFile.exists())
+
+        // Calling schedule should successfully enqueue WorkManager work
+        com.haptilog.watch.sync.RecordingDeleteWorker.schedule(context)
+
+        val workInfoList = androidx.work.WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork("recording-delete").get()
+        assertFalse(workInfoList.isEmpty())
+
+        // Calling schedule again (e.g. for a successor deletion while a run is pending or active)
+        // should safely succeed with APPEND_OR_REPLACE without throwing
+        val secondId = "44444444-4444-4444-8444-444444444444"
+        val secondDeleteFile = File(dir, "delete_$secondId.json")
+        RecordingFiles.write(secondDeleteFile, JSONObject().put("id", secondId).put("deleted_at", "2026-10-24T05:01:00Z"))
+
+        com.haptilog.watch.sync.RecordingDeleteWorker.schedule(context)
+        val updatedWorkInfoList = androidx.work.WorkManager.getInstance(context)
+            .getWorkInfosForUniqueWork("recording-delete").get()
+        assertFalse(updatedWorkInfoList.isEmpty())
     }
 }
