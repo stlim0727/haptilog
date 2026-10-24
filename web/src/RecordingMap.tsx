@@ -4,19 +4,29 @@ import "leaflet/dist/leaflet.css";
 import { hasLocation, latest } from "./domain";
 import type { Recording } from "./domain";
 
-export default function RecordingMap({ recordings, selectedId, onSelect }: {
+export default function RecordingMap({
+  recordings,
+  selectedId,
+  onSelect,
+  className,
+  showRoute = true,
+}: {
   recordings: Recording[];
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
+  className?: string;
+  showRoute?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<L.LayerGroup | null>(null);
+  const routeLayer = useRef<L.Polyline | null>(null);
   const markersById = useRef(new Map<string, L.Marker>());
   const selection = useRef(onSelect);
   selection.current = onSelect;
   const [tileError, setTileError] = useState(false);
   const located = recordings.filter(hasLocation);
+
   // Refreshing identical data must not reset a user's pan/zoom every 15 seconds.
   const locations = JSON.stringify(
     located.map((r) => [r.id, r.latitude, r.longitude]),
@@ -27,6 +37,7 @@ export default function RecordingMap({ recordings, selectedId, onSelect }: {
     ),
   );
   const initialBounds = useRef("");
+
   useEffect(() => {
     if (!container.current || !located.length) return;
     const instance = L.map(container.current, { scrollWheelZoom: false })
@@ -36,8 +47,8 @@ export default function RecordingMap({ recordings, selectedId, onSelect }: {
       "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       {
         maxZoom: 19,
-      // Send only our origin for tile-policy compliance; retain no-referrer elsewhere.
-      referrerPolicy: "origin",
+        // Send only our origin for tile-policy compliance; retain no-referrer elsewhere.
+        referrerPolicy: "origin",
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       },
@@ -46,19 +57,41 @@ export default function RecordingMap({ recordings, selectedId, onSelect }: {
     markers.current = L.layerGroup().addTo(instance);
     const resize = new ResizeObserver(() => instance.invalidateSize());
     resize.observe(container.current);
+
     return () => {
       resize.disconnect();
       instance.remove();
       map.current = null;
       markers.current = null;
+      routeLayer.current = null;
       initialBounds.current = "";
     };
   }, [located.length > 0]);
+
   useEffect(() => {
     const instance = map.current, layer = markers.current;
     if (!instance || !layer) return;
     layer.clearLayers();
     markersById.current.clear();
+    if (routeLayer.current) {
+      routeLayer.current.remove();
+      routeLayer.current = null;
+    }
+
+    // Connect sequential GPS records with a coral route line
+    if (showRoute && located.length > 1) {
+      const sorted = [...located].sort(
+        (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime(),
+      );
+      const points: L.LatLngExpression[] = sorted.map((r) => [r.latitude, r.longitude]);
+      routeLayer.current = L.polyline(points, {
+        color: "#f43f5e",
+        weight: 3,
+        opacity: 0.7,
+        dashArray: "6, 8",
+      }).addTo(instance);
+    }
+
     const groups = new Map<string, typeof located>();
     for (const r of located) {
       const key = `${r.latitude},${r.longitude}`;
@@ -104,7 +137,8 @@ export default function RecordingMap({ recordings, selectedId, onSelect }: {
       );
       initialBounds.current = locations;
     }
-  }, [markerData, locations]);
+  }, [markerData, locations, showRoute]);
+
   useEffect(() => {
     const instance = map.current;
     if (!instance) return;
@@ -112,40 +146,42 @@ export default function RecordingMap({ recordings, selectedId, onSelect }: {
       marker.getElement()?.classList.remove("active");
     }
     if (selectedId) {
-      markersById.current.get(selectedId)?.getElement()?.classList.add(
-        "active",
-      );
+      const activeMarker = markersById.current.get(selectedId);
+      activeMarker?.getElement()?.classList.add("active");
+      const active = located.find((r) => r.id === selectedId);
+      if (active) {
+        instance.flyTo(
+          [active.latitude, active.longitude],
+          Math.max(instance.getZoom(), 15),
+          { duration: 0.8 },
+        );
+        activeMarker?.openPopup();
+      }
     }
-    const active = located.find((r) => r.id === selectedId);
-    if (
-      active &&
-      !instance.getBounds().contains([active.latitude, active.longitude])
-    ) instance.panTo([active.latitude, active.longitude]);
   }, [selectedId, markerData]);
+
   return (
     <>
-      {located.length
-        ? (
-          <div
-            ref={container}
-            className="recording-map"
-            role="region"
-            aria-label="Map of recording locations"
-          />
-        )
-        : (
-          <p className="map-empty">
-            No saved locations in this selection. Recordings without GPS are
-            still available in the list.
-          </p>
-        )}
+      {located.length ? (
+        <div
+          ref={container}
+          className={`recording-map ${className ?? ""}`}
+          role="region"
+          aria-label="Map of recording locations"
+        />
+      ) : (
+        <p className="map-empty">
+          No saved locations in this selection. Recordings without GPS are
+          still available in the list.
+        </p>
+      )}
       <p className="map-caption">
-        {located.length} of {recordings.length}{" "}
-        recordings have a saved location.{" "}
-        {recordings.length - located.length > 0 && "Others remain in the list."}
-        {" "}
-        Map tiles load from OpenStreetMap. No recording audio or text is sent to
-        the map provider.
+        {located.length} of {recordings.length} recordings have a saved
+        location.{" "}
+        {recordings.length - located.length > 0 &&
+          "Others remain in the list."}{" "}
+        Map tiles load from OpenStreetMap. No recording audio or text is sent
+        to the map provider.
       </p>
       {tileError && (
         <p role="status" className="map-caption">

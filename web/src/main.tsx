@@ -9,12 +9,17 @@ import {
   Check,
   ChevronRight,
   CircleHelp,
+  Clock,
+  FileText,
   Headphones,
+  LayoutList,
   Link2,
   LoaderCircle,
   LogOut,
+  Luggage,
   MapPin,
   Mic,
+  Receipt,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
@@ -26,6 +31,9 @@ import { supabase } from "./client";
 import { NotionExport } from "./NotionExport";
 import { TranscriptEditor } from "./TranscriptEditor";
 import { purgeRecordings } from "./purge";
+import TimelineView, { CategoryBadge } from "./TimelineView";
+import CalendarView from "./CalendarView";
+import TimeSliderStrip from "./TimeSliderStrip";
 import {
   csv,
   analysisFailure,
@@ -38,6 +46,7 @@ import {
   taskItems,
   transcript,
   totals,
+  toLocalDateString,
 } from "./domain";
 import type { Correction, Recording } from "./domain";
 import { translations, getInitialLanguage } from "./i18n";
@@ -86,6 +95,8 @@ function App() {
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "spatiotemporal" | "calendar">("list");
+  const [stripDateKey, setStripDateKey] = useState<string>("ALL");
   const [lang, setLang] = useState<Language>(getInitialLanguage);
   const t = translations[lang];
 
@@ -322,7 +333,7 @@ function App() {
     if (isTrashView !== isTrashed) return false;
     const e = latest(r);
     const day = localDate(r.recorded_at),
-      today = localDate(new Date().toISOString());
+      today = toLocalDateString();
     return (
       (date === "all" ||
         (date === "today"
@@ -336,9 +347,12 @@ function App() {
     );
   });
   const active = filtered.find((r) => r.id === selected) ?? filtered[0];
+  const spatioFiltered = stripDateKey === "ALL"
+    ? filtered
+    : filtered.filter((r) => localDate(r.recorded_at) === stripDateKey);
   const dateFilteredActiveRecords = activeRecords.filter((r) => {
     const day = localDate(r.recorded_at),
-      today = localDate(new Date().toISOString());
+      today = toLocalDateString();
     return (
       date === "all" ||
       (date === "today"
@@ -360,7 +374,7 @@ function App() {
     );
     const link = document.createElement("a");
     link.href = url;
-    link.download = `haptilog-${localDate(new Date().toISOString())}.csv`;
+    link.download = `haptilog-${toLocalDateString()}.csv`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -619,25 +633,186 @@ function App() {
               {t.showing_limit_note}
             </p>
           )}
-          <div className="review-layout">
-            <section className="map-section" aria-label="Recording map view">
-              <div className="map-heading">
-                <div>
-                  <h2>{t.map_heading}</h2>
-                  <p>{t.map_desc}</p>
-                </div>
-                <button className="secondary-button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
-                  <MapPin size={16} />{showMap ? t.hide_map : t.show_map}
+          <div className="view-switcher-bar">
+            <div className="view-switcher-group" role="tablist" aria-label="View mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === "list"}
+                className={viewMode === "list" ? "active" : ""}
+                onClick={() => setViewMode("list")}
+              >
+                <LayoutList size={14} /> {t.view_list}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === "spatiotemporal"}
+                className={viewMode === "spatiotemporal" ? "active" : ""}
+                onClick={() => {
+                  if (category === "Trash") setCategory("All");
+                  setViewMode("spatiotemporal");
+                }}
+              >
+                <Clock size={14} /> {t.view_timeline_map}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === "calendar"}
+                className={viewMode === "calendar" ? "active" : ""}
+                onClick={() => {
+                  if (category === "Trash") setCategory("All");
+                  setViewMode("calendar");
+                }}
+              >
+                <CalendarDays size={14} /> {t.view_calendar}
+              </button>
+            </div>
+          </div>
+
+          <div className="global-filters-bar">
+            <div
+              className="tabs"
+              role="group"
+              aria-label="Recording category"
+            >
+              {(
+                [
+                  ["All", t.all_cat, null],
+                  ["Expense", t.expense_cat, Receipt],
+                  ["Travel", t.travel_cat, Luggage],
+                  ["Workout", t.workout_cat, Activity],
+                  ["Memo", t.memo_cat, FileText],
+                ] as const
+              ).map(([c, label, Icon]) => (
+                <button
+                  key={c}
+                  className={category === c ? "active" : ""}
+                  onClick={() => setCategory(c)}
+                >
+                  {Icon && <Icon size={12} />} {label}
                 </button>
+              ))}
+              <button
+                className={`trash-tab ${category === "Trash" ? "active" : ""}`}
+                onClick={() => {
+                  setCategory("Trash");
+                  setViewMode("list");
+                }}
+                aria-label="View trash"
+              >
+                <Trash2 size={13} /> {t.trash} {trashedCount > 0 ? `(${trashedCount})` : ""}
+              </button>
+            </div>
+            <input
+              className="search"
+              type="search"
+              aria-label="Search transcripts"
+              placeholder={t.search_placeholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {category === "Trash" && viewMode !== "list" && (
+            <div className="trash-warning-banner">
+              <span>{t.viewing_trash_warning}</span>
+              <button type="button" onClick={() => setCategory("All")}>
+                {t.exit_trash}
+              </button>
+            </div>
+          )}
+
+          {viewMode === "spatiotemporal" ? (
+            <div className="spatiotemporal-view">
+              <TimeSliderStrip
+                recordings={filtered}
+                selectedDateKey={stripDateKey}
+                onSelectDate={setStripDateKey}
+                t={t}
+                lang={lang}
+              />
+              <div className="spatiotemporal-grid">
+                <div className="timeline-pane">
+                  <TimelineView
+                    recordings={spatioFiltered}
+                    selectedId={active?.id ?? null}
+                    onSelect={(id, revealDetails) => {
+                      setSelected(id);
+                      if (revealDetails) {
+                        requestAnimationFrame(() =>
+                          document.querySelector(".inspector")?.scrollIntoView({
+                            block: "start",
+                            behavior: "smooth",
+                          }),
+                        );
+                      }
+                    }}
+                    t={t}
+                  />
+                </div>
+                <div className="map-pane">
+                  <MapBoundary>
+                    <Suspense fallback={<p>{t.loading_map}</p>}>
+                      <RecordingMap
+                        recordings={spatioFiltered}
+                        selectedId={active?.id ?? null}
+                        showRoute={true}
+                        onSelect={(id, revealDetails) => {
+                          setSelected(id);
+                          if (revealDetails) {
+                            requestAnimationFrame(() =>
+                              document.querySelector(".inspector")?.scrollIntoView({
+                                block: "start",
+                                behavior: "smooth",
+                              }),
+                            );
+                          }
+                        }}
+                      />
+                    </Suspense>
+                  </MapBoundary>
+                </div>
               </div>
-              {showMap && <MapBoundary><Suspense fallback={<p>{t.loading_map}</p>}>
-                <RecordingMap recordings={filtered} selectedId={active?.id ?? null} onSelect={(id, revealDetails) => {
-                  setSelected(id);
-                  if (revealDetails) requestAnimationFrame(() => document.querySelector(".inspector")?.scrollIntoView({ block: "start", behavior: "smooth" }));
-                }} />
-              </Suspense></MapBoundary>}
-            </section>
-            <section className="feed" aria-label="Recordings">
+            </div>
+          ) : viewMode === "calendar" ? (
+            <CalendarView
+              recordings={filtered}
+              selectedId={active?.id ?? null}
+              onSelect={(id, revealDetails) => {
+                setSelected(id);
+                if (revealDetails) {
+                  requestAnimationFrame(() =>
+                    document.querySelector(".inspector")?.scrollIntoView({
+                      block: "start",
+                      behavior: "smooth",
+                    }),
+                  );
+                }
+              }}
+              t={t}
+            />
+          ) : (
+            <div className="review-layout">
+              <section className="map-section" aria-label="Recording map view">
+                <div className="map-heading">
+                  <div>
+                    <h2>{t.map_heading}</h2>
+                    <p>{t.map_desc}</p>
+                  </div>
+                  <button className="secondary-button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
+                    <MapPin size={16} />{showMap ? t.hide_map : t.show_map}
+                  </button>
+                </div>
+                {showMap && <MapBoundary><Suspense fallback={<p>{t.loading_map}</p>}>
+                  <RecordingMap recordings={filtered} selectedId={active?.id ?? null} onSelect={(id, revealDetails) => {
+                    setSelected(id);
+                    if (revealDetails) requestAnimationFrame(() => document.querySelector(".inspector")?.scrollIntoView({ block: "start", behavior: "smooth" }));
+                  }} />
+                </Suspense></MapBoundary>}
+              </section>
+              <section className="feed" aria-label="Recordings">
               <div className="feed-heading">
                 <h2>{isTrashView ? t.trash : t.your_moments}</h2>
                 <div className="feed-heading-right">
@@ -652,44 +827,6 @@ function App() {
                   <span>{filtered.length}</span>
                 </div>
               </div>
-              <div
-                className="tabs"
-                role="group"
-                aria-label="Recording category"
-              >
-                {(
-                  [
-                    ["All", t.all_cat],
-                    ["Expense", t.expense_cat],
-                    ["Travel", t.travel_cat],
-                    ["Workout", t.workout_cat],
-                    ["Memo", t.memo_cat],
-                  ] as const
-                ).map(([c, label]) => (
-                  <button
-                    key={c}
-                    className={category === c ? "active" : ""}
-                    onClick={() => setCategory(c)}
-                  >
-                    {label}
-                  </button>
-                ))}
-                <button
-                  className={`trash-tab ${category === "Trash" ? "active" : ""}`}
-                  onClick={() => setCategory("Trash")}
-                  aria-label="View trash"
-                >
-                  <Trash2 size={13} /> {t.trash} {trashedCount > 0 ? `(${trashedCount})` : ""}
-                </button>
-              </div>
-              <input
-                className="search"
-                type="search"
-                aria-label="Search transcripts"
-                placeholder={t.search_placeholder}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
               {!loaded ? (
                 <div className="empty">
                   <LoaderCircle className="spin" />
@@ -745,11 +882,7 @@ function App() {
                               minute: "2-digit",
                             })}
                           </time>
-                          <span
-                            className={`category category-${e?.intent_type?.toLowerCase()}`}
-                          >
-                            {e?.intent_type ?? "VOICE"}
-                          </span>
+                          <CategoryBadge type={e?.intent_type} size={11} />
                         </span>
                         <strong>
                           {e?.summary || (lang === "ko" ? "기다리는 음성 기록" : "A moment, waiting to be heard")}
@@ -809,6 +942,23 @@ function App() {
               )}
             </section>
           </div>
+          )}
+
+          {viewMode !== "list" && active && (
+            <section className="inspector" style={{ marginTop: "24px" }} aria-label="Selected recording details">
+              <Inspector
+                key={active.id}
+                recording={active}
+                onChange={load}
+                onError={setError}
+                onMoveToTrash={moveToTrash}
+                onRestore={restoreRecording}
+                onDeletePermanently={deletePermanently}
+                lang={lang}
+                t={t}
+              />
+            </section>
+          )}
           <p className="timezone-note">
             {t.timezone_note(Intl.DateTimeFormat().resolvedOptions().timeZone)}
           </p>
