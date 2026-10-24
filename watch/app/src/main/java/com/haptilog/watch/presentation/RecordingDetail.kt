@@ -187,7 +187,7 @@ fun RecordingDetailScreen(
             if (confirmingDelete) {
                 item { Text(stringResource(R.string.delete_confirm_title), fontSize = 18.sp,
                     modifier = Modifier.fillMaxWidth(0.9f)) }
-                item { Text(stringResource(R.string.delete_confirm_scope), fontSize = 14.sp,
+                item { Text(stringResource(if (item.uploaded || cloudEnabled) R.string.delete_confirm_scope else R.string.delete_confirm_scope_local_only), fontSize = 14.sp,
                     color = WatchColors.Muted, modifier = Modifier.fillMaxWidth(0.9f)) }
                 item { FlexibleChip(onClick = { confirmingDelete = false },
                     label = { Text(stringResource(R.string.cancel_action), maxLines = Int.MAX_VALUE) }) }
@@ -266,7 +266,7 @@ fun RecordingDetailScreen(
                 }
                 item { FlexibleChip(onClick = onExport, label = { Text(stringResource(R.string.export_action), maxLines = Int.MAX_VALUE) }) }
                 item { FlexibleChip(onClick = { confirmingDelete = true },
-                    label = { Text(stringResource(R.string.delete_local), maxLines = Int.MAX_VALUE) },
+                    label = { Text(stringResource(if (item.uploaded || cloudEnabled) R.string.delete_recording else R.string.delete_local), maxLines = Int.MAX_VALUE) },
                     colors = ChipDefaults.chipColors(backgroundColor = WatchColors.Surface, contentColor = WatchColors.Error)) }
             }
         }

@@ -26,8 +26,10 @@
     <string name="no_map_app">지도를 열 수 있는 앱이 없습니다</string>
     <string name="export_action">내보내기</string>
     <string name="delete_local">워치에서 삭제</string>
-    <string name="delete_confirm_title">이 워치의 녹음을 삭제할까요?</string>
-    <string name="delete_confirm_scope">이 워치의 음성과 상세 정보를 삭제합니다. 클라우드 사본은 삭제하지 않습니다.</string>
+    <string name="delete_recording">녹음 삭제</string>
+    <string name="delete_confirm_title">이 녹음을 삭제할까요?</string>
+    <string name="delete_confirm_scope">워치에서 삭제하고 웹 포털의 클라우드 사본을 휴지통으로 이동합니다.</string>
+    <string name="delete_confirm_scope_local_only">이 워치의 음성과 상세 정보를 삭제합니다.</string>
     <string name="cancel_action">취소</string>
     <string name="delete_action">삭제</string>
     <string name="delete_failed">삭제를 완료하지 못했습니다. 남아 있는 파일을 확인하고 다시 시도하세요.</string>
