@@ -16,6 +16,8 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.haptilog.watch.R
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -128,23 +130,7 @@ class WebAccessActivity : ComponentActivity() {
                     }
                 }
                 DisposableEffect(Unit) { onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) } }
-                Scaffold(positionIndicator = { PositionIndicator(scalingLazyListState = list) }) {
-                    ScalingLazyColumn(state = list, autoCentering = null,
-                        contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp)
-                            .focusRequester(focus).focusable().onRotaryScrollEvent { event ->
-                                scope.launch { list.scrollBy(event.verticalScrollPixels) }; true
-                            }) {
-                        item { Text("Web access", fontSize = 18.sp) }
-                        item { Text(BuildConfig.WEB_PORTAL_URL.removePrefix("https://"), fontSize = 13.sp, textAlign = TextAlign.Center) }
-                        item { Text("Connect a browser to review your recordings. No phone needed.", fontSize = 12.sp, textAlign = TextAlign.Center) }
-                        if (connected) item { Text("Browser connected", fontSize = 17.sp, textAlign = TextAlign.Center) }
-                        if (code != null) {
-                            item { Text("Enter this code on the web", fontSize = 13.sp, textAlign = TextAlign.Center) }
-                            item { Text(if (remaining > 0) code!!.getString("code").chunked(3).joinToString(" ") else "Expired", fontSize = 27.sp, fontFamily = FontFamily.Monospace) }
-                            if (remaining > 0) item { Text("${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')} remaining", fontSize = 12.sp) }
-                        }
-                        item {
+                val codeAction: @Composable () -> Unit = {
                             FlexibleChip(enabled = !busy && CloudClient.configured, onClick = {
                                 scope.launch {
                                     busy = true; error = null
@@ -157,8 +143,26 @@ class WebAccessActivity : ComponentActivity() {
                                     catch (_: Exception) { error = "Cannot create code. Check Wi-Fi; wait a minute before retrying." }
                                     finally { busy = false }
                                 }
-                            }, label = { Text(maxLines = Int.MAX_VALUE, text = if (busy) "Connecting…" else if (connected) "Pair another browser" else if (code == null) "Create code" else "Create new code") })
+                            }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(when { busy -> R.string.connecting_notice; connected -> R.string.another_browser_action; code == null -> R.string.create_code_action; else -> R.string.new_code_action })) })
+                }
+                Scaffold(positionIndicator = { PositionIndicator(scalingLazyListState = list) }) {
+                    ScalingLazyColumn(state = list, autoCentering = null,
+                        contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp)
+                            .focusRequester(focus).focusable().onRotaryScrollEvent { event ->
+                                scope.launch { list.scrollBy(event.verticalScrollPixels) }; true
+                            }) {
+                        item { Text(stringResource(R.string.web_access_title), fontSize = 18.sp, textAlign = TextAlign.Center) }
+                        if (code == null) item { codeAction() }
+                        item { Text(BuildConfig.WEB_PORTAL_URL.removePrefix("https://"), fontSize = 13.sp, textAlign = TextAlign.Center) }
+                        item { Text(stringResource(R.string.browser_purpose), fontSize = 12.sp, textAlign = TextAlign.Center) }
+                        if (connected) item { Text(stringResource(R.string.browser_connected), fontSize = 17.sp, textAlign = TextAlign.Center) }
+                        if (code != null) {
+                            item { Text(stringResource(R.string.enter_code_hint), fontSize = 13.sp, textAlign = TextAlign.Center) }
+                            item { Text(if (remaining > 0) code!!.getString("code").chunked(3).joinToString(" ") else stringResource(R.string.code_expired), fontSize = 27.sp, fontFamily = FontFamily.Monospace) }
+                            if (remaining > 0) item { Text(stringResource(R.string.code_remaining, (remaining / 60).toInt(), (remaining % 60).toInt()), fontSize = 12.sp) }
                         }
+                        if (code != null) item { codeAction() }
                         if (error != null) item { Text(error!!, fontSize = 12.sp, textAlign = TextAlign.Center) }
                         item {
                             FlexibleChip(enabled = !busy, onClick = {
@@ -168,9 +172,9 @@ class WebAccessActivity : ComponentActivity() {
                                     catch (_: Exception) { error = "Cannot load browsers. Check connection." }
                                     finally { busy = false }
                                 }
-                            }, label = { Text(maxLines = Int.MAX_VALUE, text = "Browsers") })
+                            }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.browsers_action)) })
                         }
-                        if (browsersLoaded && connections.isEmpty()) item { Text("No connected browsers", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                        if (browsersLoaded && connections.isEmpty()) item { Text(stringResource(R.string.no_browsers), fontSize = 12.sp, textAlign = TextAlign.Center) }
                         for (connection in connections) {
                             item {
                                 FlexibleChip(enabled = !busy, onClick = {
@@ -187,10 +191,10 @@ class WebAccessActivity : ComponentActivity() {
                                         } catch (_: Exception) { error = "Revoke failed. Try again online." }
                                         finally { busy = false }
                                     }
-                                }, label = { Text(maxLines = Int.MAX_VALUE, text = "Revoke access") }, secondaryLabel = { Text(connection.getString("created_at").take(10)) })
+                                }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.revoke_action)) }, secondaryLabel = { Text(connection.getString("created_at").take(10)) })
                             }
                         }
-                        item { FlexibleChip(enabled = !busy, onClick = { cancel() }, label = { Text(maxLines = Int.MAX_VALUE, text = if (code == null) "Close" else "Cancel code") }) }
+                        item { FlexibleChip(enabled = !busy, onClick = { cancel() }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(if (code == null) R.string.close_action else R.string.cancel_code_action)) }) }
                     }
                 }
             }
