@@ -43,7 +43,9 @@ fun CaptureScreen(
         if (expanded) {
             // Keep the stop action reachable without squeezing enlarged text into a circle.
             val state = rememberScalingLazyListState(initialCenterItemIndex = 0)
-            ScreenScaffold(scrollState = state) {
+            ScreenScaffold(scrollState = state, timeText = {
+                if (!state.canScrollBackward && !state.isScrollInProgress) TimeText()
+            }) {
                 ScalingLazyColumn(state = state, autoCentering = null,
                     contentPadding = PaddingValues(start = sidePadding, end = sidePadding, top = 36.dp, bottom = 48.dp),
                     modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -147,7 +149,9 @@ fun RecordingsScreen(
     onOpenRecording: (RecordingItem) -> Unit
 ) {
     val transformation = rememberTransformationSpec()
-    ScreenScaffold(scrollState = listState, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 36.dp, bottom = 48.dp)) { padding ->
+    ScreenScaffold(scrollState = listState, timeText = {
+        if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText()
+    }, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 36.dp, bottom = 48.dp)) { padding ->
         TransformingLazyColumn(state = listState, contentPadding = padding,
             modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text(stringResource(R.string.recordings_title), style = MaterialTheme.typography.titleMedium,

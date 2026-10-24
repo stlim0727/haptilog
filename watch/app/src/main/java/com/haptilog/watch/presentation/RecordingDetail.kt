@@ -52,6 +52,7 @@ import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.compose.ui.res.painterResource
 import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.TimeText
 import androidx.wear.compose.material3.Text
 import com.haptilog.watch.data.RecordingItem
 import kotlinx.coroutines.launch
@@ -166,7 +167,9 @@ fun RecordingDetailScreen(
     val audioAvailable = item.audioFile.isFile && item.audioFile.length() > 0
 
     val category = categoryStyle(item.intentType)
-    ScreenScaffold(scrollState = listState) {
+    ScreenScaffold(scrollState = listState, timeText = {
+        if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText()
+    }) {
         ScalingLazyColumn(
             state = listState,
             autoCentering = null,
