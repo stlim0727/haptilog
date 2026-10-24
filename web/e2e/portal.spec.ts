@@ -439,3 +439,32 @@ test("transcript edits preserve originals, can be cancelled, and expose history"
   await page.reload();
   await expect(page.locator(".transcript-editor > p.transcript")).toHaveText("Corrected coffee text");
 });
+
+test("switches between List, Timeline & Map, and Calendar views seamlessly", async ({ page }) => {
+  await fixture(page);
+  await page.goto("/");
+
+  // 1. Initial list view
+  await expect(page.locator(".review-layout")).toBeVisible();
+  await expect(page.locator(".category-expense")).toBeVisible();
+
+  // 2. Switch to Timeline & Map view
+  await page.getByRole("tab", { name: "Timeline & Map" }).click();
+  await expect(page.locator(".spatiotemporal-grid")).toBeVisible();
+  await expect(page.locator(".timeline-container")).toBeVisible();
+  await expect(page.locator(".recording-map")).toBeVisible();
+
+  // Click a timeline item to select
+  await page.locator(".timeline-item").first().click();
+  await expect(page.locator(".timeline-item").first()).toHaveClass(/selected/);
+
+  // 3. Switch to Calendar view
+  await page.getByRole("tab", { name: "Calendar" }).click();
+  await expect(page.locator(".calendar-view-container")).toBeVisible();
+  await expect(page.locator(".calendar-grid")).toBeVisible();
+  await expect(page.locator(".calendar-day-panel")).toBeVisible();
+
+  // 4. Return to List view
+  await page.getByRole("tab", { name: "List" }).click();
+  await expect(page.locator(".review-layout")).toBeVisible();
+});

@@ -9,12 +9,17 @@ import {
   Check,
   ChevronRight,
   CircleHelp,
+  Clock,
+  FileText,
   Headphones,
+  LayoutList,
   Link2,
   LoaderCircle,
   LogOut,
+  Luggage,
   MapPin,
   Mic,
+  Receipt,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
@@ -26,6 +31,8 @@ import { supabase } from "./client";
 import { NotionExport } from "./NotionExport";
 import { TranscriptEditor } from "./TranscriptEditor";
 import { purgeRecordings } from "./purge";
+import TimelineView, { CategoryBadge } from "./TimelineView";
+import CalendarView from "./CalendarView";
 import {
   csv,
   analysisFailure,
@@ -86,6 +93,7 @@ function App() {
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "spatiotemporal" | "calendar">("list");
   const [lang, setLang] = useState<Language>(getInitialLanguage);
   const t = translations[lang];
 
@@ -619,25 +627,118 @@ function App() {
               {t.showing_limit_note}
             </p>
           )}
-          <div className="review-layout">
-            <section className="map-section" aria-label="Recording map view">
-              <div className="map-heading">
-                <div>
-                  <h2>{t.map_heading}</h2>
-                  <p>{t.map_desc}</p>
-                </div>
-                <button className="secondary-button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
-                  <MapPin size={16} />{showMap ? t.hide_map : t.show_map}
-                </button>
+          <div className="view-switcher-bar">
+            <div className="view-switcher-group" role="tablist" aria-label="View mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === "list"}
+                className={viewMode === "list" ? "active" : ""}
+                onClick={() => setViewMode("list")}
+              >
+                <LayoutList size={14} /> {t.view_list}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === "spatiotemporal"}
+                className={viewMode === "spatiotemporal" ? "active" : ""}
+                onClick={() => setViewMode("spatiotemporal")}
+              >
+                <Clock size={14} /> {t.view_timeline_map}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={viewMode === "calendar"}
+                className={viewMode === "calendar" ? "active" : ""}
+                onClick={() => setViewMode("calendar")}
+              >
+                <CalendarDays size={14} /> {t.view_calendar}
+              </button>
+            </div>
+          </div>
+
+          {viewMode === "spatiotemporal" ? (
+            <div className="spatiotemporal-grid">
+              <div className="timeline-pane">
+                <TimelineView
+                  recordings={filtered}
+                  selectedId={active?.id ?? null}
+                  onSelect={(id, revealDetails) => {
+                    setSelected(id);
+                    if (revealDetails) {
+                      requestAnimationFrame(() =>
+                        document.querySelector(".inspector")?.scrollIntoView({
+                          block: "start",
+                          behavior: "smooth",
+                        }),
+                      );
+                    }
+                  }}
+                  t={t}
+                />
               </div>
-              {showMap && <MapBoundary><Suspense fallback={<p>{t.loading_map}</p>}>
-                <RecordingMap recordings={filtered} selectedId={active?.id ?? null} onSelect={(id, revealDetails) => {
-                  setSelected(id);
-                  if (revealDetails) requestAnimationFrame(() => document.querySelector(".inspector")?.scrollIntoView({ block: "start", behavior: "smooth" }));
-                }} />
-              </Suspense></MapBoundary>}
-            </section>
-            <section className="feed" aria-label="Recordings">
+              <div className="map-pane">
+                <MapBoundary>
+                  <Suspense fallback={<p>{t.loading_map}</p>}>
+                    <RecordingMap
+                      recordings={filtered}
+                      selectedId={active?.id ?? null}
+                      showRoute={true}
+                      onSelect={(id, revealDetails) => {
+                        setSelected(id);
+                        if (revealDetails) {
+                          requestAnimationFrame(() =>
+                            document.querySelector(".inspector")?.scrollIntoView({
+                              block: "start",
+                              behavior: "smooth",
+                            }),
+                          );
+                        }
+                      }}
+                    />
+                  </Suspense>
+                </MapBoundary>
+              </div>
+            </div>
+          ) : viewMode === "calendar" ? (
+            <CalendarView
+              recordings={filtered}
+              selectedId={active?.id ?? null}
+              onSelect={(id, revealDetails) => {
+                setSelected(id);
+                if (revealDetails) {
+                  requestAnimationFrame(() =>
+                    document.querySelector(".inspector")?.scrollIntoView({
+                      block: "start",
+                      behavior: "smooth",
+                    }),
+                  );
+                }
+              }}
+              t={t}
+            />
+          ) : (
+            <div className="review-layout">
+              <section className="map-section" aria-label="Recording map view">
+                <div className="map-heading">
+                  <div>
+                    <h2>{t.map_heading}</h2>
+                    <p>{t.map_desc}</p>
+                  </div>
+                  <button className="secondary-button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
+                    <MapPin size={16} />{showMap ? t.hide_map : t.show_map}
+                  </button>
+                </div>
+                {showMap && <MapBoundary><Suspense fallback={<p>{t.loading_map}</p>}>
+                  <RecordingMap recordings={filtered} selectedId={active?.id ?? null} onSelect={(id, revealDetails) => {
+                    setSelected(id);
+                    if (revealDetails) requestAnimationFrame(() => document.querySelector(".inspector")?.scrollIntoView({ block: "start", behavior: "smooth" }));
+                  }} />
+                </Suspense></MapBoundary>}
+              </section>
+              <section className="feed" aria-label="Recordings">
               <div className="feed-heading">
                 <h2>{isTrashView ? t.trash : t.your_moments}</h2>
                 <div className="feed-heading-right">
@@ -659,19 +760,19 @@ function App() {
               >
                 {(
                   [
-                    ["All", t.all_cat],
-                    ["Expense", t.expense_cat],
-                    ["Travel", t.travel_cat],
-                    ["Workout", t.workout_cat],
-                    ["Memo", t.memo_cat],
+                    ["All", t.all_cat, null],
+                    ["Expense", t.expense_cat, Receipt],
+                    ["Travel", t.travel_cat, Luggage],
+                    ["Workout", t.workout_cat, Activity],
+                    ["Memo", t.memo_cat, FileText],
                   ] as const
-                ).map(([c, label]) => (
+                ).map(([c, label, Icon]) => (
                   <button
                     key={c}
                     className={category === c ? "active" : ""}
                     onClick={() => setCategory(c)}
                   >
-                    {label}
+                    {Icon && <Icon size={12} />} {label}
                   </button>
                 ))}
                 <button
@@ -745,11 +846,7 @@ function App() {
                               minute: "2-digit",
                             })}
                           </time>
-                          <span
-                            className={`category category-${e?.intent_type?.toLowerCase()}`}
-                          >
-                            {e?.intent_type ?? "VOICE"}
-                          </span>
+                          <CategoryBadge type={e?.intent_type} size={11} />
                         </span>
                         <strong>
                           {e?.summary || (lang === "ko" ? "기다리는 음성 기록" : "A moment, waiting to be heard")}
@@ -809,6 +906,23 @@ function App() {
               )}
             </section>
           </div>
+          )}
+
+          {viewMode !== "list" && active && (
+            <section className="inspector" style={{ marginTop: "24px" }} aria-label="Selected recording details">
+              <Inspector
+                key={active.id}
+                recording={active}
+                onChange={load}
+                onError={setError}
+                onMoveToTrash={moveToTrash}
+                onRestore={restoreRecording}
+                onDeletePermanently={deletePermanently}
+                lang={lang}
+                t={t}
+              />
+            </section>
+          )}
           <p className="timezone-note">
             {t.timezone_note(Intl.DateTimeFormat().resolvedOptions().timeZone)}
           </p>
