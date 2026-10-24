@@ -1,4 +1,5 @@
 <resources>
+    <string name="app_name">HaptiLog</string>
     <string name="record_start">Record</string>
     <string name="record_stop">Stop</string>
     <string name="record_start_accessibility">Start recording</string>
@@ -89,4 +90,9 @@
     <string name="describe_issue">Describe the problem</string>
     <string name="decline_cloud">Decline · Keep local only</string>
     <string name="agree_cloud">I am 18+ · Agree &amp; enable</string>
+    <string name="recordings_title">Recordings</string>
+    <string name="duration_minutes_seconds">%1$d min %2$d s</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="tile_record">Start recording</string>
+    <string name="tile_recordings">View recordings</string>
 </resources>

@@ -93,7 +93,8 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
-    implementation(libs.androidx.wear.compose.material)
+    implementation(libs.androidx.wear.compose.material) // Settings/web migrate separately.
+    implementation(libs.androidx.wear.compose.material3)
     implementation(libs.androidx.wear.compose.foundation)
     debugImplementation(libs.androidx.compose.ui.tooling)
 

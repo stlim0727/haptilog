@@ -46,7 +46,7 @@ class WebAccessActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            LegacyHaptiLogTheme {
                 val scope = rememberCoroutineScope()
                 val list = rememberScalingLazyListState(initialCenterItemIndex = 0)
                 val focus = remember { FocusRequester() }

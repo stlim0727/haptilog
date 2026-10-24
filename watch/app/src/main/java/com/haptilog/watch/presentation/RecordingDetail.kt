@@ -48,11 +48,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.ChipDefaults
-import androidx.wear.compose.material.PositionIndicator
-import androidx.wear.compose.material.Scaffold
-import androidx.wear.compose.material.Text
-import androidx.wear.compose.material.TimeText
+import androidx.wear.compose.material3.ButtonDefaults
+import androidx.wear.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.wear.compose.material3.ScreenScaffold
+import androidx.wear.compose.material3.Text
 import com.haptilog.watch.data.RecordingItem
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -60,15 +60,6 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-/** Category label and dot colour, shared by the list card and the detail screen. */
-fun recordingCategory(intentType: String?): Pair<String, Color> = when (intentType) {
-    "EXPENSE" -> "지출" to Color(0xFF34C759)
-    "TRAVEL" -> "여행" to Color(0xFF0A84FF)
-    "WORKOUT" -> "운동" to Color(0xFFFF9F0A)
-    "MEMO" -> "메모" to Color(0xFFBF5AF2)
-    else -> "대기" to Color(0xFF8E8E93)
-}
 
 fun hasMapLocation(item: RecordingItem): Boolean {
     val latitude = item.latitude
@@ -174,10 +165,8 @@ fun RecordingDetailScreen(
         "notes" to stringResource(R.string.notes_label)))
     val audioAvailable = item.audioFile.isFile && item.audioFile.length() > 0
 
-    Scaffold(
-        timeText = { if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText() },
-        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
-    ) {
+    val category = categoryStyle(item.intentType)
+    ScreenScaffold(scrollState = listState) {
         ScalingLazyColumn(
             state = listState,
             autoCentering = null,
@@ -194,41 +183,52 @@ fun RecordingDetailScreen(
                     modifier = Modifier.fillMaxWidth(0.9f)) }
                 item { Text(stringResource(if (shouldTrashCloudCopy(item)) R.string.delete_confirm_scope else R.string.delete_confirm_scope_local_only), fontSize = 14.sp,
                     color = WatchColors.Muted, modifier = Modifier.fillMaxWidth(0.9f)) }
-                item { FlexibleChip(onClick = { confirmingDelete = false },
+                item { DetailAction(onClick = { confirmingDelete = false },
                     label = { Text(stringResource(R.string.cancel_action), maxLines = Int.MAX_VALUE) }) }
-                item { FlexibleChip(onClick = { confirmingDelete = false; onDelete() },
+                item { DetailAction(onClick = { confirmingDelete = false; onDelete() },
                     label = { Text(stringResource(R.string.delete_action), maxLines = Int.MAX_VALUE) },
-                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF392521), contentColor = WatchColors.Error)) }
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF392521), contentColor = WatchColors.Error)) }
             } else {
+                // Separate items keep a large-font header from being centered under the clock.
                 item {
-                    Column(Modifier.fillMaxWidth(0.9f)) {
-                        Text(recordingDate(context, item), fontSize = 14.sp, color = WatchColors.Muted)
-                        Text(stringResource(R.string.duration_seconds, item.durationSeconds), fontSize = 12.sp, color = WatchColors.Muted)
+                    Row(Modifier.fillMaxWidth(0.94f), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(painterResource(category.icon), null, modifier = Modifier.size(22.dp), tint = category.accent)
+                        Text(categoryLabel(context, item.intentType), fontSize = 12.sp, color = category.accent)
                     }
                 }
                 item {
-                    FlexibleChip(
-                        enabled = audioAvailable,
-                        onClick = onTogglePlay,
-                        label = { Text(stringResource(if (isPlaying) R.string.stop_playback else R.string.play_audio),
-                            maxLines = Int.MAX_VALUE, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) },
-                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFFDFE8D9), contentColor = Color(0xFF172819)),
-                        secondaryLabel = { Text(stringResource(R.string.duration_seconds, item.durationSeconds), maxLines = Int.MAX_VALUE) }
-                    )
+                    Text(recordingTitle(context, item), fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis, color = WatchColors.Text,
+                        modifier = Modifier.fillMaxWidth(0.94f))
+                }
+                item { RecordingMetadata(item, Modifier.fillMaxWidth(0.94f)) }
+                item {
+                    DetailAction(enabled = audioAvailable, onClick = onTogglePlay,
+                        label = {
+                            Icon(painterResource(if (isPlaying) R.drawable.ic_stop else R.drawable.ic_play), null,
+                                Modifier.size(24.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(if (isPlaying) R.string.stop_playback else R.string.play_audio),
+                                fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = WatchColors.Record, contentColor = WatchColors.OnRecord))
                 }
                 if (!audioAvailable) item { Text(stringResource(R.string.audio_missing), color = WatchColors.Error, fontSize = 14.sp) }
                 notice?.let { message -> item { Text(message, fontSize = 14.sp, color = WatchColors.Error) } }
-                item { Text(categoryLabel(context, item.intentType), fontSize = 12.sp, color = WatchColors.Muted) }
+                if (structured.isNotEmpty() && item.intentType == "EXPENSE") item {
+                    StructuredDetails(item, structured)
+                }
                 if (summary != null) item {
                     Column(Modifier.fillMaxWidth(0.9f)) {
-                        DetailSection(stringResource(R.string.ai_summary))
+                        DetailSection(stringResource(R.string.ai_summary), category.accent)
                         Text(summary, fontSize = 14.sp, color = WatchColors.Text)
                     }
                 }
                 if (fullText != null) {
                     item {
                         val expandedState = stringResource(if (transcriptExpanded) R.string.expanded else R.string.collapsed)
-                        FlexibleChip(onClick = { transcriptExpanded = !transcriptExpanded },
+                        DetailAction(onClick = { transcriptExpanded = !transcriptExpanded },
                             modifier = Modifier.semantics { stateDescription = expandedState },
                             label = { Text(stringResource(if (transcriptExpanded) R.string.hide_transcript else R.string.show_transcript), maxLines = Int.MAX_VALUE) })
                     }
@@ -243,25 +243,22 @@ fun RecordingDetailScreen(
                     Text(stringResource(R.string.no_enrichment), fontSize = 14.sp, color = WatchColors.Muted,
                         modifier = Modifier.fillMaxWidth(0.9f))
                 }
-                if (structured.isNotEmpty()) item {
-                    Column(Modifier.fillMaxWidth(0.9f)) {
-                        DetailSection(stringResource(R.string.structured_details))
-                        structured.forEach { Text(it, fontSize = 14.sp, color = WatchColors.Text) }
-                    }
+                if (structured.isNotEmpty() && item.intentType != "EXPENSE") item {
+                    StructuredDetails(item, structured)
                 }
                 if (hasMapLocation(item)) item {
-                    FlexibleChip(onClick = onOpenMap,
+                    DetailAction(onClick = onOpenMap,
                         label = { Text(stringResource(R.string.map_action), maxLines = Int.MAX_VALUE) })
                 }
                 item { Text(recordingSyncLabel(context, item, cloudEnabled), fontSize = 12.sp, color = WatchColors.Muted) }
                 if (item.syncStatus == "ACTION_REQUIRED") item {
-                    FlexibleChip(enabled = cloudEnabled, onClick = onRetry,
+                    DetailAction(enabled = cloudEnabled, onClick = onRetry,
                         label = { Text(stringResource(R.string.retry_action), maxLines = Int.MAX_VALUE) })
                 }
                 if (item.syncAttempts > 0 || !item.syncError.isNullOrBlank()) {
                     item {
                         val expandedState = stringResource(if (syncExpanded) R.string.expanded else R.string.collapsed)
-                        FlexibleChip(onClick = { syncExpanded = !syncExpanded }, modifier = Modifier.semantics { stateDescription = expandedState },
+                        DetailAction(onClick = { syncExpanded = !syncExpanded }, modifier = Modifier.semantics { stateDescription = expandedState },
                             label = { Text(stringResource(R.string.sync_details), maxLines = Int.MAX_VALUE) })
                     }
                     if (syncExpanded) item {
@@ -269,17 +266,33 @@ fun RecordingDetailScreen(
                             (item.syncError?.let { "\n$it" } ?: ""), fontSize = 12.sp, color = WatchColors.Muted)
                     }
                 }
-                item { FlexibleChip(onClick = onExport, label = { Text(stringResource(R.string.export_action), maxLines = Int.MAX_VALUE) }) }
-                item { FlexibleChip(onClick = { confirmingDelete = true },
+                item { DetailAction(onClick = onExport, label = { Text(stringResource(R.string.export_action), maxLines = Int.MAX_VALUE) }) }
+                item { DetailAction(onClick = { confirmingDelete = true },
                     label = { Text(stringResource(if (item.uploaded || cloudEnabled) R.string.delete_recording else R.string.delete_local), maxLines = Int.MAX_VALUE) },
-                    colors = ChipDefaults.chipColors(backgroundColor = WatchColors.Surface, contentColor = WatchColors.Error)) }
+                    colors = ButtonDefaults.buttonColors(containerColor = WatchColors.Surface, contentColor = WatchColors.Error)) }
             }
         }
     }
 }
 
 @Composable
-private fun DetailSection(label: String) {
-    Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = WatchColors.Muted,
+private fun DetailSection(label: String, color: Color = WatchColors.Muted) {
+    Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color,
         modifier = Modifier.padding(bottom = 4.dp))
+}
+
+@Composable
+private fun StructuredDetails(item: RecordingItem, lines: List<String>) {
+    val category = categoryStyle(item.intentType)
+    Column(Modifier.fillMaxWidth(0.94f).background(category.surface, RoundedCornerShape(18.dp)).padding(12.dp)) {
+        DetailSection(stringResource(R.string.structured_details), category.accent)
+        lines.forEachIndexed { index, line ->
+            val amount = item.structuredData?.opt("amount") as? Number
+            val isAmount = item.intentType == "EXPENSE" && index == 0 &&
+                amount != null && amount.toDouble().isFinite() && amount.toDouble() >= 0
+            Text(line, fontSize = if (isAmount) 22.sp else 14.sp,
+                fontWeight = if (isAmount) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isAmount) category.accent else WatchColors.Text)
+        }
+    }
 }
