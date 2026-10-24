@@ -46,7 +46,7 @@ class WebAccessActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 val scope = rememberCoroutineScope()
-                val list = rememberScalingLazyListState()
+                val list = rememberScalingLazyListState(initialCenterItemIndex = 0)
                 val focus = remember { FocusRequester() }
                 LaunchedEffect(Unit) { focus.requestFocus() }
                 var code by remember { mutableStateOf<JSONObject?>(null) }
@@ -129,7 +129,8 @@ class WebAccessActivity : ComponentActivity() {
                 }
                 DisposableEffect(Unit) { onDispose { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) } }
                 Scaffold(positionIndicator = { PositionIndicator(scalingLazyListState = list) }) {
-                    ScalingLazyColumn(state = list, horizontalAlignment = Alignment.CenterHorizontally,
+                    ScalingLazyColumn(state = list, autoCentering = null,
+                        contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp), horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp)
                             .focusRequester(focus).focusable().onRotaryScrollEvent { event ->
                                 scope.launch { list.scrollBy(event.verticalScrollPixels) }; true

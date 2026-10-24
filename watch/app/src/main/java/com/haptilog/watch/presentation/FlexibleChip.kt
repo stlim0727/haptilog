@@ -20,14 +20,16 @@ fun FlexibleChip(
     label: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: ChipColors = ChipDefaults.primaryChipColors(),
+    colors: ChipColors = neutralChipColors(),
     shape: Shape = MaterialTheme.shapes.large,
-    secondaryLabel: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null
+    secondaryLabel: (@Composable androidx.compose.foundation.layout.RowScope.() -> Unit)? = null,
+    icon: (@Composable androidx.compose.foundation.layout.BoxScope.() -> Unit)? = null
 ) {
     Chip(
         onClick = onClick,
         label = label,
         secondaryLabel = secondaryLabel,
+        icon = icon,
         enabled = enabled,
         colors = colors,
         shape = shape,

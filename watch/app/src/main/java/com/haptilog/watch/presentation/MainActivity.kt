@@ -28,6 +28,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +54,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
+import androidx.wear.compose.material.Icon
+import com.haptilog.watch.R
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -269,7 +277,7 @@ fun HaptiLogScreen(
     onOpenRecording: (RecordingItem) -> Unit,
     onSettings: () -> Unit
 ) {
-    val listState = rememberScalingLazyListState()
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
 
@@ -283,11 +291,13 @@ fun HaptiLogScreen(
     }
 
     Scaffold(
-        timeText = { TimeText() },
+        timeText = { if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText() },
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
     ) {
         ScalingLazyColumn(
             state = listState,
+            autoCentering = null,
+            contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
@@ -301,11 +311,6 @@ fun HaptiLogScreen(
                 },
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 1. Top Spacing
-            item {
-                Spacer(modifier = Modifier.height(26.dp))
-            }
-
             // 2. Hero Record Action Button
             item {
                 RecordHeroSection(
@@ -320,7 +325,8 @@ fun HaptiLogScreen(
                 FlexibleChip(
                     enabled = !isRecording,
                     onClick = onSettings,
-                    label = { Text("Settings & help", fontSize = 12.sp, maxLines = Int.MAX_VALUE) },
+                    label = { Text(stringResource(R.string.settings_title), fontSize = 14.sp, maxLines = Int.MAX_VALUE) },
+                    icon = { Icon(painterResource(R.drawable.ic_settings), contentDescription = null, modifier = Modifier.size(20.dp)) },
                     modifier = Modifier.fillMaxWidth(0.86f)
                 )
             }
@@ -336,7 +342,7 @@ fun HaptiLogScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "최근 기록",
+                        text = stringResource(R.string.recent_recordings),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFFF5F5F7)
@@ -387,6 +393,8 @@ fun RecordHeroSection(
         label = "edge_breathe"
     )
 
+    val action = stringResource(if (isRecording) R.string.record_stop_accessibility else R.string.record_start_accessibility)
+    val recordState = stringResource(if (isRecording) R.string.recording_state else R.string.recording_idle)
     val discSize = maxOf(108f, 72f * LocalDensity.current.fontScale).dp
     Box(
         contentAlignment = Alignment.Center,
@@ -410,6 +418,10 @@ fun RecordHeroSection(
             onClick = onToggleRecording,
             modifier = Modifier
                 .size(discSize)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = action
+                    stateDescription = recordState
+                }
                 .border(
                     width = 1.dp,
                     color = if (isRecording) Color(0xFFFF3B30).copy(alpha = 0.5f) else Color(0xFF2C2C2E),
@@ -417,7 +429,7 @@ fun RecordHeroSection(
                 ),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
-                backgroundColor = if (isRecording) Color(0xFF241012) else Color(0xFF161618)
+                backgroundColor = if (isRecording) WatchColors.Recording else WatchColors.Record
             )
         ) {
             Column(
@@ -429,7 +441,7 @@ fun RecordHeroSection(
                     val ss = elapsedSeconds % 60
                     Text(
                         text = String.format(Locale.US, "%02d:%02d", mm, ss),
-                        fontSize = 19.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFFFFF5F5),
                         letterSpacing = 0.5.sp
@@ -446,25 +458,25 @@ fun RecordHeroSection(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "REC",
-                            fontSize = 10.sp,
+                            text = stringResource(R.string.record_stop),
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFFF453A),
-                            letterSpacing = 1.2.sp
+                            letterSpacing = 0.sp
                         )
                     }
                 } else {
                     Box(
                         modifier = Modifier
                             .size(10.dp)
-                            .background(Color(0xFFFF3B30), CircleShape)
+                            .background(Color.White, CircleShape)
                     )
                     Spacer(modifier = Modifier.height(7.dp))
                     Text(
-                        text = "RECORD",
-                        fontSize = 11.sp,
+                        text = stringResource(R.string.record_start),
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.4.sp,
+                        letterSpacing = 0.sp,
                         color = Color(0xFFF5F5F7)
                     )
                 }
@@ -483,14 +495,14 @@ fun EmptyRecordingsCard() {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "기록 없음",
+                text = stringResource(R.string.no_recordings),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color(0xFF8E8E93)
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "손목을 탭하여 첫 메모를 남겨보세요",
+                text = stringResource(R.string.first_recording_hint),
                 fontSize = 10.sp,
                 color = Color(0xFF636366),
                 textAlign = TextAlign.Center

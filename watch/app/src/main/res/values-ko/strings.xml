@@ -1,0 +1,12 @@
+<resources>
+    <string name="record_start">녹음</string>
+    <string name="record_stop">중지</string>
+    <string name="record_start_accessibility">녹음 시작</string>
+    <string name="record_stop_accessibility">녹음 중지</string>
+    <string name="recording_state">녹음 중</string>
+    <string name="recording_idle">녹음 대기</string>
+    <string name="settings_title">설정</string>
+    <string name="recent_recordings">최근 기록</string>
+    <string name="no_recordings">아직 녹음이 없습니다</string>
+    <string name="first_recording_hint">녹음을 눌러 첫 기록을 남겨 보세요</string>
+</resources>

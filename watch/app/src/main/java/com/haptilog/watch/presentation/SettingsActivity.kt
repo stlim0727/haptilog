@@ -46,7 +46,7 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 val scope = rememberCoroutineScope()
-                val list = rememberScalingLazyListState()
+                val list = rememberScalingLazyListState(initialCenterItemIndex = 0)
                 val focus = remember { FocusRequester() }
                 var cloud by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
                 var crashes by remember { mutableStateOf(AppReports.crashReportsEnabled(this)) }
@@ -68,6 +68,8 @@ class SettingsActivity : ComponentActivity() {
                 Scaffold(positionIndicator = { PositionIndicator(scalingLazyListState = list) }) {
                     ScalingLazyColumn(
                         state = list,
+                        autoCentering = null,
+                        contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 18.dp)
                             .focusRequester(focus).focusable().onRotaryScrollEvent { event ->
