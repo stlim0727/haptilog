@@ -3,6 +3,7 @@ package com.haptilog.watch.data
 import android.content.Context
 import com.haptilog.watch.sync.CloudApi
 import com.haptilog.watch.sync.CloudException
+import com.haptilog.watch.sync.RecordingDeleter
 import com.haptilog.watch.sync.RecordingUploader
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -23,9 +24,11 @@ class RecordingSyncTest {
     private lateinit var stateFile: File
     private class FakeCloud(var failEnrichment: Boolean = false, var user: String = "owner") : CloudApi {
         val paths = mutableListOf<String>()
+        val requests = mutableListOf<Triple<String, String, String?>>()
         override fun authenticate() = "token" to user
         override fun request(path: String, method: String, body: ByteArray?, token: String?, contentType: String, extra: Map<String, String>): String {
             paths.add(path)
+            requests.add(Triple(path, method, body?.let { String(it) }))
             if (path.startsWith("/functions") && failEnrichment) throw CloudException(503)
             return if (path.startsWith("/functions")) "{\"summary\":\"memo\",\"intent_type\":\"MEMO\",\"transcript\":\"test\",\"structured_data\":{}}" else ""
         }
@@ -68,5 +71,40 @@ class RecordingSyncTest {
         try { RecordingUploader(context).upload(meta, JSONObject(), stateFile, client); fail("must reject") }
         catch (_: IllegalArgumentException) {}
         assertTrue(client.paths.isEmpty())
+    }
+    @Test fun deleterPatchesDeletedAtOnRemoteAndRemovesDeleteFile() {
+        val client = FakeCloud()
+        val dir = RecordingFiles.dir(context)
+        val deleteFile = File(dir, "delete_$id.json")
+        val timestamp = "2026-10-24T05:00:00Z"
+        RecordingFiles.write(deleteFile, JSONObject().put("id", id).put("deleted_at", timestamp))
+        assertTrue(deleteFile.exists())
+
+        RecordingDeleter(context).delete(id, deleteFile, client)
+
+        assertEquals(1, client.paths.count { it.startsWith("/rest/v1/recordings") })
+        val request = client.requests.first { it.first.startsWith("/rest/v1/recordings") }
+        assertEquals("PATCH", request.second)
+        val bodyJson = JSONObject(request.third!!)
+        assertEquals(timestamp, bodyJson.getString("deleted_at"))
+        assertFalse(deleteFile.exists())
+    }
+    @Test fun repositoryDeleteLeavesTombstoneForCloudSyncWhenUploaded() {
+        val dir = RecordingFiles.dir(context)
+        RecordingFiles.write(stateFile, JSONObject().put("uploaded", true).put("status", "SYNCED"))
+        val repo = RecordingRepository(context)
+
+        val deleted = repo.deleteRecording(id)
+
+        assertTrue(deleted)
+        assertFalse(File(dir, "rec_$id.m4a").exists())
+        assertFalse(File(dir, "meta_$id.json").exists())
+        assertFalse(stateFile.exists())
+        val deleteFile = File(dir, "delete_$id.json")
+        assertTrue(deleteFile.exists())
+        val deleteData = RecordingFiles.read(deleteFile)
+        assertEquals(id, deleteData.getString("id"))
+        assertTrue(deleteData.has("deleted_at"))
+        repo.close()
     }
 }

@@ -52,6 +52,28 @@ class RecordingSyncWorker(context: Context, params: WorkerParameters) : Coroutin
         if (com.haptilog.watch.service.VoiceRecordingService.isRecording.value) return@withContext Result.retry()
         val directory = RecordingFiles.dir(applicationContext)
         var transientFailure = false
+        for (file in directory.listFiles().orEmpty().filter { it.name.startsWith("delete_") && it.extension == "json" }) {
+            if (isStopped || !enabled(applicationContext)) return@withContext Result.success()
+            val data = runCatching { RecordingFiles.read(file) }.getOrNull() ?: continue
+            val id = data.optString("id")
+            if (!RecordingFiles.validId(id)) {
+                file.delete()
+                continue
+            }
+            try {
+                val client = CloudClient(applicationContext)
+                RecordingDeleter(applicationContext).delete(id, file, client)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val retry = e !is AuthSessionException && (e !is CloudException || e.status == 408 || e.status == 429 || e.status >= 500)
+                if (e is CloudException && e.status == 404) {
+                    file.delete()
+                } else if (retry) {
+                    transientFailure = true
+                }
+            }
+        }
         for (file in directory.listFiles().orEmpty().filter { it.name.startsWith("meta_") && it.extension == "json" }) {
             if (isStopped || !enabled(applicationContext)) return@withContext Result.success()
             val meta = runCatching { RecordingFiles.read(file) }.getOrNull() ?: continue
