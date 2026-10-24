@@ -21,6 +21,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.haptilog.watch.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -78,7 +87,7 @@ private val structuredKeyLabels = mapOf(
  * then remaining scalar fields. Keys are English by model contract, values follow the recording
  * language, so unknown keys are shown as-is rather than dropped.
  */
-fun structuredDataLines(intentType: String?, data: JSONObject?): List<String> {
+fun structuredDataLines(intentType: String?, data: JSONObject?, keyLabels: Map<String, String> = structuredKeyLabels): List<String> {
     if (data == null) return emptyList()
     val lines = mutableListOf<String>()
     val consumed = mutableSetOf<String>()
@@ -106,7 +115,7 @@ fun structuredDataLines(intentType: String?, data: JSONObject?): List<String> {
 
     for (key in data.keys().asSequence().filterNot { it in consumed }) {
         when (val value = data.opt(key)) {
-            is String -> if (value.isNotBlank()) lines += "${structuredKeyLabels[key] ?: key}: $value"
+            is String -> if (value.isNotBlank()) lines += "${keyLabels[key] ?: key}: $value"
             is Number, is Boolean -> lines += "$key: $value"
             else -> Unit
         }
@@ -134,27 +143,31 @@ fun syncStatusLabel(item: RecordingItem): String {
 fun RecordingDetailScreen(
     item: RecordingItem,
     isPlaying: Boolean,
+    cloudEnabled: Boolean,
+    notice: String?,
     onTogglePlay: () -> Unit,
     onExport: () -> Unit,
     onRetry: () -> Unit,
+    onOpenMap: () -> Unit,
     onDelete: () -> Unit
 ) {
     val context = LocalContext.current
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    val coroutineScope = rememberCoroutineScope()
-    val focusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    val startedAt = remember(item.startedAtTimestamp) {
-        SimpleDateFormat("M/d HH:mm", Locale.getDefault()).format(Date(item.startedAtTimestamp))
-    }
+    val scope = rememberCoroutineScope()
+    val focus = remember { FocusRequester() }
+    var confirmingDelete by rememberSaveable(item.id) { mutableStateOf(false) }
+    var transcriptExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
+    var syncExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
+    BackHandler(enabled = confirmingDelete) { confirmingDelete = false }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    LaunchedEffect(confirmingDelete) { if (confirmingDelete) listState.scrollToItem(0) }
+    val fullText = item.transcript?.takeIf { it.isNotBlank() }
     val summary = item.summary?.takeIf { it.isNotBlank() }
-    val transcript = item.transcript?.takeIf { it.isNotBlank() }
-    val structuredLines = structuredDataLines(item.intentType, item.structuredData)
-    val (categoryName, dotColor) = recordingCategory(item.intentType)
+    val structured = structuredDataLines(item.intentType, item.structuredData, mapOf(
+        "merchant" to stringResource(R.string.merchant_label),
+        "category" to stringResource(R.string.category_label),
+        "notes" to stringResource(R.string.notes_label)))
+    val audioAvailable = item.audioFile.isFile && item.audioFile.length() > 0
 
     Scaffold(
         timeText = { if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText() },
@@ -164,189 +177,104 @@ fun RecordingDetailScreen(
             state = listState,
             autoCentering = null,
             contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-                .padding(horizontal = 18.dp)
-                .focusRequester(focusRequester)
-                .focusable()
-                .onRotaryScrollEvent { event ->
-                    coroutineScope.launch {
-                        listState.scrollBy(event.verticalScrollPixels)
-                    }
-                    true
+            modifier = Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 16.dp)
+                .focusRequester(focus).focusable().onRotaryScrollEvent { event ->
+                    scope.launch { listState.scrollBy(event.verticalScrollPixels) }; true
                 },
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-
-            item {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(text = startedAt, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFF5F5F7))
-                    Text(text = "${item.durationSeconds}s", fontSize = 11.sp, color = Color(0xFF8E8E93))
-                }
-            }
-
-            item {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth(0.9f)
-                ) {
-                    Box(modifier = Modifier.size(5.dp).background(dotColor, CircleShape))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = categoryName, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = Color(0xFFD1D1D6))
-                }
-            }
-
-            if (summary != null) item {
-                Column(modifier = Modifier.fillMaxWidth(0.86f)) {
-                    DetailSection(label = "요약")
-                    Text(
-                        text = summary,
-                        fontSize = 11.sp,
-                        color = Color(0xFFE5E5EA),
-                        lineHeight = 14.sp
-                    )
-                }
-            }
-
-            if (transcript != null) item {
-                Column(modifier = Modifier.fillMaxWidth(0.86f)) {
-                    DetailSection(label = "전사")
-                    Text(
-                        text = transcript,
-                        fontSize = 11.sp,
-                        color = Color(0xFFE5E5EA),
-                        lineHeight = 14.sp
-                    )
-                }
-            }
-
-            if (summary == null && transcript == null) item {
-                Text(
-                    text = "아직 해석된 내용이 없습니다",
-                    fontSize = 11.sp,
-                    color = Color(0xFF8E8E93),
-                    modifier = Modifier.fillMaxWidth(0.86f)
-                )
-            }
-
-            if (structuredLines.isNotEmpty()) item {
-                Column(modifier = Modifier.fillMaxWidth(0.86f)) {
-                    DetailSection(label = "세부 내용")
-                    structuredLines.forEach { line ->
-                        Text(text = line, fontSize = 11.sp, color = Color(0xFFE5E5EA), lineHeight = 14.sp)
+            if (confirmingDelete) {
+                item { Text(stringResource(R.string.delete_confirm_title), fontSize = 18.sp,
+                    modifier = Modifier.fillMaxWidth(0.9f)) }
+                item { Text(stringResource(R.string.delete_confirm_scope), fontSize = 14.sp,
+                    color = WatchColors.Muted, modifier = Modifier.fillMaxWidth(0.9f)) }
+                item { FlexibleChip(onClick = { confirmingDelete = false },
+                    label = { Text(stringResource(R.string.cancel_action), maxLines = Int.MAX_VALUE) }) }
+                item { FlexibleChip(onClick = { confirmingDelete = false; onDelete() },
+                    label = { Text(stringResource(R.string.delete_action), maxLines = Int.MAX_VALUE) },
+                    colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF392521), contentColor = WatchColors.Error)) }
+            } else {
+                item {
+                    Column(Modifier.fillMaxWidth(0.9f)) {
+                        Text(recordingDate(context, item), fontSize = 14.sp, color = WatchColors.Muted)
+                        Text(stringResource(R.string.duration_seconds, item.durationSeconds), fontSize = 12.sp, color = WatchColors.Muted)
                     }
                 }
-            }
-
-            if (hasMapLocation(item)) item {
-                FlexibleChip(
-                    onClick = {
-                        val latitude = item.latitude
-                        val longitude = item.longitude
-                        try {
-                            context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude")
-                                )
-                            )
-                        } catch (_: ActivityNotFoundException) {
-                            Toast.makeText(context, "지도를 열 수 있는 앱이 없습니다", Toast.LENGTH_LONG).show()
+                item {
+                    FlexibleChip(
+                        enabled = audioAvailable,
+                        onClick = onTogglePlay,
+                        label = { Text(stringResource(if (isPlaying) R.string.stop_playback else R.string.play_audio),
+                            maxLines = Int.MAX_VALUE, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) },
+                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFFDFE8D9), contentColor = Color(0xFF172819)),
+                        secondaryLabel = { Text(stringResource(R.string.duration_seconds, item.durationSeconds), maxLines = Int.MAX_VALUE) }
+                    )
+                }
+                if (!audioAvailable) item { Text(stringResource(R.string.audio_missing), color = WatchColors.Error, fontSize = 14.sp) }
+                notice?.let { message -> item { Text(message, fontSize = 14.sp, color = WatchColors.Error) } }
+                item { Text(categoryLabel(context, item.intentType), fontSize = 12.sp, color = WatchColors.Muted) }
+                if (summary != null) item {
+                    Column(Modifier.fillMaxWidth(0.9f)) {
+                        DetailSection(stringResource(R.string.ai_summary))
+                        Text(summary, fontSize = 14.sp, color = WatchColors.Text)
+                    }
+                }
+                if (fullText != null) {
+                    item {
+                        val expandedState = stringResource(if (transcriptExpanded) R.string.expanded else R.string.collapsed)
+                        FlexibleChip(onClick = { transcriptExpanded = !transcriptExpanded },
+                            modifier = Modifier.semantics { stateDescription = expandedState },
+                            label = { Text(stringResource(if (transcriptExpanded) R.string.hide_transcript else R.string.show_transcript), maxLines = Int.MAX_VALUE) })
+                    }
+                    if (transcriptExpanded) item {
+                        Column(Modifier.fillMaxWidth(0.9f)) {
+                            DetailSection(stringResource(R.string.transcript_title))
+                            Text(fullText, fontSize = 14.sp, color = WatchColors.Text)
                         }
-                    },
-                    label = { Text(maxLines = Int.MAX_VALUE, text = "지도 보기") },
-                    modifier = Modifier.fillMaxWidth(0.86f)
-                )
-            }
-
-            item {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth(0.86f)
-                ) {
-                    DetailSection(label = "동기화")
-                    Text(
-                        text = syncStatusLabel(item),
-                        fontSize = 11.sp,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                        color = Color(0xFF8E8E93)
-                    )
+                    }
                 }
-            }
-
-            if (item.syncStatus == "ACTION_REQUIRED") item {
-                FlexibleChip(
-                    onClick = onRetry,
-                    label = { Text(maxLines = Int.MAX_VALUE, text = "재시도", fontSize = 10.sp) },
-                    colors = ChipDefaults.chipColors(
-                        backgroundColor = Color(0xFF2C2C2E),
-                        contentColor = Color(0xFFFF9F0A)
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                )
-            }
-
-            item {
-                FlexibleChip(
-                    onClick = onTogglePlay,
-                    label = {
-                        Text(maxLines = Int.MAX_VALUE,
-                            text = if (isPlaying) "정지" else "재생",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    },
-                    colors = ChipDefaults.chipColors(
-                        backgroundColor = if (isPlaying) Color(0xFF442022) else Color(0xFF2C2C2E),
-                        contentColor = if (isPlaying) Color(0xFFFF453A) else Color(0xFFF5F5F7)
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                )
-            }
-
-            item {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    FlexibleChip(
-                        onClick = onExport,
-                        label = { Text(maxLines = Int.MAX_VALUE, text = "내보내기", fontSize = 10.sp) },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = Color(0xFF242426),
-                            contentColor = Color(0xFF8E8E93)
-                        ),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    FlexibleChip(
-                        onClick = onDelete,
-                        label = { Text(maxLines = Int.MAX_VALUE, text = "삭제", fontSize = 10.sp) },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = Color(0xFF241C1C),
-                            contentColor = Color(0xFFFF6961)
-                        ),
-                        shape = RoundedCornerShape(10.dp)
-                    )
+                if (summary == null && fullText == null) item {
+                    Text(stringResource(R.string.no_enrichment), fontSize = 14.sp, color = WatchColors.Muted,
+                        modifier = Modifier.fillMaxWidth(0.9f))
                 }
+                if (structured.isNotEmpty()) item {
+                    Column(Modifier.fillMaxWidth(0.9f)) {
+                        DetailSection(stringResource(R.string.structured_details))
+                        structured.forEach { Text(it, fontSize = 14.sp, color = WatchColors.Text) }
+                    }
+                }
+                if (hasMapLocation(item)) item {
+                    FlexibleChip(onClick = onOpenMap,
+                        label = { Text(stringResource(R.string.map_action), maxLines = Int.MAX_VALUE) })
+                }
+                item { Text(recordingSyncLabel(context, item, cloudEnabled), fontSize = 12.sp, color = WatchColors.Muted) }
+                if (item.syncStatus == "ACTION_REQUIRED") item {
+                    FlexibleChip(enabled = cloudEnabled, onClick = onRetry,
+                        label = { Text(stringResource(R.string.retry_action), maxLines = Int.MAX_VALUE) })
+                }
+                if (item.syncAttempts > 0 || !item.syncError.isNullOrBlank()) {
+                    item {
+                        val expandedState = stringResource(if (syncExpanded) R.string.expanded else R.string.collapsed)
+                        FlexibleChip(onClick = { syncExpanded = !syncExpanded }, modifier = Modifier.semantics { stateDescription = expandedState },
+                            label = { Text(stringResource(R.string.sync_details), maxLines = Int.MAX_VALUE) })
+                    }
+                    if (syncExpanded) item {
+                        Text(stringResource(R.string.sync_attempts, recordingSyncLabel(context, item, cloudEnabled), item.syncAttempts) +
+                            (item.syncError?.let { "\n$it" } ?: ""), fontSize = 12.sp, color = WatchColors.Muted)
+                    }
+                }
+                item { FlexibleChip(onClick = onExport, label = { Text(stringResource(R.string.export_action), maxLines = Int.MAX_VALUE) }) }
+                item { FlexibleChip(onClick = { confirmingDelete = true },
+                    label = { Text(stringResource(R.string.delete_local), maxLines = Int.MAX_VALUE) },
+                    colors = ChipDefaults.chipColors(backgroundColor = WatchColors.Surface, contentColor = WatchColors.Error)) }
             }
-
-            item { Spacer(modifier = Modifier.height(36.dp)) }
         }
     }
 }
 
 @Composable
 private fun DetailSection(label: String) {
-    Text(
-        text = label,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = Color(0xFF8E8E93),
-        modifier = Modifier
-            .fillMaxWidth(0.86f)
-            .padding(bottom = 2.dp)
-    )
+    Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = WatchColors.Muted,
+        modifier = Modifier.padding(bottom = 4.dp))
 }

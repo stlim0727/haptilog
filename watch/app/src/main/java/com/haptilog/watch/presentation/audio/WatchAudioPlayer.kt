@@ -15,6 +15,11 @@ import java.io.File
  */
 class WatchAudioPlayer(private val context: Context) {
 
+    enum class Failure { MISSING_AUDIO, PLAYBACK }
+    private val _error = MutableStateFlow<Failure?>(null)
+    val error: StateFlow<Failure?> = _error.asStateFlow()
+    fun dismissError() { _error.value = null }
+
     private var mediaPlayer: MediaPlayer? = null
 
     private val _playingId = MutableStateFlow<String?>(null)
@@ -32,12 +37,17 @@ class WatchAudioPlayer(private val context: Context) {
     }
 
     fun play(file: File, id: String) {
-        if (!file.exists() || file.length() == 0L) return
-
         stop()
+        _error.value = null
+        if (!file.isFile || file.length() == 0L) {
+            _error.value = Failure.MISSING_AUDIO
+            return
+        }
 
         try {
-            val player = MediaPlayer().apply {
+            val player = MediaPlayer()
+            mediaPlayer = player
+            player.apply {
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -50,6 +60,11 @@ class WatchAudioPlayer(private val context: Context) {
                     _isPlaying.value = false
                     _playingId.value = null
                 }
+                setOnErrorListener { _, _, _ ->
+                    stop()
+                    _error.value = Failure.PLAYBACK
+                    true
+                }
                 start()
             }
             mediaPlayer = player
@@ -58,6 +73,7 @@ class WatchAudioPlayer(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
             stop()
+            _error.value = Failure.PLAYBACK
         }
     }
 

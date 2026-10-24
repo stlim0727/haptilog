@@ -13,6 +13,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
+import androidx.lifecycle.ViewModelProvider
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -54,6 +55,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.semantics
@@ -100,6 +103,8 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_TOGGLE = "toggle_recording"
     }
 
+    private val entryState by lazy { ViewModelProvider(this)[CaptureEntryState::class.java] }
+    private var cloudSyncEnabled by mutableStateOf(false)
     private var pendingExportId: String? = null
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         val id = pendingExportId
@@ -116,8 +121,10 @@ class MainActivity : ComponentActivity() {
     }
     private fun exportRecording(item: RecordingItem) {
         pendingExportId = item.id
+        entryState.beginInternalReturn()
         try { exportLauncher.launch("haptilog-${item.id}.zip") }
         catch (_: ActivityNotFoundException) {
+            entryState.cancelInternalReturn()
             pendingExportId = null
             Toast.makeText(this, "No export app available on this watch", Toast.LENGTH_LONG).show()
         }
@@ -167,6 +174,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        entryState.requestCapture()
         if (intent.getBooleanExtra(EXTRA_TOGGLE, false)) {
             intent.removeExtra(EXTRA_TOGGLE)
             toggleRecording()
@@ -174,6 +182,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("internal_return", entryState.internalReturn)
+        outState.putString("capture_request", entryState.request)
         outState.putString("pending_export", pendingExportId)
         outState.putBoolean("pending_toggle", pendingToggle)
         super.onSaveInstanceState(outState)
@@ -181,6 +191,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        entryState.restoreInternalReturn(savedInstanceState?.getBoolean("internal_return") == true,
+            savedInstanceState?.getString("capture_request"))
         pendingExportId = savedInstanceState?.getString("pending_export")
         repository = RecordingRepository(this)
         audioPlayer = WatchAudioPlayer(this)
@@ -199,6 +211,19 @@ class MainActivity : ComponentActivity() {
                 val playingId by audioPlayer.playingId.collectAsState()
                 val isPlaying by audioPlayer.isPlaying.collectAsState()
                 var openDetailId by rememberSaveable { mutableStateOf<String?>(null) }
+                val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+                var handledRequest by rememberSaveable { mutableStateOf<String?>(null) }
+                var notice by rememberSaveable { mutableStateOf<String?>(null) }
+                val request = entryState.request
+                val playbackError by audioPlayer.error.collectAsState()
+                LaunchedEffect(request) {
+                    if (handledRequest != request) {
+                        audioPlayer.stop()
+                        openDetailId = null
+                        listState.scrollToItem(0)
+                        handledRequest = request
+                    }
+                }
 
                 // Refresh recordings when recording completes
                 LaunchedEffect(isRecording) {
@@ -236,10 +261,27 @@ class MainActivity : ComponentActivity() {
                             RecordingSyncWorker.retry(this, detailItem.id)
                             repository.refresh()
                         },
+                        cloudEnabled = cloudSyncEnabled,
+                        notice = notice ?: playbackError?.let { getString(if (it == WatchAudioPlayer.Failure.MISSING_AUDIO) R.string.audio_missing else R.string.audio_failed) },
+                        onOpenMap = {
+                            entryState.beginInternalReturn()
+                            try {
+                                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(
+                                    "geo:${detailItem.latitude},${detailItem.longitude}?q=${detailItem.latitude},${detailItem.longitude}")))
+                            } catch (_: ActivityNotFoundException) {
+                                entryState.cancelInternalReturn()
+                                notice = getString(R.string.no_map_app)
+                            }
+                        },
                         onDelete = {
                             if (playingId == detailItem.id) audioPlayer.stop()
-                            repository.deleteRecording(detailItem.id)
-                            openDetailId = null
+                            if (repository.deleteRecording(detailItem.id)) {
+                                notice = null
+                                openDetailId = null
+                            } else {
+                                notice = localDeleteFailure(this, detailItem)
+                                repository.refresh()
+                            }
                         }
                     )
                 } else {
@@ -247,9 +289,15 @@ class MainActivity : ComponentActivity() {
                         isRecording = isRecording,
                         elapsedSeconds = elapsedSeconds,
                         recordings = recordings,
+                        listState = listState,
+                        cloudEnabled = cloudSyncEnabled,
+                        notice = notice,
                         onToggleRecording = ::toggleRecording,
-                        onOpenRecording = { item -> openDetailId = item.id },
-                        onSettings = { if (!isRecording) startActivity(Intent(this, SettingsActivity::class.java)) }
+                        onOpenRecording = { item -> notice = null; audioPlayer.dismissError(); openDetailId = item.id },
+                        onSettings = { if (!isRecording) {
+                            entryState.beginInternalReturn()
+                            startActivity(Intent(this, SettingsActivity::class.java))
+                        } }
                     )
                 }
             }
@@ -258,7 +306,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        entryState.resumed()
+        cloudSyncEnabled = RecordingSyncWorker.enabled(this)
         repository.refresh()
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        entryState.userLeaving()
     }
 
     override fun onDestroy() {
@@ -273,21 +328,18 @@ fun HaptiLogScreen(
     isRecording: Boolean,
     elapsedSeconds: Long,
     recordings: List<RecordingItem>,
+    listState: ScalingLazyListState,
+    cloudEnabled: Boolean,
+    notice: String?,
     onToggleRecording: () -> Unit,
     onOpenRecording: (RecordingItem) -> Unit,
     onSettings: () -> Unit
 ) {
-    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
-    }
-
-    // A resumed task keeps its scroll position, which can leave the record button off screen.
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        coroutineScope.launch { listState.scrollToItem(0) }
     }
 
     Scaffold(
@@ -331,6 +383,8 @@ fun HaptiLogScreen(
                 )
             }
 
+            notice?.let { message -> item { Text(message, color = WatchColors.Error, fontSize = 12.sp, modifier = Modifier.fillMaxWidth(0.86f)) } }
+
             // 3. Section Header
             item {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -363,7 +417,7 @@ fun HaptiLogScreen(
                 }
             } else {
                 items(recordings, key = { it.id }) { item ->
-                    RecordingCard(item = item, onOpen = { onOpenRecording(item) })
+                    RecordingCard(item = item, cloudEnabled = cloudEnabled, onOpen = { onOpenRecording(item) })
                     Spacer(modifier = Modifier.height(6.dp))
                 }
             }
@@ -512,84 +566,26 @@ fun EmptyRecordingsCard() {
 }
 
 @Composable
-fun RecordingCard(
-    item: RecordingItem,
-    onOpen: () -> Unit
-) {
-    val timeFormatted = remember(item.startedAtTimestamp) {
-        val diffMs = System.currentTimeMillis() - item.startedAtTimestamp
-        when {
-            diffMs < 60_000L -> "방금 전"
-            diffMs < 3600_000L -> "${diffMs / 60_000L}분 전"
-            else -> SimpleDateFormat("M/d HH:mm", Locale.getDefault()).format(Date(item.startedAtTimestamp))
-        }
-    }
-
+fun RecordingCard(item: RecordingItem, cloudEnabled: Boolean, onOpen: () -> Unit) {
+    val context = LocalContext.current
+    val hasSummary = !item.summary.isNullOrBlank()
     Card(
         onClick = onOpen,
-        modifier = Modifier
-            .fillMaxWidth(0.92f)
-            .padding(vertical = 2.dp)
-            .border(0.5.dp, Color(0xFF242426), RoundedCornerShape(16.dp)),
+        modifier = Modifier.fillMaxWidth(0.9f),
         backgroundPainter = CardDefaults.cardBackgroundPainter(
-            startBackgroundColor = Color(0xFF141416),
-            endBackgroundColor = Color(0xFF141416)
-        ),
+            startBackgroundColor = Color(0xFF171D19), endBackgroundColor = Color(0xFF171D19)),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp)
-        ) {
-            // Header: Time & Duration
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = timeFormatted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFF5F5F7)
-                )
-                Text(
-                    text = "${item.durationSeconds}s",
-                    fontSize = 11.sp,
-                    color = Color(0xFF8E8E93)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Category
-            val (categoryName, dotColor) = recordingCategory(item.intentType)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Start
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(5.dp)
-                        .background(dotColor, CircleShape)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = categoryName,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFFD1D1D6)
-                )
-            }
-
-            // Summary text if present
-            if (!item.summary.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = item.summary,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = Color(0xFFE5E5EA),
-                    lineHeight = 14.sp
-                )
+        Column(Modifier.fillMaxWidth().padding(4.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text(recordingTitle(context, item), fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis, color = WatchColors.Text)
+            Text(stringResource(R.string.recording_metadata, recordingDate(context, item),
+                stringResource(R.string.duration_seconds, item.durationSeconds)), fontSize = 12.sp, color = WatchColors.Muted)
+            Text((if (hasSummary) stringResource(R.string.ai_summary) + " · " else "") + categoryLabel(context, item.intentType),
+                fontSize = 12.sp, color = WatchColors.Muted)
+            if (!cloudEnabled || item.syncStatus == "ACTION_REQUIRED") {
+                Text(recordingSyncLabel(context, item, cloudEnabled), fontSize = 12.sp,
+                    color = if (item.syncStatus == "ACTION_REQUIRED") WatchColors.Error else WatchColors.Muted)
             }
         }
     }
