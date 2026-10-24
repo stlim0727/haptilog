@@ -130,7 +130,11 @@ class RecordingRepository(private val context: Context) {
                     put("id", id)
                     put("deleted_at", Instant.now().toString())
                 }
-                runCatching { RecordingFiles.write(deleteFile, deleteData) }
+                val tombstoneSaved = runCatching {
+                    RecordingFiles.write(deleteFile, deleteData)
+                    deleteFile.exists()
+                }.getOrDefault(false)
+                if (!tombstoneSaved) return false
             }
 
             deleted = (!audioFile.exists() || audioFile.delete()) && (!metaFile.exists() || metaFile.delete())

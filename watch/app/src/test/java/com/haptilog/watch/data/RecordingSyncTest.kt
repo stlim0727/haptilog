@@ -107,4 +107,17 @@ class RecordingSyncTest {
         assertTrue(deleteData.has("deleted_at"))
         repo.close()
     }
+    @Test fun uploadAbortsIfDeletedLocally() {
+        val dir = RecordingFiles.dir(context)
+        val deleteFile = File(dir, "delete_$id.json")
+        RecordingFiles.write(deleteFile, JSONObject().put("id", id).put("deleted_at", "2026-10-24T05:00:00Z"))
+        val client = FakeCloud()
+        try {
+            RecordingUploader(context).upload(meta, JSONObject(), stateFile, client)
+            fail("Upload must abort when deletion tombstone exists")
+        } catch (_: kotlinx.coroutines.CancellationException) {
+            // Expected cancellation
+        }
+        assertTrue(client.paths.isEmpty())
+    }
 }
