@@ -43,6 +43,14 @@ class WatchUxStateTest {
         state.userLeaving() // Home -> launcher/recents
         assertNotEquals(initial, state.request)
     }
+    @Test fun failedActivityLaunchDoesNotSuppressTheNextExternalReturn() {
+        val state = CaptureEntryState()
+        val before = state.request
+        state.beginInternalReturn()
+        state.cancelInternalReturn() // No activity exists, so no corresponding resume will arrive.
+        state.userLeaving()
+        assertNotEquals(before, state.request)
+    }
     @Test fun explicitCaptureOverridesAnInternalReturn() {
         val state = CaptureEntryState()
         state.beginInternalReturn()

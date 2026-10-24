@@ -16,7 +16,8 @@ class CaptureEntryState : ViewModel() {
     fun requestCapture() { request = UUID.randomUUID().toString() }
     fun beginInternalReturn() { internalReturn = true }
     fun userLeaving() { if (!internalReturn) requestCapture() }
-    fun resumed() { internalReturn = false }
+    fun cancelInternalReturn() { internalReturn = false }
+    fun resumed() { cancelInternalReturn() }
     fun restoreInternalReturn(wasInternal: Boolean, savedRequest: String?) {
         if (wasInternal && savedRequest != null) {
             internalReturn = true

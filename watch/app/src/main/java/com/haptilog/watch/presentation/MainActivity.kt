@@ -124,6 +124,7 @@ class MainActivity : ComponentActivity() {
         entryState.beginInternalReturn()
         try { exportLauncher.launch("haptilog-${item.id}.zip") }
         catch (_: ActivityNotFoundException) {
+            entryState.cancelInternalReturn()
             pendingExportId = null
             Toast.makeText(this, "No export app available on this watch", Toast.LENGTH_LONG).show()
         }
@@ -267,7 +268,10 @@ class MainActivity : ComponentActivity() {
                             try {
                                 startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(
                                     "geo:${detailItem.latitude},${detailItem.longitude}?q=${detailItem.latitude},${detailItem.longitude}")))
-                            } catch (_: ActivityNotFoundException) { notice = getString(R.string.no_map_app) }
+                            } catch (_: ActivityNotFoundException) {
+                                entryState.cancelInternalReturn()
+                                notice = getString(R.string.no_map_app)
+                            }
                         },
                         onDelete = {
                             if (playingId == detailItem.id) audioPlayer.stop()
