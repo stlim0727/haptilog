@@ -131,6 +131,7 @@ export default function TimeSliderStrip({
               role="button"
               tabIndex={0}
               onKeyDown={(evt) => {
+                if (evt.target !== evt.currentTarget) return;
                 if (evt.key === "Enter" || evt.key === " ") {
                   evt.preventDefault();
                   onSelectDate(dateKey);

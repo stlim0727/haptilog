@@ -159,6 +159,7 @@ export default function TimelineView({
                   role="article"
                   tabIndex={0}
                   onKeyDown={(evt) => {
+                    if (evt.target !== evt.currentTarget) return;
                     if (evt.key === "Enter" || evt.key === " ") {
                       evt.preventDefault();
                       onSelect(r.id, false);
@@ -212,6 +213,9 @@ export default function TimelineView({
                         onClick={(evt) => {
                           evt.stopPropagation();
                           onSelect(r.id, true);
+                        }}
+                        onKeyDown={(evt) => {
+                          evt.stopPropagation();
                         }}
                       >
                         {t.switch_to_detail} ↗

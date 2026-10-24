@@ -466,6 +466,15 @@ test("switches between List, Timeline & Map, and Calendar views seamlessly", asy
   await page.locator(".timeline-item").first().click();
   await expect(page.locator(".timeline-item").first()).toHaveClass(/selected/);
 
+  // Keyboard navigation on card and nested detail button
+  await page.locator(".timeline-item").first().focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".timeline-item").first()).toHaveClass(/selected/);
+
+  await page.locator(".timeline-inspect-btn").first().focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".inspector")).toBeVisible();
+
   // 3. Switch to Calendar view
   await page.getByRole("tab", { name: "Calendar" }).click();
   await expect(page.locator(".calendar-view-container")).toBeVisible();
