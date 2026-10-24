@@ -41,3 +41,27 @@ fun localDeleteFailure(context: Context, item: RecordingItem): String = context.
     !item.audioFile.exists() && !item.metaFile.exists() -> R.string.delete_cleanup_failed
     else -> R.string.delete_failed
 })
+
+/** Locale-aware short date and clock preference, with each date/time token kept intact. */
+fun compactRecordingDate(context: Context, item: RecordingItem): String {
+    val locale = context.resources.configuration.locales[0]
+    val date = Date(item.startedAtTimestamp)
+    val dayPattern = DateFormat.getBestDateTimePattern(locale, "Md")
+    val timePattern = DateFormat.getBestDateTimePattern(locale,
+        if (DateFormat.is24HourFormat(context)) "HHmm" else "hmm")
+    val day = java.text.SimpleDateFormat(dayPattern, locale).format(date).replace(' ', '\u00A0')
+    val time = java.text.SimpleDateFormat(timePattern, locale).format(date).replace(' ', '\u00A0')
+    // Permit a large-font line break between the day and clock, but not inside either token.
+    return "$day $time"
+}
+
+fun recordingDuration(context: Context, seconds: Long): String {
+    val safe = seconds.coerceAtLeast(0)
+    val minutes = safe / 60
+    val remainder = safe % 60
+    return when {
+        minutes == 0L -> context.getString(R.string.duration_seconds, remainder)
+        remainder == 0L -> context.getString(R.string.duration_minutes, minutes)
+        else -> context.getString(R.string.duration_minutes_seconds, minutes, remainder)
+    }.replace(' ', '\u00A0')
+}

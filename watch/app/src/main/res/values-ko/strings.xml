@@ -1,4 +1,5 @@
 <resources>
+    <string name="app_name">HaptiLog</string>
     <string name="record_start">녹음</string>
     <string name="record_stop">중지</string>
     <string name="record_start_accessibility">녹음 시작</string>
@@ -89,4 +90,9 @@
     <string name="describe_issue">문제를 설명해 주세요</string>
     <string name="decline_cloud">거절 · 워치에만 저장</string>
     <string name="agree_cloud">만 18세 이상 · 동의하고 켜기</string>
+    <string name="recordings_title">기록</string>
+    <string name="duration_minutes_seconds">%1$d분 %2$d초</string>
+    <string name="duration_minutes">%1$d분</string>
+    <string name="tile_record">녹음 시작</string>
+    <string name="tile_recordings">기록 보기</string>
 </resources>
