@@ -1,0 +1,33 @@
+{
+  "scroll": {
+    "before": 1492,
+    "after": 1492,
+    "focus": "18"
+  },
+  "mapTravel": "뚝섬한강공원\n기록 1개\n오전 11:48\n여행\n한강 따라 천천히 걸었던 오후\n1분 08초\n·\n뚝섬한강공원",
+  "tabFocus": "달력",
+  "periodFocus": "date-button",
+  "trashFocus": "휴지통",
+  "text200": [
+    {
+      "view": "list",
+      "width": 320,
+      "scrollWidth": 320
+    },
+    {
+      "view": "calendar",
+      "width": 320,
+      "scrollWidth": 320
+    },
+    {
+      "view": "detail",
+      "width": 320,
+      "scrollWidth": 320
+    },
+    {
+      "view": "pair",
+      "width": 320,
+      "scrollWidth": 320
+    }
+  ]
+}

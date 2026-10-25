@@ -1,0 +1,132 @@
+{
+  "phase": "round1",
+  "metrics": [
+    {
+      "width": 320,
+      "view": "list",
+      "scrollWidth": 320,
+      "firstCardTop": 421.328125
+    },
+    {
+      "width": 320,
+      "view": "calendar",
+      "scrollWidth": 320,
+      "firstCardTop": 785.375,
+      "calendarCellWidth": 40.859375,
+      "calendarCellHeight": 47
+    },
+    {
+      "width": 320,
+      "view": "map",
+      "scrollWidth": 320,
+      "firstCardTop": 782.8125
+    },
+    {
+      "width": 320,
+      "view": "detail",
+      "scrollWidth": 320
+    },
+    {
+      "width": 320,
+      "view": "pair",
+      "scrollWidth": 320
+    },
+    {
+      "width": 360,
+      "view": "list",
+      "scrollWidth": 360,
+      "firstCardTop": 426.875
+    },
+    {
+      "width": 360,
+      "view": "calendar",
+      "scrollWidth": 360,
+      "firstCardTop": 790.921875,
+      "calendarCellWidth": 44.28125,
+      "calendarCellHeight": 47
+    },
+    {
+      "width": 360,
+      "view": "map",
+      "scrollWidth": 360,
+      "firstCardTop": 788.359375
+    },
+    {
+      "width": 360,
+      "view": "detail",
+      "scrollWidth": 360
+    },
+    {
+      "width": 360,
+      "view": "pair",
+      "scrollWidth": 360
+    },
+    {
+      "width": 390,
+      "view": "list",
+      "scrollWidth": 390,
+      "firstCardTop": 426.875
+    },
+    {
+      "width": 390,
+      "view": "calendar",
+      "scrollWidth": 390,
+      "firstCardTop": 790.921875,
+      "calendarCellWidth": 48.5625,
+      "calendarCellHeight": 47
+    },
+    {
+      "width": 390,
+      "view": "map",
+      "scrollWidth": 390,
+      "firstCardTop": 788.359375
+    },
+    {
+      "width": 390,
+      "view": "detail",
+      "scrollWidth": 390
+    },
+    {
+      "width": 390,
+      "view": "pair",
+      "scrollWidth": 390
+    },
+    {
+      "width": 430,
+      "view": "list",
+      "scrollWidth": 430,
+      "firstCardTop": 426.875
+    },
+    {
+      "width": 430,
+      "view": "calendar",
+      "scrollWidth": 430,
+      "firstCardTop": 790.921875,
+      "calendarCellWidth": 54.28125,
+      "calendarCellHeight": 47
+    },
+    {
+      "width": 430,
+      "view": "map",
+      "scrollWidth": 430,
+      "firstCardTop": 788.359375
+    },
+    {
+      "width": 430,
+      "view": "detail",
+      "scrollWidth": 430
+    },
+    {
+      "width": 430,
+      "view": "pair",
+      "scrollWidth": 430
+    }
+  ],
+  "back": {
+    "before": 0,
+    "y": 0,
+    "focus": "4",
+    "category": "분류: 메모필터 해제 ×"
+  },
+  "errors": []
+}
