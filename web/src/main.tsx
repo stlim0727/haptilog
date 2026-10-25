@@ -95,10 +95,27 @@ function App() {
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
+  const [showTimeSlider, setShowTimeSlider] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "spatiotemporal" | "calendar">("list");
   const [stripDateKey, setStripDateKey] = useState<string>("ALL");
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window === "undefined") return "dark";
+    const saved = localStorage.getItem("haptilog_theme");
+    return saved === "light" || saved === "dark" ? saved : "dark";
+  });
   const [lang, setLang] = useState<Language>(getInitialLanguage);
   const t = translations[lang];
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", theme === "dark");
+    document.body.classList.toggle("light-mode", theme === "light");
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("haptilog_theme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  }
 
   function toggleLang() {
     const next = lang === "en" ? "ko" : "en";
@@ -350,6 +367,10 @@ function App() {
   const spatioFiltered = stripDateKey === "ALL"
     ? filtered
     : filtered.filter((r) => localDate(r.recorded_at) === stripDateKey);
+  const displayRecordings =
+    viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
+      ? spatioFiltered
+      : filtered;
   const dateFilteredActiveRecords = activeRecords.filter((r) => {
     const day = localDate(r.recorded_at),
       today = toLocalDateString();
@@ -384,6 +405,15 @@ function App() {
         <Brand />
         <span className="top-label">{t.brand_slogan}</span>
         <div className="top-right">
+          <button
+            className="theme-switch-btn"
+            onClick={toggleTheme}
+            title={theme === "dark" ? t.theme_light : t.theme_dark}
+            aria-label={t.theme_toggle}
+          >
+            <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
+            <span className="theme-btn-text">{theme === "dark" ? t.theme_light : t.theme_dark}</span>
+          </button>
           <button
             className="lang-switch-btn"
             onClick={toggleLang}
@@ -669,6 +699,26 @@ function App() {
                 <CalendarDays size={14} /> {t.view_calendar}
               </button>
             </div>
+            {viewMode === "list" && !isTrashView && (
+              <div className="workbench-toggles">
+                <button
+                  type="button"
+                  className={`workbench-toggle-btn ${showTimeSlider ? "active" : ""}`}
+                  onClick={() => setShowTimeSlider(!showTimeSlider)}
+                  aria-expanded={showTimeSlider}
+                >
+                  <Clock size={14} /> {showTimeSlider ? t.hide_time_slider : t.toggle_time_slider}
+                </button>
+                <button
+                  type="button"
+                  className={`workbench-toggle-btn ${showMap ? "active" : ""}`}
+                  onClick={() => setShowMap(!showMap)}
+                  aria-expanded={showMap}
+                >
+                  <MapPin size={14} /> {showMap ? t.hide_map : t.show_map}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="global-filters-bar">
@@ -794,76 +844,108 @@ function App() {
               t={t}
             />
           ) : (
-            <div className="review-layout">
-              <section className="map-section" aria-label="Recording map view">
-                <div className="map-heading">
-                  <div>
-                    <h2>{t.map_heading}</h2>
-                    <p>{t.map_desc}</p>
+            <>
+              {showTimeSlider && (
+                <div className="workbench-slider-wrapper">
+                  <TimeSliderStrip
+                    recordings={filtered}
+                    selectedDateKey={stripDateKey}
+                    onSelectDate={setStripDateKey}
+                    t={t}
+                    lang={lang}
+                  />
+                </div>
+              )}
+              <div className="review-layout">
+                {showMap && (
+                  <section className="map-section" aria-label="Recording map view">
+                    <div className="map-heading">
+                      <div>
+                        <h2>{t.map_heading}</h2>
+                        <p>{t.map_desc}</p>
+                      </div>
+                      <button
+                        className="map-close-btn"
+                        onClick={() => setShowMap(false)}
+                        aria-label="Close map"
+                        title={t.hide_map}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <MapBoundary>
+                      <Suspense fallback={<p>{t.loading_map}</p>}>
+                        <RecordingMap
+                          recordings={displayRecordings}
+                          selectedId={active?.id ?? null}
+                          onSelect={(id, revealDetails) => {
+                            setSelected(id);
+                            if (revealDetails) {
+                              requestAnimationFrame(() =>
+                                document.querySelector(".inspector")?.scrollIntoView({
+                                  block: "start",
+                                  behavior: "smooth",
+                                }),
+                              );
+                            }
+                          }}
+                        />
+                      </Suspense>
+                    </MapBoundary>
+                  </section>
+                )}
+                <section className="feed" aria-label="Recordings">
+                  <div className="feed-heading">
+                    <h2>{isTrashView ? t.trash : t.your_moments}</h2>
+                    <div className="feed-heading-right">
+                      {isTrashView && trashedCount > 0 && (
+                        <button
+                          className="text-button empty-trash-btn"
+                          onClick={emptyTrash}
+                        >
+                          {t.empty_trash}
+                        </button>
+                      )}
+                      <span>{displayRecordings.length}</span>
+                    </div>
                   </div>
-                  <button className="secondary-button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
-                    <MapPin size={16} />{showMap ? t.hide_map : t.show_map}
-                  </button>
-                </div>
-                {showMap && <MapBoundary><Suspense fallback={<p>{t.loading_map}</p>}>
-                  <RecordingMap recordings={filtered} selectedId={active?.id ?? null} onSelect={(id, revealDetails) => {
-                    setSelected(id);
-                    if (revealDetails) requestAnimationFrame(() => document.querySelector(".inspector")?.scrollIntoView({ block: "start", behavior: "smooth" }));
-                  }} />
-                </Suspense></MapBoundary>}
-              </section>
-              <section className="feed" aria-label="Recordings">
-              <div className="feed-heading">
-                <h2>{isTrashView ? t.trash : t.your_moments}</h2>
-                <div className="feed-heading-right">
-                  {isTrashView && trashedCount > 0 && (
-                    <button
-                      className="text-button empty-trash-btn"
-                      onClick={emptyTrash}
-                    >
-                      {t.empty_trash}
-                    </button>
-                  )}
-                  <span>{filtered.length}</span>
-                </div>
-              </div>
-              {!loaded ? (
-                <div className="empty">
-                  <LoaderCircle className="spin" />
-                  <h3>{t.finding_moments}</h3>
-                </div>
-              ) : !filtered.length ? (
-                <div className="empty">
-                  {isTrashView ? (
-                    <>
-                      <Trash2 size={30} />
-                      <h3>{t.empty_trash_title}</h3>
-                      <p>
-                        {t.empty_trash_desc}
-                      </p>
-                    </>
+                  {!loaded ? (
+                    <div className="empty">
+                      <LoaderCircle className="spin" />
+                      <h3>{t.finding_moments}</h3>
+                    </div>
+                  ) : !displayRecordings.length ? (
+                    <div className="empty">
+                      {isTrashView ? (
+                        <>
+                          <Trash2 size={30} />
+                          <h3>{t.empty_trash_title}</h3>
+                          <p>
+                            {t.empty_trash_desc}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <Mic size={30} />
+                          <h3>
+                            {records.length
+                              ? t.empty_active_title
+                              : t.empty_first_title}
+                          </h3>
+                          <p>
+                            {records.length
+                              ? t.empty_active_desc
+                              : t.empty_first_desc}
+                          </p>
+                          <small>
+                            {t.demo_note}
+                          </small>
+                        </>
+                      )}
+                    </div>
                   ) : (
-                    <>
-                      <Mic size={30} />
-                      <h3>
-                        {records.length
-                          ? t.empty_active_title
-                          : t.empty_first_title}
-                      </h3>
-                      <p>
-                        {records.length
-                          ? t.empty_active_desc
-                          : t.empty_first_desc}
-                      </p>
-                      <small>
-                        {t.demo_note}
-                      </small>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="record-list">
-                  {filtered.map((r) => {
+                    <div className="record-list">
+                      {displayRecordings.map((r) => {
                     const e = latest(r),
                       state = processingState(r),
                       x = expense(r);
@@ -942,6 +1024,7 @@ function App() {
               )}
             </section>
           </div>
+          </>
           )}
 
           {viewMode !== "list" && active && (
