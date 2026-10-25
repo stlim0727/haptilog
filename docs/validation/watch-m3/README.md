@@ -1,5 +1,7 @@
 # Watch M3 category design implementation
 
+Historical evidence from the first implementation. The [concept 03 correction and current representative captures](../watch-concept03-revision/README.md) supersede these layouts.
+
 Implements the direction discussed in [Discussion #35](https://github.com/stlim0727/haptilog/discussions/35), including concept 03 category colors and icons. Native evidence is from a local debug APK, not an image generation mockup or a Play release.
 
 ## Implemented scope
@@ -31,7 +33,7 @@ The final detail header is split into independent category/title/metadata list i
 
 ## Limits
 
-This is a phased M3 adoption, not a complete replacement of legacy settings/web/ProtoLayout components. The generated design's exact geometry, textures and mock data are not an implementation specification. Large fonts intentionally scroll rather than squeezing all controls into one viewport. List titles may ellipsize at two lines; full summary remains available in detail.
+This is a phased M3 adoption, not a complete replacement of legacy settings/web/ProtoLayout components. The subsequent concept 03 correction restores the approved geometry; native surfaces use solid colors rather than image textures. Large fonts intentionally scroll rather than squeezing all controls into one viewport. List titles may ellipsize at two lines; full summary remains available in detail.
 
 TalkBack spoken navigation, physical rotary feel, Galaxy Watch haptics, microphone interference and battery acceptance still require physical hardware/manual validation. XML labels and screenshots are supporting evidence, not a TalkBack usability trial. Tile rendering in the carousel and real device launcher/Tile interaction need hardware follow-up; its existing launch action code is preserved. No Play deployment or merge is performed by this validation.
 

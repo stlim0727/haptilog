@@ -37,4 +37,18 @@ class CompactMetadataTest {
         assertEquals(R.drawable.ic_mic, categoryStyle(null).icon)
         assertEquals(context("ko").getString(R.string.category_pending), categoryLabel(context("ko"), null))
     }
+    @Test fun expenseHeroUsesWonOnlyForAnExplicitKrwCurrency() {
+        val item = com.haptilog.watch.data.RecordingItem("preview", java.io.File("audio"), java.io.File("meta"),
+            "2026-10-24T14:02:00Z", 1L, 35, "COMPLETED", "SYNCED", intentType = "EXPENSE",
+            structuredData = org.json.JSONObject().put("amount", 12000).put("currency", "KRW"))
+        assertEquals("12,000원", expenseHeroAmount(context("ko"), item))
+        assertEquals("12,000 USD", expenseHeroAmount(context("ko"), item.copy(
+            structuredData = org.json.JSONObject().put("amount", 12000).put("currency", "USD"))))
+        assertEquals("12,000", expenseHeroAmount(context("ko"), item.copy(
+            structuredData = org.json.JSONObject().put("amount", 12000))))
+        assertNull(expenseHeroAmount(context("ko"), item.copy(intentType = "MEMO")))
+        assertNull(expenseHeroAmount(context("ko"), item.copy(
+            structuredData = org.json.JSONObject().put("amount", -1).put("currency", "KRW"))))
+    }
+
 }

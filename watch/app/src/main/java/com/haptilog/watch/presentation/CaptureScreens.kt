@@ -24,6 +24,8 @@ import androidx.wear.compose.foundation.lazy.*
 import androidx.wear.compose.material3.*
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
+import androidx.wear.compose.material3.lazy.ResponsiveTransformationSpec
+import androidx.wear.compose.material3.lazy.TransformationVariableSpec
 import com.haptilog.watch.R
 import com.haptilog.watch.data.RecordingItem
 import java.util.Locale
@@ -55,7 +57,7 @@ fun CaptureScreen(
                     if (isRecording) {
                         item { ElapsedTime(elapsedSeconds, 30) }
                     } else {
-                        item { NavigationAction(R.drawable.ic_records, R.string.recordings_title,
+                        item { NavigationAction(R.drawable.ic_records, R.string.recordings_action,
                             categoryStyle("MEMO"), onRecordings, Modifier.fillMaxWidth()) }
                         item { NavigationAction(R.drawable.ic_settings, R.string.settings_title,
                             categoryStyle("TRAVEL"), onSettings, Modifier.fillMaxWidth()) }
@@ -85,21 +87,21 @@ fun CaptureScreen(
             }
         } else {
             ScreenScaffold {
-                Column(Modifier.fillMaxSize().padding(top = if (compact) 28.dp else 32.dp, bottom = 22.dp),
+                Column(Modifier.fillMaxSize().padding(top = if (compact) 28.dp else 30.dp, bottom = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 7.dp)) {
-                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall)
+                    verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp)) {
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     val recordLabel = stringResource(R.string.record_start_accessibility)
                     Button(onClick = onToggleRecording,
                         shape = CircleShape, contentPadding = PaddingValues(4.dp),
-                        modifier = Modifier.size(if (compact) 68.dp else 82.dp).semantics { contentDescription = recordLabel }) {
+                        modifier = Modifier.size(if (compact) 74.dp else 100.dp).semantics { contentDescription = recordLabel }) {
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(painterResource(R.drawable.ic_mic), null, Modifier.size(30.dp))
-                            Text(stringResource(R.string.record_start), style = MaterialTheme.typography.labelSmall)
+                            Icon(painterResource(R.drawable.ic_mic), null, Modifier.size(36.dp))
+                            Text(stringResource(R.string.record_start), fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                     Row(Modifier.fillMaxWidth(.76f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        NavigationAction(R.drawable.ic_records, R.string.recordings_title,
+                        NavigationAction(R.drawable.ic_records, R.string.recordings_action,
                             categoryStyle("MEMO"), onRecordings, Modifier.weight(1f))
                         NavigationAction(R.drawable.ic_settings, R.string.settings_title,
                             categoryStyle("TRAVEL"), onSettings, Modifier.weight(1f))
@@ -133,9 +135,12 @@ private fun NavigationAction(icon: Int, label: Int, style: CategoryStyle, onClic
     Button(onClick, modifier.heightIn(min = 48.dp),
         colors = ButtonDefaults.buttonColors(containerColor = style.surface, contentColor = WatchColors.Text),
         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)) {
-        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically) {
             Icon(painterResource(icon), null, Modifier.size(20.dp), tint = style.accent)
-            Text(stringResource(label), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+            Spacer(Modifier.width(5.dp))
+            Text(stringResource(label), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center, modifier = Modifier.weight(1f, fill = false))
         }
     }
 }
@@ -148,10 +153,17 @@ fun RecordingsScreen(
     notice: String?,
     onOpenRecording: (RecordingItem) -> Unit
 ) {
-    val transformation = rememberTransformationSpec()
-    ScreenScaffold(scrollState = listState, timeText = {
-        if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText()
-    }, contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 36.dp, bottom = 48.dp)) { padding ->
+    val transformation = rememberTransformationSpec(
+        ResponsiveTransformationSpec.smallScreen(minTransitionAreaHeightFraction = .10f,
+            maxTransitionAreaHeightFraction = .20f, contentAlpha = TransformationVariableSpec(1f),
+            containerAlpha = TransformationVariableSpec(1f), scale = TransformationVariableSpec(.95f)),
+        ResponsiveTransformationSpec.largeScreen(minTransitionAreaHeightFraction = .10f,
+            maxTransitionAreaHeightFraction = .20f, contentAlpha = TransformationVariableSpec(1f),
+            containerAlpha = TransformationVariableSpec(1f), scale = TransformationVariableSpec(.95f)))
+    val expanded = LocalDensity.current.fontScale > 1.3f
+    ScreenScaffold(scrollState = listState, timeText = {},
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp,
+            top = if (expanded) 36.dp else 30.dp, bottom = 32.dp)) { padding ->
         TransformingLazyColumn(state = listState, contentPadding = padding,
             modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text(stringResource(R.string.recordings_title), style = MaterialTheme.typography.titleMedium,
@@ -171,6 +183,7 @@ fun RecordingsScreen(
                     transformation = SurfaceTransformation(transformation))
             }
         }
+        if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText()
     }
 }
 
@@ -179,19 +192,24 @@ fun RecordingCard(item: RecordingItem, cloudEnabled: Boolean, onOpen: () -> Unit
     modifier: Modifier = Modifier, transformation: SurfaceTransformation? = null) {
     val context = LocalContext.current
     val category = categoryStyle(item.intentType)
+    val expanded = LocalDensity.current.fontScale > 1.3f
     Card(onClick = onOpen, modifier = modifier.fillMaxWidth(), transformation = transformation,
         colors = CardDefaults.cardColors(containerColor = category.surface),
-        contentPadding = PaddingValues(12.dp)) {
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             CategoryIcon(category)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(recordingTitle(context, item), style = MaterialTheme.typography.titleSmall,
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(recordingTitle(context, item), fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold,
                     maxLines = 2, overflow = TextOverflow.Ellipsis, color = WatchColors.Text)
-                Text(categoryLabel(context, item.intentType), color = category.accent, style = MaterialTheme.typography.labelSmall)
+                Text(categoryLabel(context, item.intentType), color = category.accent,
+                    fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold)
+                if (!expanded) RecordingMetadata(item, compact = true)
             }
         }
-        Spacer(Modifier.height(6.dp))
-        RecordingMetadata(item)
+        if (expanded) {
+            Spacer(Modifier.height(4.dp))
+            RecordingMetadata(item, compact = true)
+        }
         if ((cloudEnabled && item.syncStatus != "SYNCED") ||
             item.syncStatus in setOf("ACTION_REQUIRED", "CAPTURE_FAILED", "RECOVERY_REQUIRED")) {
             Text(recordingSyncLabel(context, item, cloudEnabled), style = MaterialTheme.typography.bodySmall,

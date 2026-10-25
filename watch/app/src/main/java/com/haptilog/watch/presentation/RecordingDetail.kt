@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.contentDescription
 import com.haptilog.watch.R
 import com.haptilog.watch.sync.CloudClient
 import androidx.compose.runtime.Composable
@@ -42,14 +43,19 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
+import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.IconButton
+import androidx.wear.compose.material3.IconButtonDefaults
 import androidx.compose.ui.res.painterResource
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.TimeText
@@ -167,19 +173,20 @@ fun RecordingDetailScreen(
     val audioAvailable = item.audioFile.isFile && item.audioFile.length() > 0
 
     val category = categoryStyle(item.intentType)
-    ScreenScaffold(scrollState = listState, timeText = {
-        if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText()
-    }) {
+    val heroAmount = expenseHeroAmount(context, item)
+    val expandedFont = LocalDensity.current.fontScale > 1.3f
+    ScreenScaffold(scrollState = listState, timeText = {}) {
         ScalingLazyColumn(
             state = listState,
             autoCentering = null,
-            contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp),
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = .95f, edgeAlpha = 1f),
+            contentPadding = PaddingValues(top = if (expandedFont) 36.dp else 30.dp, bottom = 48.dp),
             modifier = Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 16.dp)
                 .focusRequester(focus).focusable().onRotaryScrollEvent { event ->
                     scope.launch { listState.scrollBy(event.verticalScrollPixels) }; true
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             if (confirmingDelete) {
                 item { Text(stringResource(R.string.delete_confirm_title), fontSize = 18.sp,
@@ -195,37 +202,48 @@ fun RecordingDetailScreen(
                 // Separate items keep a large-font header from being centered under the clock.
                 item {
                     Row(Modifier.fillMaxWidth(0.94f), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Icon(painterResource(category.icon), null, modifier = Modifier.size(22.dp), tint = category.accent)
-                        Text(categoryLabel(context, item.intentType), fontSize = 12.sp, color = category.accent)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally)) {
+                        Icon(painterResource(category.icon), null, modifier = Modifier.size(18.dp), tint = category.accent)
+                        Text(categoryLabel(context, item.intentType), fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold, color = category.accent)
                     }
                 }
                 item {
-                    Text(recordingTitle(context, item), fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                    Text(recordingTitle(context, item), fontSize = 16.sp, lineHeight = 20.sp,
+                        fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
                         maxLines = 2, overflow = TextOverflow.Ellipsis, color = WatchColors.Text,
                         modifier = Modifier.fillMaxWidth(0.94f))
                 }
-                item { RecordingMetadata(item, Modifier.fillMaxWidth(0.94f)) }
+                if (heroAmount != null) item {
+                    ExpenseHero(item, heroAmount)
+                } else item {
+                    RecordingMetadata(item, Modifier.fillMaxWidth(0.94f), compact = true, centered = true)
+                }
                 item {
-                    DetailAction(enabled = audioAvailable, onClick = onTogglePlay,
-                        label = {
-                            Icon(painterResource(if (isPlaying) R.drawable.ic_stop else R.drawable.ic_play), null,
-                                Modifier.size(24.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(if (isPlaying) R.string.stop_playback else R.string.play_audio),
-                                fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = WatchColors.Record, contentColor = WatchColors.OnRecord))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                        val playLabel = stringResource(if (isPlaying) R.string.stop_playback else R.string.play_audio)
+                        IconButton(onClick = onTogglePlay, enabled = audioAvailable,
+                            modifier = Modifier.size(if (heroAmount != null) 48.dp else 52.dp)
+                                .semantics { contentDescription = playLabel },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = if (heroAmount != null) Color.Transparent else WatchColors.Record,
+                                contentColor = WatchColors.OnRecord)) {
+                            Box(Modifier.size(if (heroAmount != null) 28.dp else 52.dp)
+                                .background(WatchColors.Record, CircleShape), contentAlignment = Alignment.Center) {
+                                Icon(painterResource(if (isPlaying) R.drawable.ic_stop else R.drawable.ic_play), null,
+                                    Modifier.size(if (heroAmount != null) 18.dp else 28.dp))
+                            }
+                        }
+                        if (heroAmount != null) Text(recordingDuration(context, item.durationSeconds.toLong()),
+                            fontSize = 11.sp, color = WatchColors.Muted)
+                    }
                 }
                 if (!audioAvailable) item { Text(stringResource(R.string.audio_missing), color = WatchColors.Error, fontSize = 14.sp) }
                 notice?.let { message -> item { Text(message, fontSize = 14.sp, color = WatchColors.Error) } }
-                if (structured.isNotEmpty() && item.intentType == "EXPENSE") item {
-                    StructuredDetails(item, structured)
-                }
-                if (summary != null) item {
+                if (summary != null && heroAmount == null) item {
                     Column(Modifier.fillMaxWidth(0.9f)) {
                         DetailSection(stringResource(R.string.ai_summary), category.accent)
-                        Text(summary, fontSize = 14.sp, color = WatchColors.Text)
+                        Text(summary, fontSize = 13.sp, lineHeight = 17.sp, color = WatchColors.Text)
                     }
                 }
                 if (fullText != null) {
@@ -233,7 +251,8 @@ fun RecordingDetailScreen(
                         val expandedState = stringResource(if (transcriptExpanded) R.string.expanded else R.string.collapsed)
                         DetailAction(onClick = { transcriptExpanded = !transcriptExpanded },
                             modifier = Modifier.semantics { stateDescription = expandedState },
-                            label = { Text(stringResource(if (transcriptExpanded) R.string.hide_transcript else R.string.show_transcript), maxLines = Int.MAX_VALUE) })
+                            label = { Text(stringResource(if (transcriptExpanded) R.string.hide_transcript else R.string.show_transcript), maxLines = Int.MAX_VALUE,
+                                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) })
                     }
                     if (transcriptExpanded) item {
                         Column(Modifier.fillMaxWidth(0.9f)) {
@@ -246,9 +265,19 @@ fun RecordingDetailScreen(
                     Text(stringResource(R.string.no_enrichment), fontSize = 14.sp, color = WatchColors.Muted,
                         modifier = Modifier.fillMaxWidth(0.9f))
                 }
-                if (structured.isNotEmpty() && item.intentType != "EXPENSE") item {
-                    StructuredDetails(item, structured)
+                if (summary != null && heroAmount != null) item {
+                    Column(Modifier.fillMaxWidth(0.9f)) {
+                        DetailSection(stringResource(R.string.ai_summary), category.accent)
+                        Text(summary, fontSize = 13.sp, color = WatchColors.Text)
+                    }
                 }
+                item {
+                    Column(Modifier.fillMaxWidth(0.9f)) {
+                        DetailSection(stringResource(R.string.recorded_at))
+                        Text(recordingDate(context, item), fontSize = 12.sp, color = WatchColors.Muted)
+                    }
+                }
+                if (structured.isNotEmpty()) item { StructuredDetails(item, structured) }
                 if (hasMapLocation(item)) item {
                     DetailAction(onClick = onOpenMap,
                         label = { Text(stringResource(R.string.map_action), maxLines = Int.MAX_VALUE) })
@@ -275,13 +304,14 @@ fun RecordingDetailScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = WatchColors.Surface, contentColor = WatchColors.Error)) }
             }
         }
+        if (!listState.canScrollBackward && !listState.isScrollInProgress) TimeText()
     }
 }
 
 @Composable
 private fun DetailSection(label: String, color: Color = WatchColors.Muted) {
-    Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color,
-        modifier = Modifier.padding(bottom = 4.dp))
+    Text(label, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold, color = color,
+        modifier = Modifier.padding(bottom = 2.dp))
 }
 
 @Composable
@@ -297,5 +327,17 @@ private fun StructuredDetails(item: RecordingItem, lines: List<String>) {
                 fontWeight = if (isAmount) FontWeight.SemiBold else FontWeight.Normal,
                 color = if (isAmount) category.accent else WatchColors.Text)
         }
+    }
+}
+
+@Composable
+private fun ExpenseHero(item: RecordingItem, amount: String) {
+    val category = categoryStyle(item.intentType)
+    Column(Modifier.fillMaxWidth(0.94f).background(category.surface, RoundedCornerShape(20.dp))
+        .padding(horizontal = 14.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        val expenseCategory = (item.structuredData?.opt("category") as? String)?.trim()?.takeIf { it.isNotEmpty() }
+        Text(expenseCategory ?: stringResource(R.string.category_expense), fontSize = 11.sp,
+            lineHeight = 14.sp, color = WatchColors.Text, fontWeight = FontWeight.SemiBold)
+        Text(amount, fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, color = category.accent)
     }
 }

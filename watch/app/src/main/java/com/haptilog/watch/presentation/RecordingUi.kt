@@ -65,3 +65,21 @@ fun recordingDuration(context: Context, seconds: Long): String {
         else -> context.getString(R.string.duration_minutes_seconds, minutes, remainder)
     }.replace(' ', '\u00A0')
 }
+
+/** Localized hero presentation only; never infer won when the derived currency is absent/unknown. */
+fun expenseHeroAmount(context: Context, item: RecordingItem): String? {
+    if (item.intentType != "EXPENSE") return null
+    val data = item.structuredData ?: return null
+    val amount = (data.opt("amount") as? Number)?.toDouble() ?: return null
+    if (!amount.isFinite() || amount < 0) return null
+    val locale = context.resources.configuration.locales[0]
+    val formatted = java.text.NumberFormat.getNumberInstance(locale).apply {
+        maximumFractionDigits = 340
+    }.format(amount)
+    val currency = data.optString("currency").takeIf { it.matches(Regex("^[A-Z]{3}$")) }
+    return when {
+        currency == "KRW" && locale.language == "ko" -> context.getString(R.string.expense_amount_krw, formatted)
+        currency != null -> "$formatted $currency"
+        else -> formatted
+    }
+}

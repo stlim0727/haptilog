@@ -30,9 +30,9 @@ fun categoryStyle(intent: String?): CategoryStyle = when (intent) {
 @Composable
 fun CategoryIcon(style: CategoryStyle, modifier: Modifier = Modifier) {
     // Decorative: adjacent localized category text provides the accessible name.
-    Box(modifier.size(36.dp).background(style.accent, CircleShape), contentAlignment = Alignment.Center) {
+    Box(modifier.size(42.dp).background(style.accent, CircleShape), contentAlignment = Alignment.Center) {
         Icon(painterResource(style.icon), contentDescription = null,
-            tint = style.surface, modifier = Modifier.size(22.dp))
+            tint = style.surface, modifier = Modifier.size(25.dp))
     }
 }
 

@@ -16,8 +16,8 @@
     <string name="ai_summary">AI 요약</string>
     <string name="play_audio">재생</string>
     <string name="stop_playback">재생 중지</string>
-    <string name="show_transcript">전체 텍스트 보기</string>
-    <string name="hide_transcript">전체 텍스트 접기</string>
+    <string name="show_transcript">전문 보기</string>
+    <string name="hide_transcript">전문 접기</string>
     <string name="transcript_title">전체 텍스트</string>
     <string name="expanded">펼쳐짐</string>
     <string name="collapsed">접힘</string>
@@ -95,4 +95,7 @@
     <string name="duration_minutes">%1$d분</string>
     <string name="tile_record">녹음 시작</string>
     <string name="tile_recordings">기록 보기</string>
+    <string name="recorded_at">녹음 시각</string>
+    <string name="expense_amount_krw">%1$s원</string>
+    <string name="recordings_action">기록</string>
 </resources>

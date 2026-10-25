@@ -18,7 +18,7 @@ for i,(kind,title,data) in enumerate(fixtures):
 hashes=sh('run-as',PKG,'sha256sum',*[f'files/recordings/{prefix}_{rid}.{ext}' for rid in created for prefix,ext in [('rec','m4a'),('meta','json')]])
 (OUT/'source-hashes.txt').write_text(hashes)
 sh('am','force-stop',PKG);launch();click('기록',False);cap('list-travel-workout-227-ko-1')
-click('기차표 예약');cap('detail-travel-227-ko-1');click('재생');cap('playing-227-ko-1');click('재생 중지',False);click('전체 텍스트 보기');cap('transcript-227-ko-1')
+click('기차표 예약');cap('detail-travel-227-ko-1');click('재생');cap('playing-227-ko-1');click('재생 중지',False);click('전문 보기');cap('transcript-227-ko-1')
 click('워치에서 삭제');cap('delete-confirm-227-ko-1');click('취소');back();cap('list-back-227-ko-1')
 assert hashes==sh('run-as',PKG,'sha256sum',*[f'files/recordings/{prefix}_{rid}.{ext}' for rid in created for prefix,ext in [('rec','m4a'),('meta','json')]])
 swipe();cap('list-memo-expense-227-ko-1');click('점심 식사');cap('detail-expense-227-ko-1')
