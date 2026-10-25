@@ -34,7 +34,9 @@ import java.util.Locale
 fun CaptureScreen(
     isRecording: Boolean,
     elapsedSeconds: Long,
+    isPaused: Boolean = false,
     onToggleRecording: () -> Unit,
+    onTogglePause: () -> Unit = {},
     onRecordings: () -> Unit,
     onSettings: () -> Unit
 ) {
@@ -51,12 +53,36 @@ fun CaptureScreen(
                 ScalingLazyColumn(state = state, autoCentering = null,
                     contentPadding = PaddingValues(start = sidePadding, end = sidePadding, top = 36.dp, bottom = 48.dp),
                     modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item { Text(stringResource(if (isRecording) R.string.recording_state else R.string.app_name),
+                    item { Text(stringResource(if (isPaused) R.string.recording_paused else if (isRecording) R.string.recording_state else R.string.app_name),
                         textAlign = TextAlign.Center) }
-                    item { CaptureAction(isRecording, onToggleRecording, Modifier.fillMaxWidth()) }
                     if (isRecording) {
+                        item {
+                            val pauseResumeLabel = stringResource(if (isPaused) R.string.record_resume else R.string.record_pause)
+                            Button(
+                                onClick = onTogglePause,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (isPaused) WatchColors.Record else Color(0xFF262626),
+                                    contentColor = if (isPaused) WatchColors.OnRecord else Color.White
+                                ),
+                                modifier = Modifier.fillMaxWidth().height(48.dp).semantics { contentDescription = pauseResumeLabel }
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Icon(
+                                        painterResource(if (isPaused) R.drawable.ic_play else R.drawable.ic_pause),
+                                        null,
+                                        Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        stringResource(if (isPaused) R.string.record_resume else R.string.record_pause),
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                        item { CaptureAction(isRecording, onToggleRecording, Modifier.fillMaxWidth()) }
                         item { ElapsedTime(elapsedSeconds, 30) }
                     } else {
+                        item { CaptureAction(isRecording, onToggleRecording, Modifier.fillMaxWidth()) }
                         item { NavigationAction(R.drawable.ic_records, R.string.recordings_action,
                             categoryStyle("MEMO"), onRecordings, Modifier.fillMaxWidth()) }
                         item { NavigationAction(R.drawable.ic_settings, R.string.settings_title,
@@ -66,23 +92,68 @@ fun CaptureScreen(
             }
         } else if (isRecording) {
             ScreenScaffold {
-                Column(Modifier.fillMaxSize().padding(top = 44.dp, bottom = 58.dp),
+                Column(Modifier.fillMaxSize().padding(top = 38.dp, bottom = 64.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center) {
+                    val badgeColor = if (isPaused) Color(0xFFF2B705) else WatchColors.Record
+                    val statusText = stringResource(if (isPaused) R.string.recording_paused else R.string.recording_state)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(Modifier.size(7.dp).background(WatchColors.Record, CircleShape))
-                        Text(stringResource(R.string.recording_state), color = WatchColors.Record,
+                        Box(Modifier.size(7.dp).background(badgeColor, CircleShape))
+                        Text(statusText, color = badgeColor,
                             style = MaterialTheme.typography.labelMedium)
                     }
                     Spacer(Modifier.height(8.dp))
-                    ElapsedTime(elapsedSeconds, if (compact) 36 else 44)
+                    ElapsedTime(elapsedSeconds, if (compact) 36 else 42)
                 }
-                val stopLabel = stringResource(R.string.record_stop_accessibility)
-                EdgeButton(onClick = onToggleRecording,
-                    modifier = Modifier.align(Alignment.BottomCenter).semantics { contentDescription = stopLabel }) {
-                    Icon(painterResource(R.drawable.ic_stop), null, Modifier.size(22.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.record_stop))
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = if (compact) 8.dp else 12.dp)
+                        .fillMaxWidth(0.92f),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
+                ) {
+                    val pauseResumeLabel = stringResource(if (isPaused) R.string.record_resume else R.string.record_pause)
+                    Button(
+                        onClick = onTogglePause,
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (isPaused) WatchColors.Record else Color(0xFF262626),
+                            contentColor = if (isPaused) WatchColors.OnRecord else Color.White
+                        ),
+                        modifier = Modifier.weight(1f).height(48.dp).semantics { contentDescription = pauseResumeLabel }
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(
+                                painterResource(if (isPaused) R.drawable.ic_play else R.drawable.ic_pause),
+                                null,
+                                Modifier.size(16.dp)
+                            )
+                            Text(
+                                stringResource(if (isPaused) R.string.record_resume else R.string.record_pause),
+                                fontSize = 11.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    val stopLabel = stringResource(R.string.record_stop_accessibility)
+                    Button(
+                        onClick = onToggleRecording,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isPaused) Color(0xFF262626) else WatchColors.Record,
+                            contentColor = if (isPaused) Color.White else WatchColors.OnRecord
+                        ),
+                        modifier = Modifier.weight(1f).height(48.dp).semantics { contentDescription = stopLabel }
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Icon(painterResource(R.drawable.ic_stop), null, Modifier.size(16.dp))
+                            Text(
+                                stringResource(R.string.record_stop),
+                                fontSize = 11.sp,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
             }
         } else {

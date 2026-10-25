@@ -48,6 +48,25 @@ class HapticHeartbeatManager(private val context: Context) {
     }
 
     /**
+     * Pause feedback: 2 gentle discrete ticks confirming recording has paused.
+     */
+    fun playPauseFeedback() {
+        heartbeatJob?.cancel()
+        heartbeatJob = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && vibrator?.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK) == true) {
+            val effect = VibrationEffect.startComposition()
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 0.45f)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 0.45f, 70)
+                .compose()
+            vibrator.vibrate(effect)
+        } else {
+            val timings = longArrayOf(0, 25, 45, 25)
+            val amplitudes = intArrayOf(0, 80, 0, 80)
+            vibrator?.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+        }
+    }
+
+    /**
      * Stop & Seal feedback: "딸깍" mechanical closure.
      * Initial acknowledgment click (0.7f) followed 80ms later by a decisive
      * sealing click (1.0f) confirming recording is safely committed to disk.
