@@ -58,7 +58,14 @@
     <string name="merchant_label">상인</string>
     <string name="category_label">카테고리</string>
     <string name="notes_label">메모</string>
-    <string name="connection_group">연결</string>
+    <string name="connection_group">연결 및 동기화</string>
+    <string name="haptics_group">햅틱 및 센서</string>
+    <string name="haptic_intensity_title">박동 진동 세기</string>
+    <string name="haptic_intensity_hint">녹음 중 전달되는 쿵-쾅 박동 강도</string>
+    <string name="haptic_intensity_off">끄기</string>
+    <string name="haptic_intensity_light">약하게</string>
+    <string name="haptic_intensity_medium">보통 (기본)</string>
+    <string name="haptic_intensity_strong">강하게</string>
     <string name="help_group">도움말 및 개인정보</string>
     <string name="about_group">앱 정보</string>
     <string name="cloud_sync_title">클라우드 동기화</string>

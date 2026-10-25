@@ -33,6 +33,9 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.*
 import com.haptilog.watch.BuildConfig
+import com.haptilog.watch.data.HapticIntensity
+import com.haptilog.watch.data.HapticPreferences
+import com.haptilog.watch.service.HapticHeartbeatManager
 import com.haptilog.watch.support.AppReports
 import com.haptilog.watch.support.ReportUploadWorker
 import com.haptilog.watch.sync.CloudConsent
@@ -53,6 +56,8 @@ class SettingsActivity : ComponentActivity() {
                 val focus = remember { FocusRequester() }
                 var cloud by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
                 var crashes by remember { mutableStateOf(AppReports.crashReportsEnabled(this)) }
+                var hapticIntensity by remember { mutableStateOf(HapticPreferences.getIntensity(this)) }
+                val hapticManager = remember { HapticHeartbeatManager(this) }
                 var consenting by rememberSaveable { mutableStateOf(false) }
                 var reporting by rememberSaveable { mutableStateOf(false) }
                 var description by rememberSaveable { mutableStateOf("") }
@@ -140,10 +145,6 @@ class SettingsActivity : ComponentActivity() {
                             }
                             item { FlexibleChip(enabled = !busy, onClick = { reporting = false; notice = null }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.cancel_action)) }) }
                         } else {
-                            item { FlexibleChip(onClick = {
-                                startActivity(Intent(this@SettingsActivity, LocationJournalActivity::class.java))
-                            }, label = { Text(stringResource(R.string.location_journal_title), maxLines = Int.MAX_VALUE) },
-                                secondaryLabel = { Text(stringResource(R.string.location_journal_hint), maxLines = Int.MAX_VALUE) }) }
                             item { SettingsSection(stringResource(R.string.connection_group)) }
                             item {
                                 ToggleChip(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp),
@@ -172,6 +173,20 @@ class SettingsActivity : ComponentActivity() {
                                     secondaryLabel = { Text(stringResource(R.string.web_access_hint), maxLines = Int.MAX_VALUE) },
                                     icon = { Icon(painterResource(R.drawable.ic_link), null, Modifier.size(22.dp), tint = Color(0xFFA8D8FF)) })
                             }
+                            item { SettingsSection(stringResource(R.string.haptics_group)) }
+                            item {
+                                FlexibleChip(onClick = {
+                                    val next = hapticIntensity.next()
+                                    HapticPreferences.setIntensity(this@SettingsActivity, next)
+                                    hapticIntensity = next
+                                    hapticManager.playPreviewPulse(next)
+                                }, label = { Text(stringResource(R.string.haptic_intensity_title), maxLines = Int.MAX_VALUE) },
+                                    secondaryLabel = { Text(stringResource(hapticIntensity.labelRes), maxLines = Int.MAX_VALUE) })
+                            }
+                            item { FlexibleChip(onClick = {
+                                startActivity(Intent(this@SettingsActivity, LocationJournalActivity::class.java))
+                            }, label = { Text(stringResource(R.string.location_journal_title), maxLines = Int.MAX_VALUE) },
+                                secondaryLabel = { Text(stringResource(R.string.location_journal_hint), maxLines = Int.MAX_VALUE) }) }
                             item { FlexibleChip(onClick = {
                                 startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                                     .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))
@@ -202,12 +217,12 @@ class SettingsActivity : ComponentActivity() {
                                 }, label = { Text("Retry reports ($queued)", maxLines = Int.MAX_VALUE) })
                             }
                             item { SettingsSection(stringResource(R.string.about_group)) }
-                            item { Text(stringResource(R.string.build_info, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                                fontSize = 12.sp, color = WatchColors.Muted) }
                             item { FlexibleChip(onClick = {
                                 try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))) }
                                 catch (_: ActivityNotFoundException) { notice = "Play Store unavailable on this watch." }
                             }, label = { Text(stringResource(R.string.store_action), maxLines = Int.MAX_VALUE) }) }
+                            item { Text(stringResource(R.string.build_info, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                                fontSize = 12.sp, color = WatchColors.Muted) }
                         }
                         if (!CloudClient.configured) item { Text("Reporting needs cloud configuration.", fontSize = 12.sp, textAlign = TextAlign.Center) }
                         item { Spacer(Modifier.height(24.dp)) }
