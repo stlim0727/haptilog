@@ -98,4 +98,7 @@
     <string name="recorded_at">Recorded at</string>
     <string name="expense_amount_krw">%1$s KRW</string>
     <string name="recordings_action">Records</string>
+    <string name="recording_stage_saved">Recording saved</string>
+    <string name="recording_stage_uploaded">Audio uploaded</string>
+    <string name="recording_stage_enriched">AI analysis complete</string>
 </resources>

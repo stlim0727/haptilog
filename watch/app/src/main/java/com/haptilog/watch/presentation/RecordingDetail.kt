@@ -282,7 +282,9 @@ fun RecordingDetailScreen(
                     DetailAction(onClick = onOpenMap,
                         label = { Text(stringResource(R.string.map_action), maxLines = Int.MAX_VALUE) })
                 }
-                item { Text(recordingSyncLabel(context, item, cloudEnabled), fontSize = 12.sp, color = WatchColors.Muted) }
+                item { Text(listOfNotNull(recordingStageLabel(context, item),
+                    recordingSyncLabel(context, item, cloudEnabled).takeIf { item.syncStatus != "SYNCED" })
+                    .joinToString(" · "), fontSize = 12.sp, color = WatchColors.Muted) }
                 if (item.syncStatus == "ACTION_REQUIRED") item {
                     DetailAction(enabled = cloudEnabled, onClick = onRetry,
                         label = { Text(stringResource(R.string.retry_action), maxLines = Int.MAX_VALUE) })

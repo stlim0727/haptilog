@@ -98,4 +98,7 @@
     <string name="recorded_at">녹음 시각</string>
     <string name="expense_amount_krw">%1$s원</string>
     <string name="recordings_action">기록</string>
+    <string name="recording_stage_saved">녹음 저장됨</string>
+    <string name="recording_stage_uploaded">음성 업로드됨</string>
+    <string name="recording_stage_enriched">AI 분석 완료</string>
 </resources>

@@ -22,6 +22,14 @@ fun categoryLabel(context: Context, intent: String?): String = context.getString
     else -> R.string.category_pending
 })
 
+/** Upload is a durable checkpoint; SYNCED is written only after enrichment succeeds. */
+fun recordingStageLabel(context: Context, item: RecordingItem): String? = when {
+    item.status != "COMPLETED" || item.syncStatus in setOf("CAPTURE_FAILED", "RECOVERY_REQUIRED") -> null
+    item.syncStatus == "SYNCED" -> context.getString(R.string.recording_stage_enriched)
+    item.uploaded -> context.getString(R.string.recording_stage_uploaded)
+    else -> context.getString(R.string.recording_stage_saved)
+}
+
 fun recordingSyncLabel(context: Context, item: RecordingItem, cloudEnabled: Boolean): String {
     if (!cloudEnabled && item.syncStatus in setOf("PENDING_SYNC", "SYNCING")) return context.getString(R.string.local_only)
     return context.getString(when (item.syncStatus) {
