@@ -29,3 +29,9 @@ Smartwatch voice recorders require the user to look at the screen to verify reco
   - AMOLED True Black canvas (`#000000`) with no decorative emojis.
   - 1px Edge Luminance subtle breathing ring replacing disruptive expanding blob animations.
   - Clean typographic hierarchy and micro-index dots for semantic categorization.
+
+## 4. Optional Location Journal
+
+Users can explicitly start a location journal from watch settings, save named GPS places, and review filtered movement, arrival/departure, and sustained-stay records on the watch. This session continues independently of voice recording and displays an ongoing notification with a stop action. Location accuracy and sampling frequency limit event precision; this is a personal history feature, not a safety or emergency monitoring service.
+
+The journal is off until the user starts it. Its data remains on the watch, including when voice-recording cloud sync is enabled. It does not provide remote child tracking, family accounts, Bluetooth beacon scanning, or location sharing. The [location journal design](location-journal.md) defines the supported scope and acceptance criteria.

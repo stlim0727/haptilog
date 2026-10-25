@@ -106,7 +106,7 @@
       <header>
         <h1>HaptiLog Privacy Policy</h1>
         <div class="meta">
-          <strong>Effective Date:</strong> October 18, 2026 &bull;
+          <strong>Effective Date:</strong> October 25, 2026 &bull;
           <strong>Application:</strong> HaptiLog for Wear OS (<code>com.haptilog.watch</code>) &amp; Web Portal
         </div>
       </header>
@@ -130,11 +130,13 @@
 
       <h3>B. Location Data (GPS)</h3>
       <p>
-        When location permission is granted, HaptiLog captures a single geographic snapshot (latitude, longitude, altitude, and velocity) at the moment of recording.
+        When location permission is granted, HaptiLog captures a geographic snapshot (latitude, longitude, altitude, and velocity) during voice recording. You can also choose to start a separate location journal from watch settings.
       </p>
       <ul>
         <li><strong>Purpose:</strong> Geotagging your voice memos (e.g. marking where an expense was incurred, field notes taken, or running intervals logged).</li>
-        <li><strong>Scope:</strong> Location capture runs exclusively during active recording sessions and stops immediately when recording terminates. We do not track your real-time location outside active recording sessions.</li>
+        <li><strong>Voice-memo location:</strong> Snapshot acquisition ends when voice recording stops. Saved location metadata may be uploaded to Supabase with the recording if you enable cloud sync.</li>
+        <li><strong>Optional location journal:</strong> Off until you explicitly start it, grant precise location access, and enable notifications. During a journal session, the app periodically obtains locations even when the watch screen is off, displays an ongoing location notification, and offers a stop action. Sessions stop after at most eight hours and do not automatically restart after app process death or reboot. The journal saves filtered points with timestamps and accuracy, named places you create, and derived arrival, departure, and dwell events. Using the place editor's current-location action also obtains a location to fill the place's coordinates.</li>
+        <li><strong>Local-only journal:</strong> Journal points, place definitions, and events stay in private watch storage. They are not uploaded to Supabase or Gemini, including when voice-recording cloud sync is enabled. The journal does not provide remote tracking or sharing.</li>
       </ul>
 
       <h3>C. Optional Diagnostic &amp; Crash Reports</h3>
@@ -167,6 +169,7 @@
         <li><strong>Local Deletion:</strong> Deleting a recording on the watch removes its local files. It does not delete an already uploaded cloud copy. Revoking a browser connection removes its future access, but does not delete cloud recordings or copies already downloaded.</li>
         <li><strong>Cloud Consent:</strong> When you enable cloud features, we record your adult declaration, consent version, and consent/withdrawal time against your anonymous cloud identity. This is optional and is not a date-of-birth or identity check.</li>
         <li><strong>Retention:</strong> Local recordings remain until you delete them or remove the app's data. Cloud recordings, location snapshots, transcripts, summaries, and corrections remain until permanently deleted through the portal or removed following a verified request. Moving a recording to Trash is reversible and does not delete its stored audio. Support and crash reports are retained for troubleshooting and manually removed when no longer needed; there is no automatic 90-day deletion schedule.</li>
+        <li><strong>Location journal retention:</strong> Journal history is stored separately from audio, with up to seven days of history and limits of 2,000 location points and 500 events. Older entries are removed when you access or start the journal or it saves observations; deletion is not scheduled for the exact expiration time while the journal is unused. Saved places remain until you remove them. You can clear journal history and remove saved places on the watch. Clearing the app's data or uninstalling it also removes these local records. Cloud deletion requests do not access local journal records.</li>
       </ul>
 
       <h3 id="delete-data">Request deletion of HaptiLog cloud data</h3>
@@ -177,8 +180,8 @@
       <h2>4. Permissions Used by HaptiLog</h2>
       <ul>
         <li><code>RECORD_AUDIO</code>: Capturing voice memos initiated by the user.</li>
-        <li><code>ACCESS_FINE_LOCATION</code> &amp; <code>ACCESS_COARSE_LOCATION</code>: Geotagging memos with location coordinates at recording time.</li>
-        <li><code>FOREGROUND_SERVICE_MICROPHONE</code> &amp; <code>FOREGROUND_SERVICE_LOCATION</code>: Maintaining uninterrupted recording with an ongoing status notification while the watch screen enters ambient sleep mode.</li>
+        <li><code>ACCESS_FINE_LOCATION</code> &amp; <code>ACCESS_COARSE_LOCATION</code>: Geotagging memos and obtaining locations during explicitly started journal sessions. Precise location improves place and dwell detection.</li>
+        <li><code>FOREGROUND_SERVICE_MICROPHONE</code> &amp; <code>FOREGROUND_SERVICE_LOCATION</code>: Continuing user-started voice recording or the separate location journal with ongoing status notifications while the watch screen is off.</li>
         <li><code>VIBRATE</code>: Providing tactile living pulse feedback during recording.</li>
         <li><code>WAKE_LOCK</code>: Keeping the CPU awake strictly during active recording.</li>
       </ul>

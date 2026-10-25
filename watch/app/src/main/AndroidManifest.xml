@@ -40,6 +40,7 @@
 
         <!-- Main Wear OS UI Activity -->
         <activity android:name=".presentation.SettingsActivity" android:exported="false" />
+        <activity android:name=".presentation.LocationJournalActivity" android:exported="false" android:taskAffinity="" />
         <activity android:name=".presentation.WebAccessActivity" android:exported="false" />
         <activity
             android:name=".presentation.MainActivity"
@@ -58,6 +59,12 @@
             android:name=".service.VoiceRecordingService"
             android:exported="false"
             android:foregroundServiceType="microphone|location" />
+
+        <!-- Explicitly started, visible location journal; never restarted automatically. -->
+        <service
+            android:name=".service.LocationTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <!-- Wear OS Quick Launch Tile -->
         <service
