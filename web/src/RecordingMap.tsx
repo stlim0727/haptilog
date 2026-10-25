@@ -10,12 +10,14 @@ export default function RecordingMap({
   onSelect,
   className,
   showRoute = true,
+  lang = "en",
 }: {
   recordings: Recording[];
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
   className?: string;
   showRoute?: boolean;
+  lang?: "ko" | "en";
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -127,7 +129,9 @@ export default function RecordingMap({
       }
       marker.bindPopup(popup);
       marker.on("click", () => {
-        if (entries.length === 1) selection.current(first.id);
+        selection.current(first.id);
+        // Selecting an already highlighted place should still reveal its records.
+        marker.openPopup();
       });
     }
     if (initialBounds.current !== locations) {
@@ -171,22 +175,15 @@ export default function RecordingMap({
         />
       ) : (
         <p className="map-empty">
-          No saved locations in this selection. Recordings without GPS are
-          still available in the list.
+          {lang === "ko" ? "선택한 기록에 저장된 위치가 없어요. 위치 없는 기록도 목록에서 볼 수 있어요." : "No saved locations in this selection. Recordings without GPS are still available in the list."}
         </p>
       )}
       <p className="map-caption">
-        {located.length} of {recordings.length} recordings have a saved
-        location.{" "}
-        {recordings.length - located.length > 0 &&
-          "Others remain in the list."}{" "}
-        Map tiles load from OpenStreetMap. No recording audio or text is sent
-        to the map provider.
+        {lang === "ko" ? `${recordings.length}개 중 ${located.length}개 기록에 위치가 저장되어 있어요. 지도는 OpenStreetMap에서 불러오며 음성과 텍스트는 지도 제공자에게 보내지 않아요.` : `${located.length} of ${recordings.length} recordings have a saved location. Others remain in the list. Map tiles load from OpenStreetMap. No recording audio or text is sent to the map provider.`}
       </p>
       {tileError && (
         <p role="status" className="map-caption">
-          Map tiles could not be loaded. Pins and the recording list are still
-          available.
+          {lang === "ko" ? "지도 배경을 불러오지 못했어요. 핀과 기록 목록은 계속 사용할 수 있어요." : "Map tiles could not be loaded. Pins and the recording list are still available."}
         </p>
       )}
     </>

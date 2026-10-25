@@ -28,6 +28,7 @@ import {
   Watch,
 } from "lucide-react";
 import { supabase } from "./client";
+import { MobileWorkspace } from "./MobileWorkspace";
 import { NotionExport } from "./NotionExport";
 import { TranscriptEditor } from "./TranscriptEditor";
 import { purgeRecordings } from "./purge";
@@ -52,6 +53,7 @@ import type { Correction, Recording } from "./domain";
 import { translations, getInitialLanguage } from "./i18n";
 import type { Language, TranslationKeys } from "./i18n";
 import "./style.css";
+import "./mobile.css";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
@@ -81,6 +83,18 @@ function Brand() {
   );
 }
 function App() {
+  const [draftInProgress, setDraftInProgress] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 700px)").matches);
+  useEffect(() => {
+    // Rotating/resizing must not unmount an editor with unsaved changes.
+    if (draftInProgress || mobileDetailOpen) return;
+    const query = window.matchMedia("(max-width: 700px)");
+    setMobile(query.matches);
+    const update = () => setMobile(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, [draftInProgress, mobileDetailOpen]);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState("");
@@ -99,6 +113,7 @@ function App() {
   const [stripDateKey, setStripDateKey] = useState<string>("ALL");
   const [lang, setLang] = useState<Language>(getInitialLanguage);
   const t = translations[lang];
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
   function toggleLang() {
     const next = lang === "en" ? "ko" : "en";
@@ -539,6 +554,14 @@ function App() {
             </div>
           </section>
         </main>
+      ) : mobile ? (
+        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} loaded={loaded} truncated={truncated}
+          date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
+          summary={summary} count={dateFilteredActiveRecords.length} seconds={totalSeconds} lastChecked={lastChecked}
+          lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
+          renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
+            onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
+            lang={lang} t={t} onDirtyChange={onDirtyChange} />} />
       ) : (
         <main className="workspace">
           <div className="page-heading">
@@ -663,6 +686,7 @@ function App() {
                 className={viewMode === "calendar" ? "active" : ""}
                 onClick={() => {
                   if (category === "Trash") setCategory("All");
+                  setSelected(null);
                   setViewMode("calendar");
                 }}
               >
@@ -792,6 +816,8 @@ function App() {
                 }
               }}
               t={t}
+              lang={lang}
+              onDateChange={() => setSelected(null)}
             />
           ) : (
             <div className="review-layout">
@@ -917,6 +943,7 @@ function App() {
                   key={`${active.id}:${connection.session_id}`}
                   recording={active}
                   onChange={load}
+                  onDirtyChange={setDraftInProgress}
                   onError={setError}
                   onMoveToTrash={moveToTrash}
                   onRestore={restoreRecording}
@@ -944,12 +971,13 @@ function App() {
           </div>
           )}
 
-          {viewMode !== "list" && active && (
+          {viewMode !== "list" && active && (viewMode !== "calendar" || selected === active.id) && (
             <section className="inspector" style={{ marginTop: "24px" }} aria-label="Selected recording details">
               <Inspector
                 key={active.id}
                 recording={active}
                 onChange={load}
+                onDirtyChange={setDraftInProgress}
                 onError={setError}
                 onMoveToTrash={moveToTrash}
                 onRestore={restoreRecording}
@@ -985,6 +1013,7 @@ function Inspector({
   onDeletePermanently,
   lang,
   t,
+  onDirtyChange,
 }: {
   recording: Recording;
   onChange: () => Promise<void>;
@@ -994,6 +1023,7 @@ function Inspector({
   onDeletePermanently: (id: string) => Promise<void>;
   lang: Language;
   t: TranslationKeys;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const e = latest(r),
     x = expense(r),
@@ -1007,6 +1037,8 @@ function Inspector({
   const [merchant, setMerchant] = useState(x?.merchant ?? "");
   const [category, setCategory] = useState(x?.category ?? "");
   const [dirty, setDirty] = useState(false);
+  const [transcriptDirty, setTranscriptDirty] = useState(false);
+  useEffect(() => { onDirtyChange?.(dirty || transcriptDirty || saving); }, [dirty, transcriptDirty, saving, onDirtyChange]);
   const player = useRef<HTMLAudioElement>(null);
   const objectUrl = useRef("");
   const mounted = useRef(true);
@@ -1253,7 +1285,7 @@ function Inspector({
               ? (lang === "ko" ? "사용자 편집 · 원본 보존" : "Edited · original preserved")
               : t.transcript_note}</span>
           </div>
-          <TranscriptEditor recording={r} lang={lang} onChange={onChange} onError={onError} />
+          <TranscriptEditor recording={r} lang={lang} onChange={onChange} onError={onError} onDirtyChange={setTranscriptDirty} />
           {x && (
             <form
               className="expense-form"

@@ -6,21 +6,25 @@ import {
   MapPin,
   Clock,
 } from "lucide-react";
-import { CategoryBadge, CategoryIcon } from "./TimelineView";
+import { CategoryBadge } from "./TimelineView";
 import { expense, hasLocation, latest, localDate, money, toLocalDateString } from "./domain";
 import type { Recording } from "./domain";
-import type { translations } from "./i18n";
+import type { TranslationKeys } from "./i18n";
 
 export default function CalendarView({
   recordings,
   selectedId,
   onSelect,
   t,
+  lang = "en",
+  onDateChange,
 }: {
+  lang?: "en" | "ko";
+  onDateChange?: () => void;
   recordings: Recording[];
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
-  t: (typeof translations)["en"] | (typeof translations)["ko"];
+  t: TranslationKeys;
 }) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => toLocalDateString());
@@ -43,13 +47,20 @@ export default function CalendarView({
   const prevMonthDays = new Date(year, month, 0).getDate();
 
   const prevMonth = () => {
-    setCurrentDate(new Date(year, month - 1, 1));
+    onDateChange?.();
+    const next = new Date(year, month - 1, 1);
+    setCurrentDate(next);
+    setSelectedDateKey(toLocalDateString(next));
   };
   const nextMonth = () => {
-    setCurrentDate(new Date(year, month + 1, 1));
+    onDateChange?.();
+    const next = new Date(year, month + 1, 1);
+    setCurrentDate(next);
+    setSelectedDateKey(toLocalDateString(next));
   };
   const goToday = () => {
     const now = new Date();
+    onDateChange?.();
     setCurrentDate(now);
     setSelectedDateKey(toLocalDateString(now));
   };
@@ -92,7 +103,7 @@ export default function CalendarView({
 
   const selectedDayRecordings = dateMap.get(selectedDateKey) ?? [];
 
-  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekdays = lang === "ko" ? ["일", "월", "화", "수", "목", "금", "토"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
     <div className="calendar-view-container">
@@ -153,13 +164,18 @@ export default function CalendarView({
             );
 
             return (
-              <div
+              <button
+                type="button"
                 key={idx}
+                disabled={!cell.isCurrentMonth}
+                aria-label={cell.isCurrentMonth ? t.selected_date_recordings(cell.dateKey, list.length) : undefined}
+                aria-pressed={isSelected}
+                aria-current={isToday ? "date" : undefined}
                 className={`calendar-cell ${!cell.isCurrentMonth ? "other-month" : ""} ${
                   isSelected ? "selected-day" : ""
                 } ${isToday ? "today-cell" : ""}`}
                 onClick={() => {
-                  if (cell.isCurrentMonth) setSelectedDateKey(cell.dateKey);
+                  if (cell.isCurrentMonth) { setSelectedDateKey(cell.dateKey); onDateChange?.(); }
                 }}
               >
                 <div className="calendar-cell-top">
@@ -177,7 +193,7 @@ export default function CalendarView({
                   {categories.has("memo") && <span className="cat-dot dot-memo" title="메모" />}
                   {categories.has("voice") && <span className="cat-dot dot-voice" title="음성" />}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -194,6 +210,12 @@ export default function CalendarView({
         {selectedDayRecordings.length === 0 ? (
           <div className="calendar-empty-day">
             <p>{t.no_recordings_on_date}</p>
+            {recordings.length > 0 && <button className="text-button" onClick={() => {
+              const key = recordings.map(r => localDate(r.recorded_at)).sort().at(-1)!;
+              setSelectedDateKey(key);
+              setCurrentDate(new Date(`${key}T12:00:00`));
+              onDateChange?.();
+            }}>{lang === "ko" ? "최근 기록 날짜로 이동" : "Go to latest recording date"}</button>}
           </div>
         ) : (
           <div className="calendar-day-list">
@@ -203,8 +225,10 @@ export default function CalendarView({
               const isSelected = r.id === selectedId;
 
               return (
-                <div
+                <button
+                  type="button"
                   key={r.id}
+                  data-record-id={r.id}
                   className={`calendar-day-card ${isSelected ? "selected" : ""}`}
                   onClick={() => onSelect(r.id, true)}
                 >
@@ -239,7 +263,7 @@ export default function CalendarView({
                       <span className="no-gps-pill">{t.no_gps_badge}</span>
                     )}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

@@ -5,15 +5,17 @@ import { latest, transcript } from "./domain";
 
 type Revision = { id: number; created_at: string; before_value: { transcript?: string | null } | null; after_value: { transcript?: string | null } };
 
-export function TranscriptEditor({ recording, lang, onChange, onError }: {
+export function TranscriptEditor({ recording, lang, onChange, onError, onDirtyChange }: {
   recording: Recording; lang: "ko" | "en";
   onChange: () => Promise<void>; onError: (message: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const ko = lang === "ko";
   const current = transcript(recording);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(current);
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onDirtyChange?.((editing && draft !== current) || busy); }, [editing, draft, current, busy, onDirtyChange]);
   const [history, setHistory] = useState<Revision[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [originalOpen, setOriginalOpen] = useState(false);

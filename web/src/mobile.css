@@ -1,0 +1,560 @@
+/* Mobile review: one page scroll and an explicit detail destination. */
+.mobile-workspace [hidden] {
+  display: none !important;
+}
+.mobile-workspace {
+  max-width: 700px;
+  margin: auto;
+}
+.mobile-workspace main {
+  padding: 24px 20px 30px;
+}
+.mobile-workspace button,
+.mobile-workspace select,
+.mobile-workspace input {
+  min-height: 44px;
+}
+.mobile-workspace h1,
+.mobile-workspace h2,
+.mobile-record strong {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.mobile-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.mobile-heading > div {
+  min-width: 0;
+}
+.mobile-heading h1 {
+  font-size: 26px;
+  line-height: 1.35;
+  letter-spacing: -.8px;
+  margin-top: 6px;
+}
+.mobile-heading .eyebrow {
+  font-size: 10px;
+  color: #fb7185;
+}
+.mobile-icon {
+  display: inline-grid;
+  place-items: center;
+  min-width: 44px;
+  background: transparent;
+  color: #bfc0cd;
+  border-radius: 10px;
+}
+.mobile-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.mobile-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 20px 0 10px;
+}
+.mobile-toolbar .date-picker {
+  max-width: calc(100% - 52px);
+  min-width: 0;
+  padding: 0 12px;
+}
+.mobile-toolbar .date-picker select {
+  max-width: 100%;
+  min-width: 0;
+}
+.mobile-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  color: #a9abbc;
+  font-size: 12px;
+  margin-bottom: 20px;
+}
+.mobile-summary > span:last-child {
+  color: #f4f4f6;
+}
+.mobile-summary > span:last-child > span {
+  display: inline-block;
+}
+.mobile-note {
+  color: #a9abbc;
+  font-size: 12px;
+  margin: 8px 0 14px;
+}
+.mobile-views {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #30313e;
+  border-radius: 12px;
+  background: #171820;
+}
+.mobile-views button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  background: transparent;
+  border-radius: 8px;
+  color: #a9abbc;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 4px;
+}
+.mobile-views button[aria-current] {
+  background: #30303d;
+  color: #fff;
+}
+.mobile-views button[aria-current] svg {
+  color: #fb7185;
+}
+.mobile-search-row {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 20px;
+}
+.mobile-search {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.mobile-search svg {
+  position: absolute;
+  top: 14px;
+  left: 12px;
+  color: #a9abbc;
+}
+.mobile-search input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #30313e;
+  border-radius: 10px;
+  padding: 9px 10px 9px 38px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+}
+.mobile-search-row .secondary-button {
+  font-size: 13px;
+  padding: 8px 12px;
+  flex-shrink: 0;
+}
+.mobile-active-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #f7b1c0;
+  font-size: 12px;
+  margin-top: -10px;
+}
+.mobile-active-filter button {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: inherit;
+}
+.mobile-day-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin: 20px 0 11px;
+}
+.mobile-day-heading span {
+  color: #a9abbc;
+  font-size: 12px;
+  font-weight: 400;
+}
+.mobile-record {
+  display: block;
+  text-align: left;
+  width: 100%;
+  border: 1px solid #2b2c38;
+  background: #171820;
+  border-radius: 13px;
+  padding: 16px;
+  margin-bottom: 10px;
+}
+.mobile-record:hover {
+  border-color: #b54c66;
+}
+.mobile-record-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: #a9abbc;
+}
+.mobile-record strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+.mobile-record-foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #a9abbc;
+}
+.mobile-record-foot > svg:last-child {
+  margin-left: auto;
+}
+.mobile-record-foot .mobile-amount {
+  margin-left: auto;
+  color: #ffc49f;
+}
+.mobile-record-foot .mobile-amount + svg {
+  margin-left: 0;
+}
+.mobile-empty {
+  border: 1px dashed #30313e;
+  border-radius: 12px;
+  padding: 28px 16px;
+  text-align: center;
+}
+.mobile-empty h2 {
+  font-size: 17px;
+}
+.mobile-empty p {
+  margin-top: 10px;
+  color: #a9abbc;
+  font-size: 13px;
+}
+.mobile-sync {
+  font-size: 11px;
+  color: #a9abbc;
+  margin: 24px 0 12px;
+}
+.mobile-map-view h2 {
+  font-size: 18px;
+}
+.mobile-map-view .recording-map {
+  height: 270px;
+}
+.mobile-map-access {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #a9abbc;
+  gap: 8px;
+}
+.mobile-place-select {
+  display: block;
+  font-size: 13px;
+  margin: 12px 0;
+}
+.mobile-place-select select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border: 1px solid #30313e;
+  border-radius: 8px;
+  background: #171820;
+  color: inherit;
+}
+.mobile-workspace .mobile-detail {
+  padding: 0 0 24px;
+}
+.mobile-detail-nav {
+  position: sticky;
+  top: 0;
+  background: #0d0d12;
+  border-bottom: 1px solid #30313e;
+  padding: 10px 20px;
+  z-index: 10;
+}
+.mobile-detail-nav button {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #d4d5df;
+  font-size: 14px;
+}
+.mobile-detail .inspector {
+  padding: 24px 20px;
+}
+.mobile-detail .inspector h2 {
+  font-size: 25px;
+  line-height: 1.4;
+}
+.mobile-detail .inspector-top .eyebrow {
+  font-size: 10px;
+}
+.mobile-detail .inspector-top-actions {
+  flex-wrap: wrap;
+}
+.mobile-detail .audio-actions {
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.mobile-detail .audio-section {
+  margin-top: 24px;
+}
+.mobile-detail .analysis-note {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.mobile-detail .analysis-note .secondary-button {
+  font-size: 13px;
+}
+.mobile-detail .inspector input,
+.mobile-detail .inspector textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+.mobile-detail audio {
+  width: 100%;
+  min-width: 0;
+}
+.mobile-detail .context dl {
+  flex-wrap: wrap;
+}
+.mobile-dialog {
+  width: calc(100% - 32px);
+  max-width: 420px;
+  max-height: calc(100dvh - 40px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid #464253;
+  border-radius: 16px;
+  background: #191a23;
+  color: #f4f4f6;
+}
+.mobile-dialog::backdrop {
+  background: #030309b8;
+}
+.mobile-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 10px;
+}
+.mobile-dialog-heading h2 {
+  font-size: 20px;
+}
+.mobile-dialog > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  padding: 10px 0;
+}
+.mobile-dialog select {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid #535060;
+  background: #0f1017;
+  color: #fff;
+  border-radius: 9px;
+}
+.mobile-dialog .primary-button {
+  margin-top: 24px;
+  width: 100%;
+}
+@media (max-width: 700px) {
+  .topbar {
+    height: auto;
+    min-height: 68px;
+    flex-wrap: wrap;
+    padding: 12px 20px;
+    gap: 8px;
+  }
+  .top-right {
+    margin-left: auto;
+    flex-wrap: wrap;
+  }
+  .top-right .watch-label {
+    display: none;
+  }
+  .top-right > .icon-button {
+    display: none;
+  }
+  .lang-switch-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  body:has(.mobile-detail) > #root > .topbar {
+    display: none;
+  }
+  .pair-page {
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .pair-story {
+    order: 2;
+  }
+  .pair-story .eyebrow,
+  .pair-story h1,
+  .pair-story > p,
+  .pair-promises {
+    display: none;
+  }
+  .pair-card {
+    padding: 24px 20px;
+  }
+  .pair-card h2 {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+  .pair-card .code-input {
+    width: 100%;
+    min-width: 0;
+    font-size: 26px;
+    letter-spacing: .3em;
+    padding-left: .3em;
+  }
+  .pair-card label {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .pair-card .primary-button {
+    min-height: 48px;
+  }
+  .calendar-view-container {
+    min-width: 0;
+  }
+  .calendar-card {
+    padding: 12px 4px;
+    min-width: 0;
+  }
+  .calendar-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 8px;
+  }
+  .calendar-title-wrap {
+    gap: 6px;
+  }
+  .calendar-title-wrap h2 {
+    font-size: 17px;
+  }
+  .calendar-nav-buttons {
+    margin-left: auto;
+    gap: 0;
+  }
+  .calendar-nav-buttons .icon-button {
+    width: 36px;
+    min-width: 36px;
+    padding: 8px;
+  }
+  .calendar-grid {
+    gap: 0;
+    grid-template-columns: repeat(7,minmax(0,1fr));
+  }
+  .calendar-cell {
+    min-width: 0;
+    min-height: 48px;
+    padding: 6px 2px;
+    border: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background: transparent;
+  }
+  .calendar-cell-top {
+    justify-content: center;
+  }
+  .calendar-count-badge {
+    display: none;
+  }
+  .calendar-cell.selected-day {
+    box-shadow: inset 0 0 0 1px #fb7185;
+  }
+  .calendar-dots {
+    min-height: 4px;
+    gap: 2px;
+    justify-content: center;
+  }
+  .cat-dot {
+    width: 4px;
+    height: 4px;
+  }
+  .calendar-weekday {
+    font-size: 11px;
+  }
+  .calendar-day-panel {
+    padding: 16px 12px;
+    min-width: 0;
+  }
+  .calendar-day-list {
+    max-height: none;
+    overflow: visible;
+  }
+  .calendar-day-card {
+    text-align: left;
+    width: 100%;
+    min-width: 0;
+    color: inherit;
+  }
+  .calendar-day-card-header,
+  .calendar-card-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .calendar-card-title {
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+}
+@media (max-width: 350px) {
+  .topbar {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .brand {
+    font-size: 22px;
+  }
+  .mobile-workspace main {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .mobile-record {
+    padding: 14px;
+  }
+  .mobile-views button {
+    gap: 5px;
+  }
+  .mobile-summary {
+    font-size: 11px;
+  }
+  .mobile-detail .inspector {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .pair-page {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+.mobile-views button {
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}

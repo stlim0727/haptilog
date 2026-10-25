@@ -212,6 +212,8 @@ test("mobile layout keeps selection and send controls accessible", async ({ page
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page);
   await page.goto("/");
+  await page.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("button", { name: "Notion integration" }).click();
   const panel = page.getByRole("region", { name: "Notion export" });
   await panel.getByRole("button", { name: "Notion inbox", exact: false })
     .click();
