@@ -130,6 +130,18 @@ export function createAccessHandler(deps: Dependencies) {
       }
       if (!body || typeof body !== "object")
         return reply(400, { error: "Invalid request" });
+      if (body.action === "account") {
+        if (user.is_anonymous || !user.identities?.some((i) => i.provider === "google"))
+          return reply(403, { error: "Sign in with Google first" });
+        if (!["list", "save", "restore", "unlink"].includes(body.operation) ||
+          (body.owner_user_id !== undefined && !/^[0-9a-f-]{36}$/i.test(body.owner_user_id)))
+          return reply(400, { error: "Invalid account request" });
+        const { data, error } = await admin.rpc("manage_watch_account", {
+          p_browser: user.id, p_session: claims.session_id,
+          p_action: body.operation, p_owner: body.owner_user_id ?? null,
+        });
+        return error ? reply(403, { error: "Unable to update account connection" }) : reply(200, data);
+      }
       if (body.action === "issue") {
         // Retry collisions; the database atomically reserves each active verifier.
         for (let attempt = 0; attempt < 8; attempt++) {
@@ -168,7 +180,9 @@ export function createAccessHandler(deps: Dependencies) {
         if ((watch !== "" && !/^HL-[A-F0-9]{10}$/.test(watch)) || !/^\d{6}$/.test(code))
           return reply(400, { error: "Enter the six-digit code from your watch" });
         // Rate limiting and HMAC comparison must be atomic inside the database.
-        const { data, error } = await admin.rpc("redeem_watch_code", {
+        const { data, error } = await admin.rpc(
+          !user.is_anonymous && user.identities?.some((i) => i.provider === "google")
+            ? "redeem_account_watch_code" : "redeem_watch_code", {
           p_browser: user.id,
           p_session: claims.session_id,
           p_watch: watch,

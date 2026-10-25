@@ -2,6 +2,25 @@ export type Language = "en" | "ko";
 
 export const translations = {
   en: {
+    account: "Account & watches",
+    cancel_pair: "Back to recordings",
+    google_signin: "Continue with Google",
+    google_existing: "Sign in to an existing Google account",
+    google_existing_help: "If Google is already linked to another HaptiLog account, sign in here, then enter a fresh watch code to add this watch.",
+    google_error: "Google sign-in failed. Try again. If this Google account is already registered, open Account & watches and choose existing account sign-in.",
+    signed_in_as: "Signed in as",
+    account_saved: "This watch is saved to your Google account.",
+    save_account: "Save this watch to my Google account",
+    unlink_watch: "Unlink watch from account",
+    unlink_confirm: "Remove this watch from your Google account and revoke its account browser connections? Recordings are kept. You will need the watch's code to link it again.",
+    account_error: "Could not update account access. Check your connection; this watch may already be linked to another account.",
+    add_watch: "Connect a new watch",
+    sign_out: "Sign out",
+    signout_help: "Signing out keeps your account's watch links. Unlink a watch to remove its recovery access.",
+    recovery_help: "Keep access when you replace your watch: continue with Google, then save this watch to your account.",
+    recovery_limit: "Only uploaded recordings from account-linked watches can be recovered. Local-only audio and watches lost before linking cannot be restored with Google.",
+    account_pair_help: "Connecting with a code also saves this watch to your Google account for recovery.",
+
     brand_slogan: "A LITTLE SPACE TO REFLECT",
     wrist_promise: "Made for your wrist. Open on the web.",
     disconnect: "Disconnect browser",
@@ -22,7 +41,8 @@ export const translations = {
     connect_btn: "Connect my watch",
     connecting: "Connecting…",
     pair_footnote:
-      "No phone. No password. Just your watch.\nDisconnect this browser any time.",
+    pair_footnote:
+      "Use a watch code for temporary access.\nLink Google for access after replacing your watch.",
     preview_test_badge: "PR Preview / Demo",
     preview_divider_or: "OR TRY WITH SAMPLE DATA",
     preview_test_desc:
@@ -170,6 +190,25 @@ export const translations = {
     no_location: "No location was captured for this recording.",
   },
   ko: {
+    account: "계정 및 워치",
+    cancel_pair: "기록으로 돌아가기",
+    google_signin: "Google로 계속하기",
+    google_existing: "기존 Google 계정으로 로그인",
+    google_existing_help: "이미 다른 HaptiLog 계정에 연결된 Google 계정이라면 여기서 로그인한 뒤 새 워치 코드를 입력해 연결하세요.",
+    google_error: "Google 로그인에 실패했습니다. 다시 시도하세요. 이미 등록한 Google 계정이면 ‘계정 및 워치’에서 기존 계정 로그인을 선택하세요.",
+    signed_in_as: "로그인 계정",
+    account_saved: "이 워치가 Google 계정에 연결되어 있습니다.",
+    save_account: "Google 계정에 이 워치 연결하기",
+    unlink_watch: "계정에서 워치 연결 해제",
+    unlink_confirm: "Google 계정에서 이 워치 연결과 해당 계정의 브라우저 접근 권한을 해제할까요? 녹음은 보존됩니다. 다시 연결하려면 워치 코드가 필요합니다.",
+    account_error: "계정 연결을 변경하지 못했습니다. 인터넷 연결을 확인하세요. 이미 다른 계정에 연결된 워치일 수 있습니다.",
+    add_watch: "새 워치 연결",
+    sign_out: "로그아웃",
+    signout_help: "로그아웃해도 계정의 워치 연결은 유지됩니다. 복구 권한을 없애려면 워치 연결을 해제하세요.",
+    recovery_help: "워치를 바꿔도 기록을 보려면 Google로 계속한 뒤 이 워치를 계정에 연결하세요.",
+    recovery_limit: "계정에 연결한 워치의 업로드된 녹음만 복구할 수 있습니다. 로컬에만 있는 녹음과 계정 연결 전에 잃어버린 워치는 Google로 복구할 수 없습니다.",
+    account_pair_help: "코드로 연결하면 이 워치가 Google 계정에도 저장되어 나중에 기록을 복구할 수 있습니다.",
+
     brand_slogan: "잠시 생각을 정리하는 공간",
     wrist_promise: "손목에서 시작하여 웹에서 확인하세요.",
     disconnect: "브라우저 연결 해제",
@@ -190,7 +229,8 @@ export const translations = {
     connect_btn: "워치 연결하기",
     connecting: "연결 중…",
     pair_footnote:
-      "휴대폰도 비밀번호도 필요 없습니다. 오직 워치 하나로.\n언제든 브라우저 연결을 해제할 수 있습니다.",
+    pair_footnote:
+      "워치 코드로 임시 접근할 수 있습니다.\n워치 교체 후에도 접근하려면 Google 계정을 연결하세요.",
     preview_test_badge: "PR 프리뷰 / 데모",
     preview_divider_or: "또는 샘플 데이터로 둘러보기",
     preview_test_desc:

@@ -9,7 +9,7 @@ const connection = {
   watch_id: "HL-0123456789",
   expires_at: "2099-01-01T00:00:00Z",
 };
-const session = {
+export const portalSession = {
   access_token: `header.${
     btoa(
       JSON.stringify({
@@ -64,11 +64,16 @@ export const baseRecording = {
 };
 export async function fixture(
   page: Page,
-  { connected = true, failed = false } = {},
+  { connected = true, failed = false, google = false, saved = false } = {},
 ) {
   page.on("dialog", (dialog) => dialog.accept());
+  const activeSession = google ? { ...portalSession, user: { ...portalSession.user, is_anonymous: false,
+    email: "test@example.com", identities: [{ provider: "google", user_id: browserId }] } } : portalSession;
   const state = {
     paired: connected,
+    accountWatches: saved ? [{ owner_user_id: owner, watch_id: connection.watch_id }] : [] as { owner_user_id: string; watch_id: string }[],
+    accountOperations: [] as string[],
+    accountFailure: false,
     recording: structuredClone(baseRecording) as any,
     retry: 0,
     retryFailure: null as string | null,
@@ -84,30 +89,42 @@ export async function fixture(
       lease_until: "2026-10-16T12:00:00Z",
     };
   }
-  if (connected) {
+  if (connected || google) {
     await page.addInitScript(
       (session) =>
         localStorage.setItem(
           "haptilog-portal-session",
           JSON.stringify(session),
         ),
-      session,
+      activeSession,
     );
   }
   await page.route("https://haptilog-test.supabase.co/**", async (route) => {
     const req = route.request(),
       path = new URL(req.url()).pathname;
     let body: unknown;
-    if (path.endsWith("/signup")) body = session;
+    if (path.endsWith("/signup")) body = activeSession;
+    else if (path.endsWith("/user")) body = activeSession.user;
     else if (path.endsWith("/notion-export")) {
       body = { configured: false, connected: false, target: null, exports: [] };
     } else if (path.endsWith("/set_cloud_consent")) {
       return route.fulfill({ status: 204 });
     } else if (path.endsWith("/logout")) return route.fulfill({ status: 204 });
     else if (path.endsWith("/watch-access")) {
-      expect(req.postDataJSON()).toEqual({ action: "redeem", code: "123456" });
-      state.paired = true;
-      body = { watch_id: connection.watch_id };
+      const input = req.postDataJSON();
+      if (input.action === "account") {
+        state.accountOperations.push(input.operation);
+        if (state.accountFailure) return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: "denied" }) });
+        if (input.operation === "restore") state.paired = true;
+        if (input.operation === "save") state.accountWatches = [{ owner_user_id: owner, watch_id: connection.watch_id }];
+        if (input.operation === "unlink") { state.accountWatches = []; state.paired = false; }
+        body = { watches: state.accountWatches };
+      } else {
+        expect(input).toEqual({ action: "redeem", code: "123456" });
+        state.paired = true;
+        if (google) state.accountWatches = [{ owner_user_id: owner, watch_id: connection.watch_id }];
+        body = { watch_id: connection.watch_id };
+      }
     } else if (path.endsWith("/portal_connections")) {
       if (req.method() === "PATCH") {
         state.paired = false;
