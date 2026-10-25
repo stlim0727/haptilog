@@ -1332,6 +1332,10 @@ function Inspector({
   const [transcriptDirty, setTranscriptDirty] = useState(false);
   const onDirtyChangeRef = useRef(onDirtyChange);
   onDirtyChangeRef.current = onDirtyChange;
+  const updateTranscriptDirty = useCallback((isDirty: boolean) => {
+    setTranscriptDirty(isDirty);
+    onDirtyChangeRef.current?.(dirty || isDirty || saving);
+  }, [dirty, saving]);
   useEffect(() => { onDirtyChange?.(dirty || transcriptDirty || saving); }, [dirty, transcriptDirty, saving, onDirtyChange]);
   useEffect(() => () => { onDirtyChangeRef.current?.(false); }, []);
   const player = useRef<HTMLAudioElement>(null);
@@ -1626,12 +1630,15 @@ function Inspector({
               ? (lang === "ko" ? "사용자 편집 · 원본 보존" : "Edited · original preserved")
               : t.transcript_note}</span>
           </div>
-          <TranscriptEditor recording={r} lang={lang} onChange={onChange} onError={onError} onDirtyChange={setTranscriptDirty} />
+          <TranscriptEditor recording={r} lang={lang} onChange={onChange} onError={onError} onDirtyChange={updateTranscriptDirty} />
           {x && (
             <form
               className="expense-form"
               onSubmit={saveExpense}
-              onChange={() => setDirty(true)}
+              onChange={() => {
+                setDirty(true);
+                onDirtyChangeRef.current?.(true);
+              }}
             >
               <div className="section-label">
                 {t.expense_details} <span>{t.expense_note}</span>

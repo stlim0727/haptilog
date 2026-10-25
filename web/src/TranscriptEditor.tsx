@@ -83,12 +83,16 @@ export function TranscriptEditor({ recording, lang, onChange, onError, onDirtyCh
     {editing ? <form onSubmit={event => { event.preventDefault(); void save(); }}>
       <label>{ko ? "해석된 텍스트" : "Transcript"}
         <textarea autoFocus rows={7} maxLength={50000} value={draft} disabled={busy}
-          onChange={event => setDraft(event.target.value)} />
+          onChange={event => {
+            const next = event.target.value;
+            setDraft(next);
+            onDirtyChange?.(next !== current);
+          }} />
       </label>
       <button className="secondary-button" disabled={busy || draft === current}>
         {busy ? (ko ? "저장 중…" : "Saving…") : (ko ? "저장" : "Save")}
       </button>{" "}
-      <button type="button" className="secondary-button" disabled={busy} onClick={() => setEditing(false)}>{ko ? "취소" : "Cancel"}</button>
+      <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEditing(false); onDirtyChange?.(false); }}>{ko ? "취소" : "Cancel"}</button>
     </form> : <>
       <p className="transcript">{current || (ko ? "인식된 음성이 없습니다." : "No speech detected.")}</p>
       {!recording.deleted_at && <button className="secondary-button" onClick={() => { setDraft(current); setEditing(true); }}>{ko ? "텍스트 편집" : "Edit transcript"}</button>}
