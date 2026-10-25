@@ -41,3 +41,45 @@ fun localDeleteFailure(context: Context, item: RecordingItem): String = context.
     !item.audioFile.exists() && !item.metaFile.exists() -> R.string.delete_cleanup_failed
     else -> R.string.delete_failed
 })
+
+/** Locale-aware short date and clock preference, with each date/time token kept intact. */
+fun compactRecordingDate(context: Context, item: RecordingItem): String {
+    val locale = context.resources.configuration.locales[0]
+    val date = Date(item.startedAtTimestamp)
+    val dayPattern = DateFormat.getBestDateTimePattern(locale, "Md")
+    val timePattern = DateFormat.getBestDateTimePattern(locale,
+        if (DateFormat.is24HourFormat(context)) "HHmm" else "hmm")
+    val day = java.text.SimpleDateFormat(dayPattern, locale).format(date).replace(' ', '\u00A0')
+    val time = java.text.SimpleDateFormat(timePattern, locale).format(date).replace(' ', '\u00A0')
+    // Permit a large-font line break between the day and clock, but not inside either token.
+    return "$day $time"
+}
+
+fun recordingDuration(context: Context, seconds: Long): String {
+    val safe = seconds.coerceAtLeast(0)
+    val minutes = safe / 60
+    val remainder = safe % 60
+    return when {
+        minutes == 0L -> context.getString(R.string.duration_seconds, remainder)
+        remainder == 0L -> context.getString(R.string.duration_minutes, minutes)
+        else -> context.getString(R.string.duration_minutes_seconds, minutes, remainder)
+    }.replace(' ', '\u00A0')
+}
+
+/** Localized hero presentation only; never infer won when the derived currency is absent/unknown. */
+fun expenseHeroAmount(context: Context, item: RecordingItem): String? {
+    if (item.intentType != "EXPENSE") return null
+    val data = item.structuredData ?: return null
+    val amount = (data.opt("amount") as? Number)?.toDouble() ?: return null
+    if (!amount.isFinite() || amount < 0) return null
+    val locale = context.resources.configuration.locales[0]
+    val formatted = java.text.NumberFormat.getNumberInstance(locale).apply {
+        maximumFractionDigits = 340
+    }.format(amount)
+    val currency = data.optString("currency").takeIf { it.matches(Regex("^[A-Z]{3}$")) }
+    return when {
+        currency == "KRW" && locale.language == "ko" -> context.getString(R.string.expense_amount_krw, formatted)
+        currency != null -> "$formatted $currency"
+        else -> formatted
+    }
+}

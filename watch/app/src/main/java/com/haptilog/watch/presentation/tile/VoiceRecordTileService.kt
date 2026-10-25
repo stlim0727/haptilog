@@ -13,10 +13,11 @@ import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.haptilog.watch.presentation.MainActivity
+import com.haptilog.watch.R
 
 class VoiceRecordTileService : TileService() {
 
-    private val RESOURCES_VERSION = "1"
+    private val RESOURCES_VERSION = "m3-coral-2"
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         val launchIntent = ActionBuilders.LaunchAction.Builder()
@@ -34,38 +35,27 @@ class VoiceRecordTileService : TileService() {
             .setOnClick(launchIntent)
             .build()
 
-        val rubyDot = LayoutElementBuilders.Box.Builder()
-            .setWidth(DimensionBuilders.dp(10f))
-            .setHeight(DimensionBuilders.dp(10f))
-            .setModifiers(
-                ModifiersBuilders.Modifiers.Builder()
-                    .setBackground(
-                        ModifiersBuilders.Background.Builder()
-                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFFFF3B30.toInt()))
-                            .setCorner(
-                                ModifiersBuilders.Corner.Builder()
-                                    .setRadius(DimensionBuilders.dp(5f))
-                                    .build()
-                            )
-                            .build()
-                    )
-                    .build()
-            )
+        val microphone = LayoutElementBuilders.Image.Builder()
+            .setResourceId("microphone")
+            .setWidth(DimensionBuilders.dp(32f))
+            .setHeight(DimensionBuilders.dp(32f))
+            .setColorFilter(LayoutElementBuilders.ColorFilter.Builder()
+                .setTint(androidx.wear.protolayout.ColorBuilders.argb(0xFF492017.toInt())).build())
             .build()
 
         val recordText = LayoutElementBuilders.Text.Builder()
-            .setText("RECORD")
+            .setText(getString(R.string.record_start))
             .setFontStyle(
                 LayoutElementBuilders.FontStyle.Builder()
-                    .setSize(DimensionBuilders.sp(11f))
-                    .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFFF5F5F7.toInt()))
+                    .setSize(DimensionBuilders.sp(14f))
+                    .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFF492017.toInt()))
                     .build()
             )
             .build()
 
         val discContent = LayoutElementBuilders.Column.Builder()
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
-            .addContent(rubyDot)
+            .addContent(microphone)
             .addContent(LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(8f)).build())
             .addContent(recordText)
             .build()
@@ -78,12 +68,12 @@ class VoiceRecordTileService : TileService() {
                     .setClickable(clickModifier)
                     .setSemantics(
                         ModifiersBuilders.Semantics.Builder()
-                            .setContentDescription("Record voice memo")
+                            .setContentDescription(getString(R.string.record_start_accessibility))
                             .build()
                     )
                     .setBackground(
                         ModifiersBuilders.Background.Builder()
-                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFF161618.toInt()))
+                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFFFFB4A5.toInt()))
                             .setCorner(
                                 ModifiersBuilders.Corner.Builder()
                                     .setRadius(DimensionBuilders.dp(56f))
@@ -94,7 +84,7 @@ class VoiceRecordTileService : TileService() {
                     .setBorder(
                         ModifiersBuilders.Border.Builder()
                             .setWidth(DimensionBuilders.dp(1f))
-                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFF2C2C2E.toInt()))
+                            .setColor(androidx.wear.protolayout.ColorBuilders.argb(0xFFFFB4A5.toInt()))
                             .build()
                     )
                     .build()
@@ -130,6 +120,9 @@ class VoiceRecordTileService : TileService() {
         return Futures.immediateFuture(
             ResourceBuilders.Resources.Builder()
                 .setVersion(RESOURCES_VERSION)
+                .addIdToImageMapping("microphone", ResourceBuilders.ImageResource.Builder()
+                    .setAndroidResourceByResId(ResourceBuilders.AndroidImageResourceByResId.Builder()
+                        .setResourceId(R.drawable.ic_mic).build()).build())
                 .build()
         )
     }

@@ -23,6 +23,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import com.haptilog.watch.R
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -46,7 +47,7 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            LegacyHaptiLogTheme {
                 val scope = rememberCoroutineScope()
                 val list = rememberScalingLazyListState(initialCenterItemIndex = 0)
                 val focus = remember { FocusRequester() }
@@ -150,7 +151,12 @@ class SettingsActivity : ComponentActivity() {
                                             notice = "Sync stopped. Server withdrawal will be sent when online. Cloud copies remain until deleted."
                                         }
                                     }, label = { Text(stringResource(R.string.cloud_sync_title), maxLines = Int.MAX_VALUE) },
-                                    colors = ToggleChipDefaults.toggleChipColors(),
+                                    colors = ToggleChipDefaults.toggleChipColors(
+                                        checkedStartBackgroundColor = Color(0xFF142A38),
+                                        checkedEndBackgroundColor = Color(0xFF142A38),
+                                        checkedContentColor = WatchColors.Text,
+                                        uncheckedStartBackgroundColor = WatchColors.Surface,
+                                        uncheckedEndBackgroundColor = WatchColors.Surface),
                                     toggleControl = { Switch(checked = cloud) })
                             }
                             if (!cloud) item { Text(stringResource(R.string.cloud_off_notice), fontSize = 12.sp,
@@ -159,7 +165,8 @@ class SettingsActivity : ComponentActivity() {
                                 FlexibleChip(enabled = CloudClient.configured, onClick = {
                                     startActivity(Intent(this@SettingsActivity, WebAccessActivity::class.java))
                                 }, label = { Text(stringResource(R.string.web_access_title), maxLines = Int.MAX_VALUE) },
-                                    secondaryLabel = { Text(stringResource(R.string.web_access_hint), maxLines = Int.MAX_VALUE) })
+                                    secondaryLabel = { Text(stringResource(R.string.web_access_hint), maxLines = Int.MAX_VALUE) },
+                                    icon = { Icon(painterResource(R.drawable.ic_link), null, Modifier.size(22.dp), tint = Color(0xFFA8D8FF)) })
                             }
                             item { SettingsSection(stringResource(R.string.help_group)) }
                             item { FlexibleChip(onClick = {

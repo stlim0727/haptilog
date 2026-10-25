@@ -1,4 +1,5 @@
 <resources>
+    <string name="app_name">HaptiLog</string>
     <string name="record_start">녹음</string>
     <string name="record_stop">중지</string>
     <string name="record_start_accessibility">녹음 시작</string>
@@ -15,8 +16,8 @@
     <string name="ai_summary">AI 요약</string>
     <string name="play_audio">재생</string>
     <string name="stop_playback">재생 중지</string>
-    <string name="show_transcript">전체 텍스트 보기</string>
-    <string name="hide_transcript">전체 텍스트 접기</string>
+    <string name="show_transcript">전문 보기</string>
+    <string name="hide_transcript">전문 접기</string>
     <string name="transcript_title">전체 텍스트</string>
     <string name="expanded">펼쳐짐</string>
     <string name="collapsed">접힘</string>
@@ -89,4 +90,12 @@
     <string name="describe_issue">문제를 설명해 주세요</string>
     <string name="decline_cloud">거절 · 워치에만 저장</string>
     <string name="agree_cloud">만 18세 이상 · 동의하고 켜기</string>
+    <string name="recordings_title">기록</string>
+    <string name="duration_minutes_seconds">%1$d분 %2$d초</string>
+    <string name="duration_minutes">%1$d분</string>
+    <string name="tile_record">녹음 시작</string>
+    <string name="tile_recordings">기록 보기</string>
+    <string name="recorded_at">녹음 시각</string>
+    <string name="expense_amount_krw">%1$s원</string>
+    <string name="recordings_action">기록</string>
 </resources>

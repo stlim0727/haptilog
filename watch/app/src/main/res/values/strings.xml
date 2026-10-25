@@ -1,4 +1,5 @@
 <resources>
+    <string name="app_name">HaptiLog</string>
     <string name="record_start">Record</string>
     <string name="record_stop">Stop</string>
     <string name="record_start_accessibility">Start recording</string>
@@ -15,7 +16,7 @@
     <string name="ai_summary">AI summary</string>
     <string name="play_audio">Play</string>
     <string name="stop_playback">Stop playback</string>
-    <string name="show_transcript">Show full text</string>
+    <string name="show_transcript">Full text</string>
     <string name="hide_transcript">Hide full text</string>
     <string name="transcript_title">Full text</string>
     <string name="expanded">Expanded</string>
@@ -89,4 +90,12 @@
     <string name="describe_issue">Describe the problem</string>
     <string name="decline_cloud">Decline · Keep local only</string>
     <string name="agree_cloud">I am 18+ · Agree &amp; enable</string>
+    <string name="recordings_title">Recordings</string>
+    <string name="duration_minutes_seconds">%1$d min %2$d s</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="tile_record">Start recording</string>
+    <string name="tile_recordings">View recordings</string>
+    <string name="recorded_at">Recorded at</string>
+    <string name="expense_amount_krw">%1$s KRW</string>
+    <string name="recordings_action">Records</string>
 </resources>

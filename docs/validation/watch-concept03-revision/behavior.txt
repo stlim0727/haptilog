@@ -1,0 +1,6 @@
+Existing source audio/metadata files preserved: 36.
+Actual MainActivity: offline capture start/stop; saved nonempty audio; process restart; playback start/stop; full text expansion; delete cancellation; detail Back to list; external entry to capture; settings Back.
+Derived memo sidecar is synthetic. Debug preview callbacks are not behavior evidence.
+Source audio/metadata hashes unchanged after cancellation and offline restart:
+e1d89eda10b1507214d4b8bc9c53d20fed248b6638561aca87d3c3dc8a32466e  files/recordings/rec_35f43d4d-a790-421a-b142-79fa1ae440d9.m4a
+fc1fb0f4aefe693a406ad754cafa72ded7f1ee1a0c825b2ddf29fb5def3df240  files/recordings/meta_35f43d4d-a790-421a-b142-79fa1ae440d9.json

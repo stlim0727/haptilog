@@ -1,0 +1,5 @@
+assembleDebug lintDebug testDebugUnitTest processReleaseMainManifest: BUILD SUCCESSFUL
+{'tests': 51, 'failures': 0, 'errors': 0, 'skipped': 0}
+Lint: 0 errors, 101 advisory warnings.
+Debug preview activity absent from release merged manifest.
+Final debug APK SHA-256: ddecbb7f3511aaafb411212d00508c750206ea08ab33027cbf3dbd1bfe870f81
