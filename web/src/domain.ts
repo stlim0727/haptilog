@@ -113,11 +113,14 @@ export function totals(recordings: Recording[]) {
   }
   return { grouped, incomplete };
 }
+export function toLocalDateString(d: Date = new Date()) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 export function localDate(iso: string) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${
-    String(d.getDate()).padStart(2, "0")
-  }`;
+  return toLocalDateString(new Date(iso));
 }
 export function money(amount: number, currency: string) {
   try {

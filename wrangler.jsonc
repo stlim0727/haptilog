@@ -2,6 +2,7 @@
   "$schema": "web/node_modules/wrangler/config-schema.json",
   "name": "haptilog",
   "compatibility_date": "2026-10-16",
+  "preview_urls": true,
   "previews": {},
   "build": {
     "command": "npm --prefix web ci --ignore-scripts && npm --prefix web run prepare:deploy"
@@ -15,6 +16,7 @@
     "production": {
       "name": "haptilog-web",
       "workers_dev": false,
+      "preview_urls": true,
       "routes": [
         {
           "pattern": "haptilog.keepory.app",
