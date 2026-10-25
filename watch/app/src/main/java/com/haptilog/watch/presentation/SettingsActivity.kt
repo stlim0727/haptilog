@@ -140,6 +140,10 @@ class SettingsActivity : ComponentActivity() {
                             }
                             item { FlexibleChip(enabled = !busy, onClick = { reporting = false; notice = null }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.cancel_action)) }) }
                         } else {
+                            item { FlexibleChip(onClick = {
+                                startActivity(Intent(this@SettingsActivity, LocationJournalActivity::class.java))
+                            }, label = { Text(stringResource(R.string.location_journal_title), maxLines = Int.MAX_VALUE) },
+                                secondaryLabel = { Text(stringResource(R.string.location_journal_hint), maxLines = Int.MAX_VALUE) }) }
                             item { SettingsSection(stringResource(R.string.connection_group)) }
                             item {
                                 ToggleChip(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp),

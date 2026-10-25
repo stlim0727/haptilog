@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="location_journal_title">Location journal</string>
+    <string name="location_journal_hint">Places, visits and time spent</string>
+    <string name="location_permission_needed">Allow precise location in app permissions to use the journal.</string>
+    <string name="location_start_failed">Could not start. Open this screen and try again.</string>
+    <string name="location_enable_gps">Turn on location in watch settings.</string>
+    <string name="location_center_ready">Current position filled in. Name this place and save.</string>
+    <string name="location_no_fix">No accurate location yet. Try outdoors or enter coordinates.</string>
+    <string name="location_save_failed">Could not save the change. Existing history is kept. Try again.</string>
+    <string name="location_place_name">Place name</string>
+    <string name="location_use_current">Use current location</string>
+    <string name="location_latitude">Latitude (−90 to 90)</string>
+    <string name="location_longitude">Longitude (−180 to 180)</string>
+    <string name="location_radius">Radius: %1$d m · tap to change</string>
+    <string name="location_save_place">Save place</string>
+    <string name="location_delete_place">Delete place</string>
+    <string name="location_back">Back</string>
+    <string name="location_clear_confirm">Delete all location points and visit events? Saved places stay. Audio recordings are unaffected.</string>
+    <string name="location_clear">Clear location history</string>
+    <string name="location_no_events">No visits yet. Start the journal and spend time near a place.</string>
+    <string name="location_enter">Entered</string>
+    <string name="location_exit">Left</string>
+    <string name="location_dwell">Stayed</string>
+    <string name="location_unsaved_place">Unlisted place</string>
+    <string name="location_minutes">%1$d min</string>
+    <string name="location_no_points">No location points yet. Start the journal outdoors.</string>
+    <string name="location_more">Show more</string>
+    <string name="location_running">Location journal is running</string>
+    <string name="location_stopped">Location journal is stopped</string>
+    <string name="location_disclosure">Optional · saves location on this watch while running, including with the screen off. No cloud upload or sharing. Uses battery. Stops after 8 hours; start again to continue.</string>
+    <string name="location_stop">Stop location journal</string>
+    <string name="location_start">Start location journal</string>
+    <string name="location_counts">%1$d points · %2$d events</string>
+    <string name="location_last_fix">Latest location: %1$s</string>
+    <string name="location_waiting_fix">Waiting for an accurate location. Try outdoors; location updates can be delayed.</string>
+    <string name="location_open_settings">Permissions and notifications</string>
+    <string name="location_events">Visit timeline</string>
+    <string name="location_points">Location points</string>
+    <string name="location_dwell_setting">Stay: %1$d min · tap to change</string>
+    <string name="location_places_hint">GPS places · Stop the journal to edit. At most 20 places. Keeps 7 days, up to 2,000 points and 500 events.</string>
+    <string name="location_add_place">Add a place</string>
+</resources>

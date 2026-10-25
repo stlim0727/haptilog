@@ -1,6 +1,6 @@
 # Google Play Console Release Guide & Policy Declarations
 
-Last updated: 2026-10-18
+Last updated: 2026-10-25 (location journal declaration draft; not a record of Console submission)
 Application ID: `com.haptilog.watch`  
 Target: Wear OS 3+ (API 30–35)
 
@@ -102,7 +102,7 @@ HaptiLog is an eyes-free, haptic-first voice logger designed exclusively for Wea
      - 수집: 선택적 클라우드 동기화 시 전송, 익명 사용자 ID에 연결, 비임시 저장, 앱 기능 목적
   2. **정확한 위치 / 대략적인 위치(Location - Precise & Approximate)**:
      - 목적: 앱 기능(녹음 시점의 GPS 좌표, 고도, 속도를 메모 맥락으로 태깅)
-     - 수집: 위치 권한 및 선택적 동기화에 따라 전송, 비임시 저장, 앱 기능 목적. 녹음 세션에서만 위치 취득, 지속적인 경로 추적 없음.
+     - 수집: 녹음에 저장된 위치는 위치 권한 및 선택적 동기화에 따라 전송, 비임시 저장, 앱 기능 목적. 별도의 위치 일지는 사용자가 워치에서 직접 시작한 세션 동안 주기적으로 위치를 취득하며, 필터링된 위치·지정 장소·진입/이탈/체류 기록을 워치에만 저장합니다. 위치 일지 데이터는 클라우드 동기화를 켜도 전송하지 않습니다.
   3. **앱 정보 및 성능 (진단 / 비정상 종료 로그)**:
      - 목적: 분석 및 오류 수정. 크래시 동의와 사용자 제보는 녹음 동기화 스위치와 별개입니다.
      - 수집: 예외 클래스명·앱 코드 위치·앱 버전·기기 모델·Android API. 보고서는 익명 사용자 ID와 연결됩니다. 오디오·GPS·예외 메시지는 자동 첨부하지 않습니다.
@@ -139,15 +139,16 @@ HaptiLog 매니페스트에 등록된 포그라운드 서비스 타입:
 
 #### (B) Location (`FOREGROUND_SERVICE_LOCATION`)
 - **기능 목적 (Use case)**:
-  `음성 메모 시점의 위치 맥락 기록 (Geotagging voice memo context)`
+  `음성 메모 위치 맥락 및 사용자가 시작한 로컬 위치 일지 (Voice-memo geotagging and user-started local location journal)`
 - **포그라운드 서비스가 필수적인 이유 (Justification text)**:
   ```
-  HaptiLog captures the user's location (latitude, longitude, altitude, speed) strictly during active voice recording sessions to enrich voice memos with geographical context (such as travel field notes or transit memos).
+  HaptiLog captures location during user-started voice recording to geotag memos. Users may separately start a local location journal from watch settings to record filtered movement, arrival/departure at saved GPS places, and sustained stays.
 
-  Location acquisition runs concurrently with audio recording inside the active foreground service window and terminates immediately when voice recording stops. Running within the foreground service ensures high-accuracy GPS fixes are retrieved reliably while the watch display is dimmed.
+  Voice-memo location acquisition ends when recording stops. A journal session uses its own location foreground service with an ongoing notification and stop action so sampling can continue while the watch display is off. The user can stop it from the journal or notification. Journal data stays on the watch and does not join voice-recording cloud sync. The journal does not require microphone access or hold a wake lock.
   ```
 - **사용자 시작 조건 (User-initiated trigger)**:
-  `Triggered concurrently with the user-initiated voice recording session.`
+  `Triggered by a voice recording, or by the user explicitly pressing Start in the separate watch location journal.`
+- **위치 일지 출시 확인**: 공개 개인정보처리방침 변경본 배포, 위치 FGS 선언 설명/데모 갱신, 워치에서 시작·화면 꺼짐·알림 정지 동작 검증 후 심사 제출. 이 문서 변경 자체가 콘솔 저장이나 배포를 뜻하지 않습니다.
 
 ---
 
