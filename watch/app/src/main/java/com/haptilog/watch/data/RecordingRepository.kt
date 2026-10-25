@@ -140,6 +140,7 @@ class RecordingRepository(private val context: Context) {
 
             deleted = (!audioFile.exists() || audioFile.delete()) && (!metaFile.exists() || metaFile.delete())
             if (deleted) {
+                com.haptilog.watch.notifications.RecordingNotifications.clearSync(context, id)
                 listOf(syncFile, enrichFile).forEach { if (it.exists()) it.delete() }
             }
             refresh()

@@ -1,5 +1,6 @@
 package com.haptilog.watch.sync
 
+import com.haptilog.watch.notifications.RecordingNotifications
 import android.content.Context
 import androidx.work.*
 import com.haptilog.watch.data.RecordingFiles
@@ -25,10 +26,12 @@ class RecordingSyncWorker(context: Context, params: WorkerParameters) : Coroutin
             state.put("status", "PENDING_SYNC").put("attempts", 0)
             state.remove("error")
             RecordingFiles.write(file, state)
+            RecordingNotifications.clearSync(context, id)
             schedule(context)
         }
         fun disable(context: Context) {
             context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).edit().putBoolean("enabled", false).commit()
+            RecordingNotifications.clearAllSync(context)
             WorkManager.getInstance(context).cancelUniqueWork("recording-sync")
             WorkManager.getInstance(context).cancelUniqueWork("recording-sync-safety")
         }
@@ -100,7 +103,10 @@ class RecordingSyncWorker(context: Context, params: WorkerParameters) : Coroutin
                 val autoRetry = retry && attempts < 6
                 state.put("status", if (autoRetry) "PENDING_SYNC" else "ACTION_REQUIRED")
                 state.put("error", if (e is CloudException) "HTTP_${e.status}" else "CONNECTION_OR_SESSION_ERROR")
-                runCatching { RecordingFiles.write(stateFile, state) }
+                val persisted = runCatching { RecordingFiles.write(stateFile, state) }.isSuccess
+                if (persisted && !autoRetry && enabled(applicationContext)) {
+                    RecordingNotifications.syncNeedsAttention(applicationContext, id)
+                }
                 transientFailure = transientFailure || autoRetry
             }
         }
