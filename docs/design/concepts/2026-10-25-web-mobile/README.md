@@ -2,7 +2,13 @@
 
 2026-10-25 · 기준 origin/main `0c7bcff` · 제품 소스 변경 없음
 
-[시안 전체 보기](overview.png) · [클릭 가능한 HTML 시안](prototype.html) · [UX 디자이너 2차 검토](round2-review.md)
+[Google 로그인 확장 시안](google-overview.png) · [계정 흐름·복구 범위](google-account-notes.md) · [시안 전체 보기](overview.png) · [클릭 가능한 HTML 시안](prototype.html) · [UX 디자이너 2차 검토](round2-review.md)
+
+## Google 로그인 추가 요구사항 반영
+
+Discussion의 [추가 요구사항](https://github.com/stlim0727/haptilog/discussions/46#discussioncomment-19180660)을 반영했다. Google 로그인과 코드 연결, 기존 사용자의 계정 연결, 현재·이전 워치 선택, 새 워치 코드 확인, 브라우저 로그아웃과 계정에서 워치 연결 해제를 구분한다. 복구 불가능한 기록의 범위도 안내한다.
+
+이는 아래 두 차례 UX 검토 이후의 **시안 확장**이다. 제품의 실제 Google OAuth 구현 완료를 의미하지 않는다. [상태별 화면·검증](google-account-notes.md)을 참고한다. 프로토타입의 계정 흐름을 보려면 `prototype.html`과 `account-prototype.js`를 같은 폴더에 둔다.
 
 ## 결과
 

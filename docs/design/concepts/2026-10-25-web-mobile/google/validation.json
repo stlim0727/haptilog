@@ -1,0 +1,173 @@
+{
+  "metrics": [
+    {
+      "width": 320,
+      "name": "welcome",
+      "scrollWidth": 320
+    },
+    {
+      "width": 320,
+      "name": "guest",
+      "scrollWidth": 320
+    },
+    {
+      "width": 320,
+      "name": "link-account",
+      "scrollWidth": 320
+    },
+    {
+      "width": 320,
+      "name": "watches",
+      "scrollWidth": 320
+    },
+    {
+      "width": 320,
+      "name": "account",
+      "scrollWidth": 320
+    },
+    {
+      "width": 320,
+      "name": "unlink-watch",
+      "scrollWidth": 320
+    },
+    {
+      "width": 320,
+      "name": "pair",
+      "scrollWidth": 320
+    },
+    {
+      "width": 320,
+      "name": "signin-error",
+      "scrollWidth": 320
+    },
+    {
+      "width": 360,
+      "name": "welcome",
+      "scrollWidth": 360
+    },
+    {
+      "width": 360,
+      "name": "guest",
+      "scrollWidth": 360
+    },
+    {
+      "width": 360,
+      "name": "link-account",
+      "scrollWidth": 360
+    },
+    {
+      "width": 360,
+      "name": "watches",
+      "scrollWidth": 360
+    },
+    {
+      "width": 360,
+      "name": "account",
+      "scrollWidth": 360
+    },
+    {
+      "width": 360,
+      "name": "unlink-watch",
+      "scrollWidth": 360
+    },
+    {
+      "width": 360,
+      "name": "pair",
+      "scrollWidth": 360
+    },
+    {
+      "width": 360,
+      "name": "signin-error",
+      "scrollWidth": 360
+    },
+    {
+      "width": 390,
+      "name": "welcome",
+      "scrollWidth": 390
+    },
+    {
+      "width": 390,
+      "name": "guest",
+      "scrollWidth": 390
+    },
+    {
+      "width": 390,
+      "name": "link-account",
+      "scrollWidth": 390
+    },
+    {
+      "width": 390,
+      "name": "watches",
+      "scrollWidth": 390
+    },
+    {
+      "width": 390,
+      "name": "account",
+      "scrollWidth": 390
+    },
+    {
+      "width": 390,
+      "name": "unlink-watch",
+      "scrollWidth": 390
+    },
+    {
+      "width": 390,
+      "name": "pair",
+      "scrollWidth": 390
+    },
+    {
+      "width": 390,
+      "name": "signin-error",
+      "scrollWidth": 390
+    },
+    {
+      "width": 430,
+      "name": "welcome",
+      "scrollWidth": 430
+    },
+    {
+      "width": 430,
+      "name": "guest",
+      "scrollWidth": 430
+    },
+    {
+      "width": 430,
+      "name": "link-account",
+      "scrollWidth": 430
+    },
+    {
+      "width": 430,
+      "name": "watches",
+      "scrollWidth": 430
+    },
+    {
+      "width": 430,
+      "name": "account",
+      "scrollWidth": 430
+    },
+    {
+      "width": 430,
+      "name": "unlink-watch",
+      "scrollWidth": 430
+    },
+    {
+      "width": 430,
+      "name": "pair",
+      "scrollWidth": 430
+    },
+    {
+      "width": 430,
+      "name": "signin-error",
+      "scrollWidth": 430
+    }
+  ],
+  "flows": [
+    "code only remains unlinked",
+    "Google login precedes explicit watch link",
+    "watch scoped history",
+    "logout preserves account connection",
+    "unlink removes watch from account",
+    "new watch begins empty"
+  ],
+  "errors": []
+}
