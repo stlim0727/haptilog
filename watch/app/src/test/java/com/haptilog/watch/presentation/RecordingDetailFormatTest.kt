@@ -28,6 +28,26 @@ class RecordingDetailFormatTest {
             uploaded = uploaded
         )
 
+    @Test fun listDistinguishesSavedUploadedAndEnrichedCheckpoints() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        assertEquals(context.getString(com.haptilog.watch.R.string.recording_stage_saved),
+            recordingStageLabel(context, item("PENDING_SYNC")))
+        for (status in listOf("PENDING_SYNC", "SYNCING", "ACTION_REQUIRED")) {
+            assertEquals(context.getString(com.haptilog.watch.R.string.recording_stage_uploaded),
+                recordingStageLabel(context, item(status, uploaded = true)))
+        }
+        assertEquals(context.getString(com.haptilog.watch.R.string.recording_stage_enriched),
+            recordingStageLabel(context, item("SYNCED")))
+    }
+
+    @Test fun incompleteOrFailedCaptureDoesNotClaimSavedRecording() {
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
+        for (status in listOf("CAPTURE_FAILED", "RECOVERY_REQUIRED")) {
+            assertNull(recordingStageLabel(context, item(status)))
+        }
+        assertNull(recordingStageLabel(context, item("PENDING_SYNC").copy(status = "RECORDING")))
+    }
+
     @Test fun expenseAmountAndMerchantBecomeWristSizedLines() {
         val lines = structuredDataLines(
             "EXPENSE",
