@@ -443,18 +443,19 @@ form label {
   color: var(--text-secondary);
 }
 input {
-  background: #09090d;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
   color: var(--text-primary);
   padding: 12px 14px;
   width: 100%;
   min-width: 0;
   font-size: 14px;
+  transition: border-color 80ms ease, box-shadow 80ms ease;
 }
 input:focus {
-  outline: 2px solid #fb7185;
-  border-color: #fb7185;
+  outline: 2px solid var(--ph-lemon);
+  border-color: var(--border);
 }
 .pair-card input {
   margin-bottom: 22px;
@@ -467,9 +468,10 @@ input:focus {
   font-weight: 700;
   padding: 12px 16px;
   text-align: center;
-  color: #ffffff;
-  background: #07070b;
-  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  background: var(--bg-surface-elevated);
+  border: 2px solid var(--border-strong);
+  box-shadow: 2px 2px 0px var(--border);
 }
 .primary-button {
   display: flex;
@@ -928,6 +930,125 @@ footer a:hover {
 body.light-mode .record-amount {
   color: var(--ph-orange);
 }
+:root[data-theme="light"] .ready-text,
+body.light-mode .ready-text {
+  color: #059669;
+}
+:root[data-theme="light"] .pending-text,
+body.light-mode .pending-text {
+  color: var(--ph-orange);
+}
+:root[data-theme="light"] .state-pill,
+body.light-mode .state-pill {
+  color: var(--ph-orange);
+}
+:root[data-theme="light"] .state-pill.is-ready,
+body.light-mode .state-pill.is-ready {
+  color: #059669;
+  border-color: #059669;
+}
+:root[data-theme="light"] .metrics small .status-dot,
+body.light-mode .metrics small .status-dot,
+:root[data-theme="light"] .sync-note > svg,
+body.light-mode .sync-note > svg {
+  color: #059669;
+}
+:root[data-theme="light"] .calendar-card-amount,
+body.light-mode .calendar-card-amount {
+  color: var(--ph-orange);
+}
+:root[data-theme="light"] .timeline-expense,
+body.light-mode .timeline-expense {
+  background: var(--cat-expense-bg);
+  border-color: var(--cat-expense-border);
+  color: var(--cat-expense-ink);
+}
+:root[data-theme="light"] .gps-pill,
+body.light-mode .gps-pill {
+  background: var(--cat-travel-bg);
+  border-color: var(--cat-travel-border);
+  color: var(--cat-travel-ink);
+}
+:root[data-theme="light"] .no-gps-pill,
+body.light-mode .no-gps-pill {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-subtle);
+  color: var(--text-muted);
+}
+:root[data-theme="light"] .node-expense,
+body.light-mode .node-expense {
+  border-color: #f59e0b;
+  color: #b45309;
+}
+:root[data-theme="light"] .node-travel,
+body.light-mode .node-travel {
+  border-color: #10b981;
+  color: #047857;
+}
+:root[data-theme="light"] .node-workout,
+body.light-mode .node-workout {
+  border-color: #0ea5e9;
+  color: #0369a1;
+}
+:root[data-theme="light"] .node-memo,
+body.light-mode .node-memo {
+  border-color: #a855f7;
+  color: #6b21a8;
+}
+:root[data-theme="light"] .error-banner,
+body.light-mode .error-banner {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+:root[data-theme="light"] .toast-banner,
+body.light-mode .toast-banner {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #064e3b;
+}
+:root[data-theme="light"] .toast-banner button.undo-button,
+body.light-mode .toast-banner button.undo-button {
+  color: #047857;
+}
+:root[data-theme="light"] .trashed-banner,
+body.light-mode .trashed-banner {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #991b1b;
+}
+:root[data-theme="light"] .trashed-banner p,
+body.light-mode .trashed-banner p {
+  color: #b91c1c;
+}
+:root[data-theme="light"] .trash-warning-banner,
+body.light-mode .trash-warning-banner {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #991b1b;
+}
+:root[data-theme="light"] .trash-warning-banner button,
+body.light-mode .trash-warning-banner button {
+  background: #dc2626;
+  color: #ffffff;
+}
+:root[data-theme="light"] .danger-button,
+body.light-mode .danger-button {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #991b1b;
+}
+:root[data-theme="light"] .danger-button:hover:not(:disabled),
+body.light-mode .danger-button:hover:not(:disabled) {
+  background: #ef4444;
+  color: #ffffff;
+}
+:root[data-theme="light"] .trash-trigger:hover,
+body.light-mode .trash-trigger:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+  color: #991b1b;
+}
 .inspector {
   padding: 28px 32px;
   background: var(--bg-surface);
@@ -1154,13 +1275,13 @@ audio {
 .structured pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  background: #08080c;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
   padding: 16px;
   line-height: 1.6;
   font-size: 12px;
-  color: #e4e4e7;
+  color: var(--text-primary);
 }
 .context {
   border-top: 1px solid var(--border);
@@ -1412,7 +1533,7 @@ audio {
   }
   .metrics section + section {
     border-left: 0;
-    border-top: 1px solid #29292f;
+    border-top: 1px solid var(--border-subtle);
   }
   .metrics strong {
     font-size: 26px;
@@ -1432,7 +1553,7 @@ audio {
   }
   .feed {
     border-right: 0;
-    border-bottom: 1px solid #292930;
+    border-bottom: 1px solid var(--border);
   }
   .record-list {
     max-height: 360px;
@@ -1685,14 +1806,15 @@ audio {
   font-size: 15px;
   line-height: 1.6;
   color: var(--text-primary);
-  background: #08080c;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
   resize: vertical;
+  transition: border-color 80ms ease, box-shadow 80ms ease;
 }
 .transcript-editor textarea:focus {
-  outline: 2px solid #fb7185;
-  border-color: #fb7185;
+  outline: 2px solid var(--ph-lemon);
+  border-color: var(--border);
 }
 .transcript-editor details {
   margin-top: 18px;
@@ -2161,8 +2283,9 @@ audio {
 .calendar-count-badge {
   font-size: 10px;
   font-weight: 700;
-  color: var(--text-primary);
-  background: #2a2a38;
+  color: var(--text-secondary);
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 1px 5px;
 }
