@@ -11,6 +11,7 @@ import com.google.android.gms.location.LocationServices
 internal interface JournalLocationUpdates {
     fun request(request: LocationRequest, callback: LocationCallback, registered: () -> Unit, failed: () -> Unit)
     fun remove(callback: LocationCallback)
+    fun getLastLocation(onLocation: (android.location.Location?) -> Unit) { onLocation(null) }
 }
 
 internal class FusedJournalLocationUpdates(context: Context) : JournalLocationUpdates {
@@ -25,5 +26,12 @@ internal class FusedJournalLocationUpdates(context: Context) : JournalLocationUp
 
     override fun remove(callback: LocationCallback) {
         client.removeLocationUpdates(callback)
+    }
+
+    @SuppressLint("MissingPermission")
+    override fun getLastLocation(onLocation: (android.location.Location?) -> Unit) {
+        client.lastLocation
+            .addOnSuccessListener { onLocation(it) }
+            .addOnFailureListener { onLocation(null) }
     }
 }
