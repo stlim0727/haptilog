@@ -55,10 +55,34 @@ fun CaptureScreen(
                     modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     item { Text(stringResource(if (isPaused) R.string.recording_paused else if (isRecording) R.string.recording_state else R.string.app_name),
                         textAlign = TextAlign.Center) }
-                    item { CaptureAction(isRecording, onToggleRecording, Modifier.fillMaxWidth()) }
                     if (isRecording) {
+                        item {
+                            val pauseResumeLabel = stringResource(if (isPaused) R.string.record_resume else R.string.record_pause)
+                            Button(
+                                onClick = onTogglePause,
+                                colors = ButtonDefaults.filledTonalButtonColors(
+                                    containerColor = if (isPaused) WatchColors.Record else Color(0xFF262626),
+                                    contentColor = if (isPaused) WatchColors.OnRecord else Color.White
+                                ),
+                                modifier = Modifier.fillMaxWidth().height(48.dp).semantics { contentDescription = pauseResumeLabel }
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Icon(
+                                        painterResource(if (isPaused) R.drawable.ic_play else R.drawable.ic_pause),
+                                        null,
+                                        Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        stringResource(if (isPaused) R.string.record_resume else R.string.record_pause),
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                        item { CaptureAction(isRecording, onToggleRecording, Modifier.fillMaxWidth()) }
                         item { ElapsedTime(elapsedSeconds, 30) }
                     } else {
+                        item { CaptureAction(isRecording, onToggleRecording, Modifier.fillMaxWidth()) }
                         item { NavigationAction(R.drawable.ic_records, R.string.recordings_action,
                             categoryStyle("MEMO"), onRecordings, Modifier.fillMaxWidth()) }
                         item { NavigationAction(R.drawable.ic_settings, R.string.settings_title,

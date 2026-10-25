@@ -216,6 +216,7 @@ class VoiceRecordingService : Service() {
             _elapsedDurationSeconds.value = (accumulatedElapsedMs / 1000L).coerceAtLeast(0L)
             timerJob?.cancel()
             timeoutJob?.cancel()
+            if (wakeLock?.isHeld == true) wakeLock?.release()
             hapticManager.playPauseFeedback()
             updateForegroundNotification()
         } catch (e: Exception) {
@@ -225,14 +226,20 @@ class VoiceRecordingService : Service() {
 
     private fun resumeRecording() {
         if (!_isRecording.value || !_isPaused.value) return
+        val remainingMs = MAX_RECORDING_MS - accumulatedElapsedMs
+        if (remainingMs <= 0L) {
+            stopRecording()
+            return
+        }
         try {
             mediaRecorder?.resume()
             _isPaused.value = false
             elapsedStartMs = SystemClock.elapsedRealtime()
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+            wakeLock?.acquire(remainingMs + 5000L)
             hapticManager.playStartFeedback()
             hapticManager.startHeartbeatLoop()
             startTimer()
-            val remainingMs = (MAX_RECORDING_MS - accumulatedElapsedMs).coerceAtLeast(5000L)
             startTimeout(remainingMs)
             updateForegroundNotification()
         } catch (e: Exception) {
