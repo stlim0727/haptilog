@@ -10,6 +10,7 @@ const secret = "only-for-tests-a-long-pairing-secret";
 const token = `header.${btoa(JSON.stringify({ sub: userId, session_id: session }))}.signature`;
 function fixture({
   valid = true,
+  google = false,
   rpcError = false,
   result = { watch_id: "HL-0123456789", expires_at: "2026-10-16T15:00:00Z" },
 } = {}) {
@@ -21,7 +22,7 @@ function fixture({
       createClient: () => ({
         auth: {
           getUser: async () => ({
-            data: { user: valid ? { id: userId } : null },
+            data: { user: valid ? { id: userId, is_anonymous: !google, identities: google ? [{ provider: "google" }] : [] } : null },
             error: valid ? null : "bad",
           }),
         },
@@ -198,3 +199,28 @@ test("persistent collisions stop after bounded retries", async () => {
   assert.equal((await handler(req({ action: "issue" }))).status, 503);
   assert.equal(calls.length, 8);
 });
+
+ test("account management requires verified Google identity and ignores forged caller IDs", async () => {
+  const anonymous = fixture();
+  assert.equal((await anonymous.handler(req({ action: "account", operation: "restore", provider: "google" }))).status, 403);
+  assert.equal(anonymous.calls.length, 0);
+  const { handler, calls } = fixture({ google: true });
+  assert.equal((await handler(req({ action: "account", operation: "restore", p_browser: "forged", p_session: "forged" }))).status, 200);
+  assert.deepEqual(calls[0], { name: "manage_watch_account", input: {
+    p_browser: userId, p_session: session, p_action: "restore", p_owner: null,
+  } });
+ });
+ test("Google pairing saves the durable link atomically", async () => {
+  const { handler, calls } = fixture({ google: true });
+  assert.equal((await handler(req({ action: "redeem", code: "123456" }))).status, 200);
+  assert.equal(calls[0].name, "redeem_account_watch_code");
+ });
+ test("account management rejects malformed requests and fails closed on RPC errors", async () => {
+  for (const body of [{ action: "account", operation: "invalid" }, { action: "account", operation: "restore", owner_user_id: "bad" }]) {
+    const { handler, calls } = fixture({ google: true });
+    assert.equal((await handler(req(body))).status, 400);
+    assert.equal(calls.length, 0);
+  }
+  const { handler } = fixture({ google: true, rpcError: true });
+  assert.equal((await handler(req({ action: "account", operation: "save" }))).status, 403);
+ });

@@ -111,4 +111,7 @@
     <string name="notification_sync_body">Automatic retries have stopped. Your recording is still on this watch. Open recordings to review and retry.</string>
     <string name="notification_settings">Notifications</string>
     <string name="notification_settings_hint">Auto-save, capture errors and sync issues</string>
+    <string name="recording_stage_saved">Recording saved</string>
+    <string name="recording_stage_uploaded">Audio uploaded</string>
+    <string name="recording_stage_enriched">AI analysis complete</string>
 </resources>

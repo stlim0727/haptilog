@@ -2,18 +2,25 @@ import { useEffect, useState } from "react";
 import { supabase } from "./client";
 import type { Recording } from "./domain";
 import { latest, transcript } from "./domain";
+import {
+  isDemoSessionActive,
+  getStoredDemoRecords,
+  saveStoredDemoRecords,
+} from "./demo";
 
 type Revision = { id: number; created_at: string; before_value: { transcript?: string | null } | null; after_value: { transcript?: string | null } };
 
-export function TranscriptEditor({ recording, lang, onChange, onError }: {
+export function TranscriptEditor({ recording, lang, onChange, onError, onDirtyChange }: {
   recording: Recording; lang: "ko" | "en";
   onChange: () => Promise<void>; onError: (message: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const ko = lang === "ko";
   const current = transcript(recording);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(current);
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onDirtyChange?.((editing && draft !== current) || busy); }, [editing, draft, current, busy, onDirtyChange]);
   const [history, setHistory] = useState<Revision[] | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [originalOpen, setOriginalOpen] = useState(false);
@@ -31,8 +38,35 @@ export function TranscriptEditor({ recording, lang, onChange, onError }: {
     return () => { active = false; };
   }, [historyOpen, recording.id, recording.recording_corrections?.updated_at]);
   async function save() {
-    if (!supabase) return;
     setBusy(true);
+    if (isDemoSessionActive() || recording.id.startsWith("demo-")) {
+      const stored = getStoredDemoRecords() ?? [];
+      const updated = stored.map((r) => {
+        if (r.id !== recording.id) return r;
+        return {
+          ...r,
+          recording_corrections: {
+            ...(r.recording_corrections ?? {
+              recording_id: r.id,
+              amount: null,
+              currency: null,
+              merchant: null,
+              category: null,
+              completed_tasks: [],
+              updated_at: new Date().toISOString(),
+            }),
+            transcript: draft,
+            updated_at: new Date().toISOString(),
+          },
+        };
+      });
+      saveStoredDemoRecords(updated);
+      await onChange();
+      setEditing(false);
+      setBusy(false);
+      return;
+    }
+    if (!supabase) return;
     try {
       const { error } = await supabase.from("recording_corrections").upsert(
         { recording_id: recording.id, transcript: draft, updated_at: new Date().toISOString() },
@@ -49,12 +83,16 @@ export function TranscriptEditor({ recording, lang, onChange, onError }: {
     {editing ? <form onSubmit={event => { event.preventDefault(); void save(); }}>
       <label>{ko ? "해석된 텍스트" : "Transcript"}
         <textarea autoFocus rows={7} maxLength={50000} value={draft} disabled={busy}
-          onChange={event => setDraft(event.target.value)} />
+          onChange={event => {
+            const next = event.target.value;
+            setDraft(next);
+            onDirtyChange?.(next !== current);
+          }} />
       </label>
       <button className="secondary-button" disabled={busy || draft === current}>
         {busy ? (ko ? "저장 중…" : "Saving…") : (ko ? "저장" : "Save")}
       </button>{" "}
-      <button type="button" className="secondary-button" disabled={busy} onClick={() => setEditing(false)}>{ko ? "취소" : "Cancel"}</button>
+      <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEditing(false); onDirtyChange?.(false); }}>{ko ? "취소" : "Cancel"}</button>
     </form> : <>
       <p className="transcript">{current || (ko ? "인식된 음성이 없습니다." : "No speech detected.")}</p>
       {!recording.deleted_at && <button className="secondary-button" onClick={() => { setDraft(current); setEditing(true); }}>{ko ? "텍스트 편집" : "Edit transcript"}</button>}
