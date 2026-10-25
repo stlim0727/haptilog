@@ -172,6 +172,11 @@ class SettingsActivity : ComponentActivity() {
                                     secondaryLabel = { Text(stringResource(R.string.web_access_hint), maxLines = Int.MAX_VALUE) },
                                     icon = { Icon(painterResource(R.drawable.ic_link), null, Modifier.size(22.dp), tint = Color(0xFFA8D8FF)) })
                             }
+                            item { FlexibleChip(onClick = {
+                                startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))
+                            }, label = { Text(stringResource(R.string.notification_settings), maxLines = Int.MAX_VALUE) },
+                                secondaryLabel = { Text(stringResource(R.string.notification_settings_hint), maxLines = Int.MAX_VALUE) }) }
                             item { SettingsSection(stringResource(R.string.help_group)) }
                             item { FlexibleChip(onClick = {
                                 try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://haptilog.keepory.app/privacy.html"))) }

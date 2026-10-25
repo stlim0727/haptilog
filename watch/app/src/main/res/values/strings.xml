@@ -103,4 +103,20 @@
     <string name="recording_paused">Paused</string>
     <string name="seek_backward_5">Rewind 5s</string>
     <string name="seek_forward_5">Forward 5s</string>
+    <string name="notification_events_channel">Recording updates</string>
+    <string name="notification_recording_channel">Recording in progress</string>
+    <string name="notification_recording_title">HaptiLog recording</string>
+    <string name="notification_recording_body">Recording audio. Tap Stop and save to finish.</string>
+    <string name="notification_stop">Stop and save</string>
+    <string name="notification_auto_stop_title">Recording automatically saved</string>
+    <string name="notification_auto_stop_body">The 3-minute limit was reached. Your recording is saved on this watch.</string>
+    <string name="notification_capture_failed_title">Recording could not be completed</string>
+    <string name="notification_capture_failed_body">Check microphone permission and available storage. Any captured audio is kept, but may be incomplete.</string>
+    <string name="notification_sync_title">Recording sync needs attention</string>
+    <string name="notification_sync_body">Automatic retries have stopped. Your recording is still on this watch. Open recordings to review and retry.</string>
+    <string name="notification_settings">Notifications</string>
+    <string name="notification_settings_hint">Auto-save, capture errors and sync issues</string>
+    <string name="recording_stage_saved">Recording saved</string>
+    <string name="recording_stage_uploaded">Audio uploaded</string>
+    <string name="recording_stage_enriched">AI analysis complete</string>
 </resources>

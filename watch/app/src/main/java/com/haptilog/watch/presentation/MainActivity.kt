@@ -1,5 +1,6 @@
 package com.haptilog.watch.presentation
 
+import com.haptilog.watch.notifications.RecordingNotifications
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
@@ -170,7 +171,8 @@ class MainActivity : ComponentActivity() {
                         if (handledRequest != request) {
                             audioPlayer.stop()
                             openDetailId = null
-                            showRecordings = false
+                            showRecordings = intent.getBooleanExtra(RecordingNotifications.EXTRA_RECORDINGS, false)
+                            intent.removeExtra(RecordingNotifications.EXTRA_RECORDINGS)
                             listState.scrollToItem(0)
                             handledRequest = request
                         }

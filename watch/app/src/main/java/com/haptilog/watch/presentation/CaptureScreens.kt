@@ -264,7 +264,18 @@ fun RecordingCard(item: RecordingItem, cloudEnabled: Boolean, onOpen: () -> Unit
     val context = LocalContext.current
     val category = categoryStyle(item.intentType)
     val expanded = LocalDensity.current.fontScale > 1.3f
-    Card(onClick = onOpen, modifier = modifier.fillMaxWidth(), transformation = transformation,
+    val needsAttention = item.syncStatus in setOf("ACTION_REQUIRED", "CAPTURE_FAILED", "RECOVERY_REQUIRED")
+    val statusDescription = listOfNotNull(recordingStageLabel(context, item),
+        recordingSyncLabel(context, item, cloudEnabled).takeIf { item.syncStatus != "SYNCED" }).joinToString(" · ")
+    val statusColor = when {
+        needsAttention -> Color(0xFFFFBE78)
+        item.syncStatus == "SYNCED" -> Color(0xFF94D9AC)
+        item.uploaded -> Color(0xFF9CCAFF)
+        else -> WatchColors.Muted
+    }
+    Card(onClick = onOpen, modifier = modifier.fillMaxWidth().semantics {
+        stateDescription = statusDescription
+    }, transformation = transformation,
         colors = CardDefaults.cardColors(containerColor = category.surface),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -276,15 +287,16 @@ fun RecordingCard(item: RecordingItem, cloudEnabled: Boolean, onOpen: () -> Unit
                     fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold)
                 if (!expanded) RecordingMetadata(item, compact = true)
             }
+            Box(Modifier.align(Alignment.Top).padding(top = 5.dp).size(6.dp)
+                .background(statusColor, CircleShape))
         }
         if (expanded) {
             Spacer(Modifier.height(4.dp))
             RecordingMetadata(item, compact = true)
         }
-        if ((cloudEnabled && item.syncStatus != "SYNCED") ||
-            item.syncStatus in setOf("ACTION_REQUIRED", "CAPTURE_FAILED", "RECOVERY_REQUIRED")) {
+        if (needsAttention) {
             Text(recordingSyncLabel(context, item, cloudEnabled), style = MaterialTheme.typography.bodySmall,
-                color = if (item.syncStatus in setOf("ACTION_REQUIRED", "CAPTURE_FAILED", "RECOVERY_REQUIRED")) WatchColors.Error else WatchColors.Muted)
+                color = WatchColors.Error)
         }
     }
 }

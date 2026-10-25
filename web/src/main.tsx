@@ -1,3 +1,4 @@
+import { signInGoogle, watchAccount, type AccountWatch } from "./account";
 import React, { Fragment, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -23,11 +24,26 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Sparkles,
   Trash,
   Trash2,
   Watch,
 } from "lucide-react";
-import { supabase } from "./client";
+import { supabase, authCallbackFailed } from "./client";
+import {
+  DEMO_MODE_STORAGE_KEY,
+  DEMO_SESSION_ID,
+  DEMO_WATCH_ID,
+  DEMO_OWNER_ID,
+  isPreviewEnvironment,
+  isDemoSessionActive,
+  getStoredDemoRecords,
+  saveStoredDemoRecords,
+  clearDemoState,
+  generateSampleRecordings,
+  createDemoAudioBlob,
+} from "./demo";
+import { MobileWorkspace } from "./MobileWorkspace";
 import { NotionExport } from "./NotionExport";
 import { TranscriptEditor } from "./TranscriptEditor";
 import { purgeRecordings } from "./purge";
@@ -52,6 +68,7 @@ import type { Correction, Recording } from "./domain";
 import { translations, getInitialLanguage } from "./i18n";
 import type { Language, TranslationKeys } from "./i18n";
 import "./style.css";
+import "./mobile.css";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
@@ -81,9 +98,26 @@ function Brand() {
   );
 }
 function App() {
+  const [draftInProgress, setDraftInProgress] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 700px)").matches);
+  useEffect(() => {
+    // Rotating/resizing must not unmount an editor with unsaved changes.
+    if (draftInProgress || mobileDetailOpen) return;
+    const query = window.matchMedia("(max-width: 700px)");
+    setMobile(query.matches);
+    const update = () => setMobile(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, [draftInProgress, mobileDetailOpen]);
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [accountWatches, setAccountWatches] = useState<AccountWatch[]>([]);
+  const [addingWatch, setAddingWatch] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [checking, setChecking] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(authCallbackFailed
+    ? translations[getInitialLanguage()].google_error : "");
   const [records, setRecords] = useState<Recording[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [truncated, setTruncated] = useState(false);
@@ -95,10 +129,30 @@ function App() {
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
+  const [showTimeSlider, setShowTimeSlider] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "spatiotemporal" | "calendar">("list");
   const [stripDateKey, setStripDateKey] = useState<string>("ALL");
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window === "undefined") return "dark";
+    const saved = localStorage.getItem("haptilog_theme");
+    return saved === "light" || saved === "dark" ? saved : "dark";
+  });
   const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [isDemo, setIsDemo] = useState(isDemoSessionActive);
+  const showTestLogin = isPreviewEnvironment();
   const t = translations[lang];
+  useEffect(() => { document.documentElement.lang = lang; }, [lang]);
+
+  useEffect(() => {
+    document.body.classList.toggle("dark-mode", theme === "dark");
+    document.body.classList.toggle("light-mode", theme === "light");
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("haptilog_theme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  }
 
   function toggleLang() {
     const next = lang === "en" ? "ko" : "en";
@@ -106,19 +160,50 @@ function App() {
     localStorage.setItem("haptilog_language", next);
   }
   const generation = useRef(0);
+  const authenticatedUser = useRef<string | null>(null);
   const refreshConnection = useCallback(async () => {
+    if (isDemoSessionActive()) {
+      setIsDemo(true);
+      setConnection({
+        session_id: DEMO_SESSION_ID,
+        watch_id: DEMO_WATCH_ID,
+        owner_user_id: DEMO_OWNER_ID,
+        expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      });
+      const stored = getStoredDemoRecords() ?? generateSampleRecordings();
+      saveStoredDemoRecords(stored);
+      setRecords(stored);
+      setLoaded(true);
+      setChecking(false);
+      setLastChecked(new Date());
+      return;
+    }
     if (!supabase) {
       setChecking(false);
       return;
     }
+    const epoch = generation.current;
     const {
-      data: { session },
+      data: { session }, error: sessionError,
     } = await supabase.auth.getSession();
+    if (epoch !== generation.current) return;
+    if (sessionError) setError("Could not complete sign-in. Try Google sign-in again.");
+    const google = session && !session.user.is_anonymous && session.user.identities?.some(i => i.provider === "google");
+    setAccountEmail(google ? session.user.email ?? "Google" : null);
     if (!session) {
       setChecking(false);
       return;
     }
-    const { data, error } = await supabase
+    let watches: AccountWatch[] = [];
+    if (google) {
+      try {
+        watches = await watchAccount("list");
+        if (epoch !== generation.current) return;
+        setAccountWatches(watches);
+      }
+      catch { setError("Could not load account connections. Try again."); }
+    }
+    let { data, error } = await supabase
       .from("portal_connections")
       .select("session_id,watch_id,owner_user_id,expires_at")
       .eq("browser_user_id", session.user.id)
@@ -126,6 +211,18 @@ function App() {
       .gt("expires_at", new Date().toISOString())
       .limit(1)
       .maybeSingle();
+    if (epoch !== generation.current) return;
+    if (!error && !data && watches.length) {
+      try {
+        await watchAccount("restore", watches[0].owner_user_id);
+        const result = await supabase.from("portal_connections")
+          .select("session_id,watch_id,owner_user_id,expires_at")
+          .eq("browser_user_id", session.user.id).is("revoked_at", null)
+          .gt("expires_at", new Date().toISOString()).limit(1).maybeSingle();
+        data = result.data; error = result.error;
+      } catch { setError("Could not restore your watch. Open Account to try again."); }
+    }
+    if (epoch !== generation.current) return;
     if (error) setError("Could not check your connection. Try again.");
     setConnection(data);
     setChecking(false);
@@ -137,17 +234,35 @@ function App() {
     if (!supabase) return;
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const userId = session?.user.id ?? null;
+      const identityChanged = authenticatedUser.current !== userId;
+      authenticatedUser.current = userId;
+      if (event === "SIGNED_OUT" || identityChanged) {
         generation.current++;
         setConnection(null);
         setRecords([]);
         setLoaded(false);
+        setAccountEmail(null);
+        setAccountWatches([]);
+        setAccountOpen(false);
+        setAddingWatch(false);
+      }
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED") {
+        // Defer Supabase calls until outside the Auth callback lock.
+        setTimeout(() => { void refreshConnection(); }, 0);
       }
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [refreshConnection]);
   const load = useCallback(async () => {
+    if (isDemoSessionActive()) {
+      const stored = getStoredDemoRecords();
+      if (stored) setRecords(stored);
+      setLoaded(true);
+      setLastChecked(new Date());
+      return;
+    }
     if (!supabase || !connection) return;
     const epoch = generation.current;
     const { data: grants, error: grantError } = await supabase
@@ -222,6 +337,9 @@ function App() {
       });
       if (error) throw error;
       setCode("");
+      generation.current++;
+      setRecords([]); setLoaded(false); setSelected(null);
+      setAddingWatch(false);
       await refreshConnection();
     } catch {
       setError(
@@ -231,7 +349,86 @@ function App() {
       setBusy(false);
     }
   }
+  function loginWithSampleData() {
+    setBusy(true);
+    setError("");
+    try {
+      const samples = generateSampleRecordings();
+      localStorage.setItem(DEMO_MODE_STORAGE_KEY, "true");
+      saveStoredDemoRecords(samples);
+      setIsDemo(true);
+      setConnection({
+        session_id: DEMO_SESSION_ID,
+        watch_id: DEMO_WATCH_ID,
+        owner_user_id: DEMO_OWNER_ID,
+        expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      });
+      setRecords(samples);
+      setLoaded(true);
+      setChecking(false);
+      setLastChecked(new Date());
+      setSelected(null);
+    } catch {
+      setError(
+        lang === "ko"
+          ? "샘플 데이터를 생성하지 못했습니다."
+          : "Could not initialize sample recordings.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function resetSampleData() {
+    const samples = generateSampleRecordings();
+    saveStoredDemoRecords(samples);
+    setRecords(samples);
+    setSelected(null);
+    setToast({
+      message:
+        lang === "ko"
+          ? "샘플 데이터를 초기화했습니다."
+          : "Sample recordings reset.",
+    });
+  }
+
+  async function googleLogin(existingAccount = false) {
+    setBusy(true); setError("");
+    try {
+      if (existingAccount && supabase) {
+        const { error } = await supabase.auth.signInWithOAuth({ provider: "google",
+          options: { redirectTo: `${window.location.origin}/`, queryParams: { prompt: "select_account" } } });
+        if (error) throw error;
+      } else await signInGoogle();
+    } catch { setError(t.google_error); }
+    finally { setBusy(false); }
+  }
+
+  async function accountOperation(operation: "save" | "restore" | "unlink", owner?: string) {
+    if (draftInProgress || busy) return;
+    if (operation === "unlink" && !window.confirm(t.unlink_confirm)) return;
+    setBusy(true); setError("");
+    // Unmount players/editors and invalidate in-flight reads when switching owners.
+    generation.current++; setRecords([]); setLoaded(false); setSelected(null);
+    setConnection(null);
+    try {
+      setAccountWatches(await watchAccount(operation, owner));
+      await refreshConnection();
+      setAddingWatch(false);
+    } catch { setError(t.account_error); await refreshConnection(); }
+    finally { setBusy(false); }
+  }
   async function disconnect() {
+    if (isDemo) {
+      clearDemoState();
+      setIsDemo(false);
+      generation.current++;
+      setConnection(null);
+      setRecords([]);
+      setLoaded(false);
+      setSelected(null);
+      return;
+    }
     if (!supabase || !connection) return;
     setBusy(true);
     setError("");
@@ -257,12 +454,17 @@ function App() {
   const pendingTrashUpdates = useRef<Map<string, Promise<unknown>>>(new Map());
 
   async function moveToTrash(id: string) {
-    if (!supabase) return;
     const now = new Date().toISOString();
-    setRecords((prev) =>
-      prev.map((rec) => (rec.id === id ? { ...rec, deleted_at: now } : rec)),
-    );
+    setRecords((prev) => {
+      const updated = prev.map((rec) =>
+        rec.id === id ? { ...rec, deleted_at: now } : rec,
+      );
+      if (isDemo) saveStoredDemoRecords(updated);
+      return updated;
+    });
     setToast({ message: t.toast_moved_trash, undoId: id });
+    if (isDemo) return;
+    if (!supabase) return;
     const writePromise = (async () => {
       const { error } = await supabase
         .from("recordings")
@@ -279,11 +481,16 @@ function App() {
   }
 
   async function restoreRecording(id: string) {
-    if (!supabase) return;
-    setRecords((prev) =>
-      prev.map((rec) => (rec.id === id ? { ...rec, deleted_at: null } : rec)),
-    );
+    setRecords((prev) => {
+      const updated = prev.map((rec) =>
+        rec.id === id ? { ...rec, deleted_at: null } : rec,
+      );
+      if (isDemo) saveStoredDemoRecords(updated);
+      return updated;
+    });
     setToast(null);
+    if (isDemo) return;
+    if (!supabase) return;
     const pending = pendingTrashUpdates.current.get(id);
     if (pending) await pending.catch(() => {});
     const { data, error } = await supabase
@@ -315,12 +522,29 @@ function App() {
 
   async function deletePermanently(id: string) {
     if (!window.confirm(t.confirm_delete)) return;
+    if (isDemo) {
+      setRecords((prev) => {
+        const updated = prev.filter((rec) => rec.id !== id);
+        saveStoredDemoRecords(updated);
+        return updated;
+      });
+      if (selected === id) setSelected(null);
+      return;
+    }
     await completePurge([id]);
   }
 
   async function emptyTrash() {
     const ids = records.filter((r) => r.deleted_at).map((r) => r.id);
     if (!ids.length || !window.confirm(t.confirm_empty_trash(ids.length))) return;
+    if (isDemo) {
+      setRecords((prev) => {
+        const updated = prev.filter((r) => !r.deleted_at);
+        saveStoredDemoRecords(updated);
+        return updated;
+      });
+      return;
+    }
     await completePurge(ids);
   }
 
@@ -350,6 +574,10 @@ function App() {
   const spatioFiltered = stripDateKey === "ALL"
     ? filtered
     : filtered.filter((r) => localDate(r.recorded_at) === stripDateKey);
+  const displayRecordings =
+    viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
+      ? spatioFiltered
+      : filtered;
   const dateFilteredActiveRecords = activeRecords.filter((r) => {
     const day = localDate(r.recorded_at),
       today = toLocalDateString();
@@ -385,6 +613,15 @@ function App() {
         <span className="top-label">{t.brand_slogan}</span>
         <div className="top-right">
           <button
+            className="theme-switch-btn"
+            onClick={toggleTheme}
+            title={theme === "dark" ? t.theme_light : t.theme_dark}
+            aria-label={t.theme_toggle}
+          >
+            <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
+            <span className="theme-btn-text">{theme === "dark" ? t.theme_light : t.theme_dark}</span>
+          </button>
+          <button
             className="lang-switch-btn"
             onClick={toggleLang}
             title={lang === "en" ? "한국어로 변경" : "Switch to English"}
@@ -414,6 +651,34 @@ function App() {
           )}
         </div>
       </header>
+      {supabase && <section className="account-bar" aria-label={t.account}>
+        <button onClick={() => setAccountOpen(!accountOpen)} aria-expanded={accountOpen}>{t.account}</button>
+        {!accountEmail && <button disabled={busy || draftInProgress} onClick={() => googleLogin()}>{t.google_signin}</button>}
+        {accountOpen && <div className="account-panel">
+          {accountEmail ? <>
+            <p>{t.signed_in_as}: {accountEmail}</p>
+            {connection && (accountWatches.some(w => w.owner_user_id === connection.owner_user_id)
+              ? <p role="status">{t.account_saved}</p>
+              : <button disabled={busy || draftInProgress} onClick={() => accountOperation("save")}>{t.save_account}</button>)}
+            {accountWatches.map(w => <div className="account-watch" key={w.owner_user_id}>
+              <button disabled={busy || draftInProgress} onClick={() => accountOperation("restore", w.owner_user_id)}>{w.watch_id}</button>
+              <button disabled={busy || draftInProgress} onClick={() => accountOperation("unlink", w.owner_user_id)} aria-label={`${t.unlink_watch} ${w.watch_id}`}>{t.unlink_watch}</button>
+            </div>)}
+            <button disabled={busy || draftInProgress} onClick={() => { setAddingWatch(true); setAccountOpen(false); }}>{t.add_watch}</button>
+            <button disabled={busy || draftInProgress} onClick={async () => {
+              if (!supabase) return;
+              const { error } = await supabase.auth.signOut({ scope: "local" });
+              if (error) setError(t.account_error);
+            }}>{t.sign_out}</button>
+            <p>{t.signout_help}</p>
+          </> : <>
+            <p>{t.recovery_help}</p>
+            <button disabled={busy || draftInProgress} onClick={() => googleLogin(true)}>{t.google_existing}</button>
+            <p>{t.google_existing_help}</p>
+          </>}
+          <p>{t.recovery_limit}</p>
+        </div>}
+      </section>}
       {error && (
         <div className="error-banner" role="alert">
           {error}
@@ -444,11 +709,12 @@ function App() {
           </div>
         </div>
       )}
+      {!mobile && connection && !accountEmail && <p className="recovery-notice">{t.recovery_help}</p>}
       {checking ? (
         <main className="loading">
           <LoaderCircle className="spin" /> {t.opening_space}
         </main>
-      ) : !connection ? (
+      ) : !connection || addingWatch ? (
         <main className="pair-page">
           <section className="pair-story">
             <span className="eyebrow">
@@ -491,7 +757,9 @@ function App() {
           </section>
           <section className="pair-card">
             <span className="step-label">{t.step_label}</span>
-            <h2>{t.connect_title}</h2>
+            <h2>{addingWatch ? t.add_watch : t.connect_title}</h2>
+            {addingWatch && connection && <button onClick={() => setAddingWatch(false)}>{t.cancel_pair}</button>}
+            {accountEmail && <p>{t.account_pair_help}</p>}
             <p>{t.connect_desc}</p>
             {!supabase ? (
               <div className="setup-note">
@@ -526,6 +794,32 @@ function App() {
                 </button>
               </form>
             )}
+            {showTestLogin && (
+              <div className="preview-test-card" data-testid="preview-test-login-card">
+                <div className="preview-divider">
+                  <span>{t.preview_divider_or}</span>
+                </div>
+                <div className="preview-test-header">
+                  <span className="preview-test-badge">
+                    <Sparkles size={12} />
+                    {t.preview_test_badge}
+                  </span>
+                </div>
+                <p className="preview-test-desc">
+                  {t.preview_test_desc}
+                </p>
+                <button
+                  type="button"
+                  className="test-login-btn"
+                  data-testid="preview-test-login-button"
+                  onClick={loginWithSampleData}
+                  disabled={busy}
+                >
+                  <Sparkles size={15} />
+                  <span>{t.preview_test_login_btn}</span>
+                </button>
+              </div>
+            )}
             <div className="pair-footnote">
               <Link2 size={15} />
               <span>
@@ -539,8 +833,48 @@ function App() {
             </div>
           </section>
         </main>
+      ) : mobile ? (
+        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} loaded={loaded} truncated={truncated}
+          date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
+          summary={summary} count={dateFilteredActiveRecords.length} seconds={totalSeconds} lastChecked={lastChecked}
+          lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
+          isDemo={isDemo} onResetDemo={resetSampleData}
+          renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
+            onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
+            lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
       ) : (
         <main className="workspace">
+          {isDemo && (
+            <div className="demo-mode-banner" role="status" aria-label="Demo mode notice">
+              <div className="demo-banner-content">
+                <span className="demo-banner-badge">
+                  <Sparkles size={12} />
+                  {t.preview_banner_badge}
+                </span>
+                <span className="demo-banner-text">{t.preview_banner_text}</span>
+              </div>
+              <div className="demo-banner-actions">
+                <button
+                  type="button"
+                  className="demo-reset-btn"
+                  onClick={resetSampleData}
+                  title={t.preview_banner_reset}
+                >
+                  <RotateCcw size={13} />
+                  {t.preview_banner_reset}
+                </button>
+                <button
+                  type="button"
+                  className="demo-exit-btn"
+                  onClick={disconnect}
+                  title={t.preview_banner_exit}
+                >
+                  <LogOut size={13} />
+                  {t.preview_banner_exit}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="page-heading">
             <div>
               <span className="eyebrow">{t.evening_review}</span>
@@ -662,13 +996,35 @@ function App() {
                 aria-selected={viewMode === "calendar"}
                 className={viewMode === "calendar" ? "active" : ""}
                 onClick={() => {
+                  if (viewMode === "calendar") return;
                   if (category === "Trash") setCategory("All");
+                  setSelected(null);
                   setViewMode("calendar");
                 }}
               >
                 <CalendarDays size={14} /> {t.view_calendar}
               </button>
             </div>
+            {viewMode === "list" && !isTrashView && (
+              <div className="workbench-toggles">
+                <button
+                  type="button"
+                  className={`workbench-toggle-btn ${showTimeSlider ? "active" : ""}`}
+                  onClick={() => setShowTimeSlider(!showTimeSlider)}
+                  aria-expanded={showTimeSlider}
+                >
+                  <Clock size={14} /> {showTimeSlider ? t.hide_time_slider : t.toggle_time_slider}
+                </button>
+                <button
+                  type="button"
+                  className={`workbench-toggle-btn ${showMap ? "active" : ""}`}
+                  onClick={() => setShowMap(!showMap)}
+                  aria-expanded={showMap}
+                >
+                  <MapPin size={14} /> {showMap ? t.hide_map : t.show_map}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="global-filters-bar">
@@ -792,78 +1148,118 @@ function App() {
                 }
               }}
               t={t}
+              lang={lang}
+              onDateChange={() => {
+                if (draftInProgress && !window.confirm(lang === "ko"
+                  ? "저장하지 않은 변경을 버리고 날짜를 바꿀까요?"
+                  : "Discard unsaved changes and change the date?")) return false;
+                setSelected(null);
+                return true;
+              }}
             />
           ) : (
-            <div className="review-layout">
-              <section className="map-section" aria-label="Recording map view">
-                <div className="map-heading">
-                  <div>
-                    <h2>{t.map_heading}</h2>
-                    <p>{t.map_desc}</p>
+            <>
+              {showTimeSlider && (
+                <div className="workbench-slider-wrapper">
+                  <TimeSliderStrip
+                    recordings={filtered}
+                    selectedDateKey={stripDateKey}
+                    onSelectDate={setStripDateKey}
+                    t={t}
+                    lang={lang}
+                  />
+                </div>
+              )}
+              <div className="review-layout">
+                {showMap && (
+                  <section className="map-section" aria-label="Recording map view">
+                    <div className="map-heading">
+                      <div>
+                        <h2>{t.map_heading}</h2>
+                        <p>{t.map_desc}</p>
+                      </div>
+                      <button
+                        className="map-close-btn"
+                        onClick={() => setShowMap(false)}
+                        aria-label="Close map"
+                        title={t.hide_map}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <MapBoundary>
+                      <Suspense fallback={<p>{t.loading_map}</p>}>
+                        <RecordingMap
+                          recordings={displayRecordings}
+                          selectedId={active?.id ?? null}
+                          onSelect={(id, revealDetails) => {
+                            setSelected(id);
+                            if (revealDetails) {
+                              requestAnimationFrame(() =>
+                                document.querySelector(".inspector")?.scrollIntoView({
+                                  block: "start",
+                                  behavior: "smooth",
+                                }),
+                              );
+                            }
+                          }}
+                        />
+                      </Suspense>
+                    </MapBoundary>
+                  </section>
+                )}
+                <section className="feed" aria-label="Recordings">
+                  <div className="feed-heading">
+                    <h2>{isTrashView ? t.trash : t.your_moments}</h2>
+                    <div className="feed-heading-right">
+                      {isTrashView && trashedCount > 0 && (
+                        <button
+                          className="text-button empty-trash-btn"
+                          onClick={emptyTrash}
+                        >
+                          {t.empty_trash}
+                        </button>
+                      )}
+                      <span>{displayRecordings.length}</span>
+                    </div>
                   </div>
-                  <button className="secondary-button" onClick={() => setShowMap(!showMap)} aria-expanded={showMap}>
-                    <MapPin size={16} />{showMap ? t.hide_map : t.show_map}
-                  </button>
-                </div>
-                {showMap && <MapBoundary><Suspense fallback={<p>{t.loading_map}</p>}>
-                  <RecordingMap recordings={filtered} selectedId={active?.id ?? null} onSelect={(id, revealDetails) => {
-                    setSelected(id);
-                    if (revealDetails) requestAnimationFrame(() => document.querySelector(".inspector")?.scrollIntoView({ block: "start", behavior: "smooth" }));
-                  }} />
-                </Suspense></MapBoundary>}
-              </section>
-              <section className="feed" aria-label="Recordings">
-              <div className="feed-heading">
-                <h2>{isTrashView ? t.trash : t.your_moments}</h2>
-                <div className="feed-heading-right">
-                  {isTrashView && trashedCount > 0 && (
-                    <button
-                      className="text-button empty-trash-btn"
-                      onClick={emptyTrash}
-                    >
-                      {t.empty_trash}
-                    </button>
-                  )}
-                  <span>{filtered.length}</span>
-                </div>
-              </div>
-              {!loaded ? (
-                <div className="empty">
-                  <LoaderCircle className="spin" />
-                  <h3>{t.finding_moments}</h3>
-                </div>
-              ) : !filtered.length ? (
-                <div className="empty">
-                  {isTrashView ? (
-                    <>
-                      <Trash2 size={30} />
-                      <h3>{t.empty_trash_title}</h3>
-                      <p>
-                        {t.empty_trash_desc}
-                      </p>
-                    </>
+                  {!loaded ? (
+                    <div className="empty">
+                      <LoaderCircle className="spin" />
+                      <h3>{t.finding_moments}</h3>
+                    </div>
+                  ) : !displayRecordings.length ? (
+                    <div className="empty">
+                      {isTrashView ? (
+                        <>
+                          <Trash2 size={30} />
+                          <h3>{t.empty_trash_title}</h3>
+                          <p>
+                            {t.empty_trash_desc}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <Mic size={30} />
+                          <h3>
+                            {records.length
+                              ? t.empty_active_title
+                              : t.empty_first_title}
+                          </h3>
+                          <p>
+                            {records.length
+                              ? t.empty_active_desc
+                              : t.empty_first_desc}
+                          </p>
+                          <small>
+                            {t.demo_note}
+                          </small>
+                        </>
+                      )}
+                    </div>
                   ) : (
-                    <>
-                      <Mic size={30} />
-                      <h3>
-                        {records.length
-                          ? t.empty_active_title
-                          : t.empty_first_title}
-                      </h3>
-                      <p>
-                        {records.length
-                          ? t.empty_active_desc
-                          : t.empty_first_desc}
-                      </p>
-                      <small>
-                        {t.demo_note}
-                      </small>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="record-list">
-                  {filtered.map((r) => {
+                    <div className="record-list">
+                      {displayRecordings.map((r) => {
                     const e = latest(r),
                       state = processingState(r),
                       x = expense(r);
@@ -917,12 +1313,14 @@ function App() {
                   key={`${active.id}:${connection.session_id}`}
                   recording={active}
                   onChange={load}
+                  onDirtyChange={setDraftInProgress}
                   onError={setError}
                   onMoveToTrash={moveToTrash}
                   onRestore={restoreRecording}
                   onDeletePermanently={deletePermanently}
                   lang={lang}
                   t={t}
+                  isDemo={isDemo}
                 />
               ) : (
                 <div className="inspector-empty">
@@ -942,20 +1340,23 @@ function App() {
               )}
             </section>
           </div>
+          </>
           )}
 
-          {viewMode !== "list" && active && (
+          {viewMode !== "list" && active && (viewMode !== "calendar" || selected === active.id) && (
             <section className="inspector" style={{ marginTop: "24px" }} aria-label="Selected recording details">
               <Inspector
                 key={active.id}
                 recording={active}
                 onChange={load}
+                onDirtyChange={setDraftInProgress}
                 onError={setError}
                 onMoveToTrash={moveToTrash}
                 onRestore={restoreRecording}
                 onDeletePermanently={deletePermanently}
                 lang={lang}
                 t={t}
+                isDemo={isDemo}
               />
             </section>
           )}
@@ -985,6 +1386,8 @@ function Inspector({
   onDeletePermanently,
   lang,
   t,
+  onDirtyChange,
+  isDemo,
 }: {
   recording: Recording;
   onChange: () => Promise<void>;
@@ -994,6 +1397,8 @@ function Inspector({
   onDeletePermanently: (id: string) => Promise<void>;
   lang: Language;
   t: TranslationKeys;
+  onDirtyChange?: (dirty: boolean) => void;
+  isDemo?: boolean;
 }) {
   const e = latest(r),
     x = expense(r),
@@ -1007,6 +1412,15 @@ function Inspector({
   const [merchant, setMerchant] = useState(x?.merchant ?? "");
   const [category, setCategory] = useState(x?.category ?? "");
   const [dirty, setDirty] = useState(false);
+  const [transcriptDirty, setTranscriptDirty] = useState(false);
+  const onDirtyChangeRef = useRef(onDirtyChange);
+  onDirtyChangeRef.current = onDirtyChange;
+  const updateTranscriptDirty = useCallback((isDirty: boolean) => {
+    setTranscriptDirty(isDirty);
+    onDirtyChangeRef.current?.(dirty || isDirty || saving);
+  }, [dirty, saving]);
+  useEffect(() => { onDirtyChange?.(dirty || transcriptDirty || saving); }, [dirty, transcriptDirty, saving, onDirtyChange]);
+  useEffect(() => () => { onDirtyChangeRef.current?.(false); }, []);
   const player = useRef<HTMLAudioElement>(null);
   const objectUrl = useRef("");
   const mounted = useRef(true);
@@ -1026,7 +1440,14 @@ function Inspector({
     }
   }, [r.recording_corrections?.updated_at, e?.created_at, dirty]);
   async function prepareAudio() {
-    if (!supabase || !r.audio_path || audioUrl) return;
+    if (audioUrl) return;
+    if (isDemo || r.audio_path?.startsWith("demo/")) {
+      const blob = createDemoAudioBlob();
+      objectUrl.current = URL.createObjectURL(blob);
+      setAudioUrl(objectUrl.current);
+      return;
+    }
+    if (!supabase || !r.audio_path) return;
     setAudioBusy(true);
     const { data, error } = await supabase.storage
       .from("recordings")
@@ -1041,6 +1462,16 @@ function Inspector({
     setAudioBusy(false);
   }
   async function retry() {
+    if (isDemo || r.id.startsWith("demo-")) {
+      setRetryBusy(true);
+      setTimeout(async () => {
+        if (mounted.current) {
+          await onChange();
+          setRetryBusy(false);
+        }
+      }, 300);
+      return;
+    }
     if (!supabase) return;
     const consentText = lang === "ko"
       ? "AI 분석은 만 18세 이상만 사용할 수 있습니다. 음성과 녹음 시각이 Supabase 및 Google Gemini에서 처리됩니다. 민감한 내용은 보내지 마세요. 개인정보처리방침: https://haptilog.keepory.app/privacy.html\n만 18세 이상이며 이 처리에 동의합니까? 워치에서도 동의가 필요합니다."
@@ -1068,6 +1499,35 @@ function Inspector({
     }
   }
   async function saveCorrection(patch: Partial<Correction>) {
+    if (isDemo || r.id.startsWith("demo-")) {
+      setSaving(true);
+      const stored = getStoredDemoRecords() ?? [];
+      const updated = stored.map((rec) => {
+        if (rec.id !== r.id) return rec;
+        return {
+          ...rec,
+          recording_corrections: {
+            ...(rec.recording_corrections ?? {
+              recording_id: r.id,
+              amount: null,
+              currency: null,
+              merchant: null,
+              category: null,
+              completed_tasks: [],
+              updated_at: new Date().toISOString(),
+            }),
+            ...patch,
+            updated_at: new Date().toISOString(),
+          },
+        };
+      });
+      saveStoredDemoRecords(updated);
+      if (mounted.current) {
+        await onChange();
+        setSaving(false);
+      }
+      return true;
+    }
     if (!supabase) return false;
     setSaving(true);
     const { error } = await supabase
@@ -1253,12 +1713,15 @@ function Inspector({
               ? (lang === "ko" ? "사용자 편집 · 원본 보존" : "Edited · original preserved")
               : t.transcript_note}</span>
           </div>
-          <TranscriptEditor recording={r} lang={lang} onChange={onChange} onError={onError} />
+          <TranscriptEditor recording={r} lang={lang} onChange={onChange} onError={onError} onDirtyChange={updateTranscriptDirty} />
           {x && (
             <form
               className="expense-form"
               onSubmit={saveExpense}
-              onChange={() => setDirty(true)}
+              onChange={() => {
+                setDirty(true);
+                onDirtyChangeRef.current?.(true);
+              }}
             >
               <div className="section-label">
                 {t.expense_details} <span>{t.expense_note}</span>

@@ -15,6 +15,7 @@ jobs:
     env:
       VITE_SUPABASE_URL: ${{ vars.HAPTILOG_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.HAPTILOG_SUPABASE_PUBLISHABLE_KEY }}
+      VITE_DISABLE_TEST_LOGIN: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

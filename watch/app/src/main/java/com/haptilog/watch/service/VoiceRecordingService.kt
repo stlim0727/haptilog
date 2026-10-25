@@ -1,5 +1,7 @@
 package com.haptilog.watch.service
 
+import com.haptilog.watch.R
+import com.haptilog.watch.notifications.RecordingNotifications
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
@@ -88,7 +90,7 @@ class VoiceRecordingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> startRecording()
-            ACTION_STOP -> stopRecording()
+            ACTION_STOP -> if (_isRecording.value) stopRecording() else stopSelf()
             ACTION_TOGGLE -> {
                 if (_isRecording.value) stopRecording() else startRecording()
             }
@@ -108,6 +110,7 @@ class VoiceRecordingService : Service() {
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             hapticManager.playFailureFeedback()
+            RecordingNotifications.captureFailed(this)
             stopSelf()
             return
         }
@@ -202,7 +205,7 @@ class VoiceRecordingService : Service() {
                 delay(remainingMs.coerceAtLeast(0L))
             }
             if (_isRecording.value) {
-                stopRecording()
+                stopRecording(autoStopped = true)
             }
         }
     }
@@ -228,7 +231,7 @@ class VoiceRecordingService : Service() {
         if (!_isRecording.value || !_isPaused.value) return
         val remainingMs = MAX_RECORDING_MS - accumulatedElapsedMs
         if (remainingMs <= 0L) {
-            stopRecording()
+            stopRecording(autoStopped = true)
             return
         }
         try {
@@ -247,7 +250,7 @@ class VoiceRecordingService : Service() {
         }
     }
 
-    private fun stopRecording() {
+    private fun stopRecording(autoStopped: Boolean = false) {
         if (!_isRecording.value) return
 
         timerJob?.cancel()
@@ -285,11 +288,15 @@ class VoiceRecordingService : Service() {
             saved = false
             e.printStackTrace()
         }
+        if (wakeLock?.isHeld == true) wakeLock?.release()
         if (saved) {
             hapticManager.playStopFeedback()
             com.haptilog.watch.sync.RecordingSyncWorker.schedule(this)
-        } else hapticManager.playFailureFeedback()
-        if (wakeLock?.isHeld == true) wakeLock?.release()
+            if (autoStopped) RecordingNotifications.autoStopped(this)
+        } else {
+            hapticManager.playFailureFeedback()
+            RecordingNotifications.captureFailed(this)
+        }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -341,6 +348,7 @@ class VoiceRecordingService : Service() {
         hapticManager.playFailureFeedback()
         if (wakeLock?.isHeld == true) wakeLock?.release()
         stopForeground(STOP_FOREGROUND_REMOVE)
+        RecordingNotifications.captureFailed(this)
         stopSelf()
     }
 
@@ -348,10 +356,10 @@ class VoiceRecordingService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Voice Recording Service",
+                getString(R.string.notification_recording_channel),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shows ongoing status of HaptiLog voice capture"
+                description = getString(R.string.notification_recording_body)
             }
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
@@ -366,12 +374,18 @@ class VoiceRecordingService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
-        val contentText = if (_isPaused.value) "Recording paused" else "Capturing voice & location..."
+        val contentText = if (_isPaused.value) getString(R.string.recording_paused) else getString(R.string.notification_recording_body)
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("HaptiLog Recording")
+            .setContentTitle(getString(R.string.notification_recording_title))
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pendingIntent)
+            .addAction(android.R.drawable.ic_media_pause, getString(R.string.notification_stop),
+                PendingIntent.getService(this, 1002,
+                    Intent(this, VoiceRecordingService::class.java).setAction(ACTION_STOP),
+                    PendingIntent.FLAG_IMMUTABLE))
+            .setOnlyAlertOnce(true)
+            .setLocalOnly(true)
             .setOngoing(true)
             .build()
     }
