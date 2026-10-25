@@ -62,7 +62,7 @@
     <string name="haptics_group">햅틱 및 센서</string>
     <string name="haptic_intensity_title">박동 진동 세기</string>
     <string name="haptic_intensity_hint">녹음 중 전달되는 쿵-쾅 박동 강도</string>
-    <string name="haptic_intensity_off">끄기</string>
+    <string name="haptic_intensity_gentle">은은하게</string>
     <string name="haptic_intensity_light">약하게</string>
     <string name="haptic_intensity_medium">보통 (기본)</string>
     <string name="haptic_intensity_strong">강하게</string>

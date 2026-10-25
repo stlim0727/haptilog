@@ -25,11 +25,17 @@ class LocationHistoryRepository internal constructor(private val directory: File
         if (next != current) persist(next)
     }
 
-    @Synchronized fun startSession() {
+    @Synchronized fun startSession(sessionStartElapsedMillis: Long = 0L) {
         check(detector == null) { "Location session already active" }
         prune()
-        detector = LocationEventDetector(state.value.places, state.value.dwellMinutes)
+        detector = LocationEventDetector(state.value.places, state.value.dwellMinutes, sessionStartElapsedMillis)
         mutableState.value = state.value.copy(latestSample = null)
+    }
+
+    @Synchronized fun setInitialFix(sample: LocationSample) {
+        if (state.value.latestSample == null) {
+            mutableState.value = state.value.copy(latestSample = sample)
+        }
     }
 
     @Synchronized fun stopSession() {

@@ -30,8 +30,8 @@ class WatchUxPhase2Test {
     @Test
     fun hapticIntensityCyclesCorrectly() {
         assertEquals(HapticIntensity.STRONG, HapticIntensity.MEDIUM.next())
-        assertEquals(HapticIntensity.OFF, HapticIntensity.STRONG.next())
-        assertEquals(HapticIntensity.LIGHT, HapticIntensity.OFF.next())
+        assertEquals(HapticIntensity.GENTLE, HapticIntensity.STRONG.next())
+        assertEquals(HapticIntensity.LIGHT, HapticIntensity.GENTLE.next())
         assertEquals(HapticIntensity.MEDIUM, HapticIntensity.LIGHT.next())
     }
 
@@ -45,15 +45,16 @@ class WatchUxPhase2Test {
         HapticPreferences.setIntensity(context, HapticIntensity.STRONG)
         assertEquals(HapticIntensity.STRONG, HapticPreferences.getIntensity(context))
 
-        // Set to OFF
-        HapticPreferences.setIntensity(context, HapticIntensity.OFF)
-        assertEquals(HapticIntensity.OFF, HapticPreferences.getIntensity(context))
+        // Set to GENTLE
+        HapticPreferences.setIntensity(context, HapticIntensity.GENTLE)
+        assertEquals(HapticIntensity.GENTLE, HapticPreferences.getIntensity(context))
 
         // Set to LIGHT
         HapticPreferences.setIntensity(context, HapticIntensity.LIGHT)
         assertEquals(HapticIntensity.LIGHT, HapticPreferences.getIntensity(context))
 
-        // Fallback for null/unknown ID
+        // Fallback for legacy "off" and null/unknown ID
+        assertEquals(HapticIntensity.GENTLE, HapticIntensity.fromId("off"))
         assertEquals(HapticIntensity.MEDIUM, HapticIntensity.fromId(null))
         assertEquals(HapticIntensity.MEDIUM, HapticIntensity.fromId("unknown_xyz"))
     }
@@ -67,8 +68,8 @@ class WatchUxPhase2Test {
             manager.playPreviewPulse(intensity)
         }
 
-        // Test startHeartbeatLoop with OFF does not launch vibrating loop
-        HapticPreferences.setIntensity(context, HapticIntensity.OFF)
+        // Test startHeartbeatLoop with GENTLE
+        HapticPreferences.setIntensity(context, HapticIntensity.GENTLE)
         manager.startHeartbeatLoop()
         manager.stop(cancelVibration = true)
 

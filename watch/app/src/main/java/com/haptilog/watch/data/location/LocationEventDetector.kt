@@ -3,7 +3,8 @@ package com.haptilog.watch.data.location
 /** Pure session-scoped detector. All durations and freshness use the monotonic clock. */
 class LocationEventDetector(
     private val places: List<SavedPlace>,
-    private val dwellMinutes: Int = 10
+    private val dwellMinutes: Int = 10,
+    private val sessionStartElapsedMillis: Long = 0L
 ) {
     init { require(dwellMinutes in setOf(5, 10, 20, 30)) }
 
@@ -19,7 +20,8 @@ class LocationEventDetector(
         val age = nowElapsedRealtimeMillis - sample.elapsedRealtimeMillis
         if (!validCoordinates(sample.latitude, sample.longitude) || !sample.accuracyMeters.isFinite() ||
             sample.accuracyMeters <= 0 || sample.accuracyMeters > MAX_ACCURACY_METERS ||
-            sample.timestampMillis <= 0 || sample.elapsedRealtimeMillis < 0 || age !in 0..MAX_AGE_MILLIS
+            sample.timestampMillis <= 0 || sample.elapsedRealtimeMillis < 0 || age !in 0..MAX_AGE_MILLIS ||
+            sample.elapsedRealtimeMillis < sessionStartElapsedMillis
         ) return Result(false)
 
         val last = previous

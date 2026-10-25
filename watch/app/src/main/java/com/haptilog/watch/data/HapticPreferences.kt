@@ -5,21 +5,25 @@ import android.content.SharedPreferences
 import com.haptilog.watch.R
 
 enum class HapticIntensity(val id: String, val scale: Float, val labelRes: Int) {
-    OFF("off", 0.0f, R.string.haptic_intensity_off),
-    LIGHT("light", 0.55f, R.string.haptic_intensity_light),
+    GENTLE("gentle", 0.35f, R.string.haptic_intensity_gentle),
+    LIGHT("light", 0.65f, R.string.haptic_intensity_light),
     MEDIUM("medium", 1.0f, R.string.haptic_intensity_medium),
     STRONG("strong", 1.5f, R.string.haptic_intensity_strong);
 
     fun next(): HapticIntensity = when (this) {
         MEDIUM -> STRONG
-        STRONG -> OFF
-        OFF -> LIGHT
+        STRONG -> GENTLE
+        GENTLE -> LIGHT
         LIGHT -> MEDIUM
     }
 
     companion object {
-        fun fromId(id: String?): HapticIntensity =
-            values().firstOrNull { it.id == id } ?: MEDIUM
+        fun fromId(id: String?): HapticIntensity = when (id) {
+            "off", "gentle" -> GENTLE
+            "light" -> LIGHT
+            "strong" -> STRONG
+            else -> MEDIUM
+        }
     }
 }
 
