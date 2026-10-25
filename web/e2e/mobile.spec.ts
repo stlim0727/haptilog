@@ -288,3 +288,34 @@ test("mobile narrow layout tolerates text enlargement", async ({ page }) => {
     );
   }
 });
+
+test("mobile reload preserves history so cancelling browser Back keeps the draft", async ({ page }) => {
+  page.on("console", (msg) => console.log(msg.text()));
+  const state = await mobile(page);
+  await page.locator(".mobile-record").click();
+  const index = await page.evaluate(() => history.state.mobileIndex);
+  expect(index).toBeGreaterThan(0);
+  await page.reload();
+  await expect(page.locator(".mobile-detail")).toBeVisible();
+  expect(await page.evaluate(() => history.state.mobileIndex)).toBe(index);
+  await page.getByRole("button", { name: "Edit transcript", exact: true })
+    .click();
+  const editor = page.getByRole("textbox", { name: "Transcript", exact: true });
+  await editor.fill("Keep this reloaded detail draft");
+  await expect(editor).toHaveValue("Keep this reloaded detail draft");
+  let documentRequests = 0;
+  page.on("request", (request) => {
+    if (request.resourceType() === "document") documentRequests++;
+  });
+  page.removeAllListeners("dialog");
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.goBack();
+  await expect(page).toHaveURL(/recording=/);
+  await expect(editor).toHaveValue("Keep this reloaded detail draft");
+  expect(documentRequests).toBe(0);
+  expect(state.corrections).toHaveLength(0);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.goBack();
+  await expect(page.locator(".mobile-record")).toBeVisible();
+  await expect(page.locator(".mobile-detail")).toHaveCount(0);
+});

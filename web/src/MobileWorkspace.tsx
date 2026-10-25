@@ -19,8 +19,10 @@ import {
   MapPin,
   MoreHorizontal,
   RefreshCw,
+  RotateCcw,
   Search,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -79,6 +81,8 @@ type Props = {
   exportCsv: () => void;
   disconnect: () => Promise<void>;
   emptyTrash: () => Promise<void>;
+  isDemo?: boolean;
+  onResetDemo?: () => void;
   renderInspector: (
     recording: Recording,
     onDirtyChange: (dirty: boolean) => void,
@@ -107,7 +111,11 @@ export function MobileWorkspace(p: Props) {
   const detailTitle = useRef<HTMLDivElement>(null);
   const dirty = useRef(false);
   const returnPosition = useRef({ y: 0, id: "" });
-  const historyIndex = useRef(0);
+  const historyIndex = useRef<number>(
+    Number.isSafeInteger(history.state?.mobileIndex)
+      ? history.state.mobileIndex
+      : 0,
+  );
   const restoring = useRef(false);
   const discardMessage = ko
     ? "저장하지 않은 변경을 버리고 돌아갈까요?"
@@ -145,7 +153,7 @@ export function MobileWorkspace(p: Props) {
   }, [p.onDetailChange, p.onDraftChange]);
 
   useEffect(() => {
-    const state = { ...history.state, mobileIndex: 0 };
+    const state = { ...history.state, mobileIndex: historyIndex.current };
     history.replaceState(state, "");
     const previousRestoration = history.scrollRestoration;
     history.scrollRestoration = "manual";
@@ -239,6 +247,19 @@ export function MobileWorkspace(p: Props) {
     }
   }, [p.loaded, detailId, detail?.deleted_at, isTrash, !!detail]);
 
+  const revealNotion = useCallback(() => {
+    setNotionOpen(true);
+    requestAnimationFrame(() => {
+      const panel = document.querySelector<HTMLElement>(
+        ".mobile-workspace .notion-panel",
+      );
+      panel?.scrollIntoView({ block: "start" });
+      panel?.querySelector<HTMLButtonElement>("button")?.focus({
+        preventScroll: true,
+      });
+    });
+  }, []);
+
   function changeView(next: View) {
     setView(next);
   }
@@ -321,6 +342,39 @@ export function MobileWorkspace(p: Props) {
     <div className="mobile-workspace">
       <div hidden={!!detailId}>
         <main>
+          {p.isDemo && (
+            <div className="demo-mode-banner" role="status" aria-label="Demo mode notice">
+              <div className="demo-banner-content">
+                <span className="demo-banner-badge">
+                  <Sparkles size={12} />
+                  {t.preview_banner_badge}
+                </span>
+                <span className="demo-banner-text">{t.preview_banner_text}</span>
+              </div>
+              <div className="demo-banner-actions">
+                {p.onResetDemo && (
+                  <button
+                    type="button"
+                    className="demo-reset-btn"
+                    onClick={p.onResetDemo}
+                    title={t.preview_banner_reset}
+                  >
+                    <RotateCcw size={13} />
+                    {t.preview_banner_reset}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="demo-exit-btn"
+                  onClick={p.disconnect}
+                  title={t.preview_banner_exit}
+                >
+                  <LogOut size={13} />
+                  {t.preview_banner_exit}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="mobile-heading">
             <div>
               <span className="eyebrow">
@@ -618,7 +672,11 @@ export function MobileWorkspace(p: Props) {
             {t.timezone_note(Intl.DateTimeFormat().resolvedOptions().timeZone)}
           </p>
           <div hidden={!notionOpen || isTrash}>
-            <NotionExport records={filtered} ko={ko} />
+            <NotionExport
+              records={filtered}
+              ko={ko}
+              onAuthorizationReturn={p.loaded ? revealNotion : undefined}
+            />
           </div>
         </main>
       </div>

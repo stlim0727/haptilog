@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "./client";
 import type { Recording } from "./domain";
 import { latest, transcript } from "./domain";
+import {
+  isDemoSessionActive,
+  getStoredDemoRecords,
+  saveStoredDemoRecords,
+} from "./demo";
 
 type Revision = { id: number; created_at: string; before_value: { transcript?: string | null } | null; after_value: { transcript?: string | null } };
 
@@ -33,8 +38,35 @@ export function TranscriptEditor({ recording, lang, onChange, onError, onDirtyCh
     return () => { active = false; };
   }, [historyOpen, recording.id, recording.recording_corrections?.updated_at]);
   async function save() {
-    if (!supabase) return;
     setBusy(true);
+    if (isDemoSessionActive() || recording.id.startsWith("demo-")) {
+      const stored = getStoredDemoRecords() ?? [];
+      const updated = stored.map((r) => {
+        if (r.id !== recording.id) return r;
+        return {
+          ...r,
+          recording_corrections: {
+            ...(r.recording_corrections ?? {
+              recording_id: r.id,
+              amount: null,
+              currency: null,
+              merchant: null,
+              category: null,
+              completed_tasks: [],
+              updated_at: new Date().toISOString(),
+            }),
+            transcript: draft,
+            updated_at: new Date().toISOString(),
+          },
+        };
+      });
+      saveStoredDemoRecords(updated);
+      await onChange();
+      setEditing(false);
+      setBusy(false);
+      return;
+    }
+    if (!supabase) return;
     try {
       const { error } = await supabase.from("recording_corrections").upsert(
         { recording_id: recording.id, transcript: draft, updated_at: new Date().toISOString() },

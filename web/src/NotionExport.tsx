@@ -112,7 +112,11 @@ async function invoke(body: Record<string, unknown>) {
   return data;
 }
 export function NotionExport(
-  { records, ko }: { records: Recording[]; ko: boolean },
+  { records, ko, onAuthorizationReturn }: {
+    records: Recording[];
+    ko: boolean;
+    onAuthorizationReturn?: () => void;
+  },
 ) {
   const [status, setStatus] = useState<Status | null>(null);
   const [open, setOpen] = useState(Boolean(callback));
@@ -127,6 +131,9 @@ export function NotionExport(
   const alive = useRef(true);
   const running = useRef(false);
   const locale = (en: string, kr: string) => ko ? kr : en;
+  useEffect(() => {
+    if (callback) onAuthorizationReturn?.();
+  }, [onAuthorizationReturn]);
   useEffect(() => {
     alive.current = true;
     const run = async () => {

@@ -20,7 +20,7 @@ export default function CalendarView({
   onDateChange,
 }: {
   lang?: "en" | "ko";
-  onDateChange?: () => void;
+  onDateChange?: () => boolean | void;
   recordings: Recording[];
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
@@ -46,24 +46,16 @@ export default function CalendarView({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevMonthDays = new Date(year, month, 0).getDate();
 
-  const prevMonth = () => {
-    onDateChange?.();
-    const next = new Date(year, month - 1, 1);
+  const selectDate = (next: Date) => {
+    const key = toLocalDateString(next);
+    if (key === selectedDateKey) return;
+    if (onDateChange?.() === false) return;
     setCurrentDate(next);
-    setSelectedDateKey(toLocalDateString(next));
+    setSelectedDateKey(key);
   };
-  const nextMonth = () => {
-    onDateChange?.();
-    const next = new Date(year, month + 1, 1);
-    setCurrentDate(next);
-    setSelectedDateKey(toLocalDateString(next));
-  };
-  const goToday = () => {
-    const now = new Date();
-    onDateChange?.();
-    setCurrentDate(now);
-    setSelectedDateKey(toLocalDateString(now));
-  };
+  const prevMonth = () => selectDate(new Date(year, month - 1, 1));
+  const nextMonth = () => selectDate(new Date(year, month + 1, 1));
+  const goToday = () => selectDate(new Date());
 
   const dayCells = [];
 
@@ -175,7 +167,7 @@ export default function CalendarView({
                   isSelected ? "selected-day" : ""
                 } ${isToday ? "today-cell" : ""}`}
                 onClick={() => {
-                  if (cell.isCurrentMonth) { setSelectedDateKey(cell.dateKey); onDateChange?.(); }
+                  if (cell.isCurrentMonth) selectDate(new Date(`${cell.dateKey}T12:00:00`));
                 }}
               >
                 <div className="calendar-cell-top">
@@ -212,9 +204,7 @@ export default function CalendarView({
             <p>{t.no_recordings_on_date}</p>
             {recordings.length > 0 && <button className="text-button" onClick={() => {
               const key = recordings.map(r => localDate(r.recorded_at)).sort().at(-1)!;
-              setSelectedDateKey(key);
-              setCurrentDate(new Date(`${key}T12:00:00`));
-              onDateChange?.();
+              selectDate(new Date(`${key}T12:00:00`));
             }}>{lang === "ko" ? "최근 기록 날짜로 이동" : "Go to latest recording date"}</button>}
           </div>
         ) : (

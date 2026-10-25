@@ -23,6 +23,16 @@ export const translations = {
     connecting: "Connecting…",
     pair_footnote:
       "No phone. No password. Just your watch.\nDisconnect this browser any time.",
+    preview_test_badge: "PR Preview / Demo",
+    preview_divider_or: "OR TRY WITH SAMPLE DATA",
+    preview_test_desc:
+      "Explore all features (review, timeline, map, calendar, mobile view, corrections) immediately with sample recordings—no watch required.",
+    preview_test_login_btn: "Explore with Sample Data (Test Login)",
+    preview_banner_badge: "PR Preview Demo",
+    preview_banner_text:
+      "Sample recordings loaded. All review, filter, and editing features are active.",
+    preview_banner_reset: "Reset sample data",
+    preview_banner_exit: "Exit demo",
     evening_review: "YOUR EVENING REVIEW",
     workspace_title: "A day, in your own words.",
     workspace_subtitle: "Listen back. Find the details. Pick up a thought.",
@@ -181,6 +191,16 @@ export const translations = {
     connecting: "연결 중…",
     pair_footnote:
       "휴대폰도 비밀번호도 필요 없습니다. 오직 워치 하나로.\n언제든 브라우저 연결을 해제할 수 있습니다.",
+    preview_test_badge: "PR 프리뷰 / 데모",
+    preview_divider_or: "또는 샘플 데이터로 둘러보기",
+    preview_test_desc:
+      "워치 없이도 샘플 데이터(소비, 여행, 운동, 메모)로 웹 포털의 모든 기능(리뷰, 타임라인/지도, 캘린더, 모바일 뷰, 수정 등)을 즉시 둘러보세요.",
+    preview_test_login_btn: "샘플 데이터로 둘러보기 (테스트 로그인)",
+    preview_banner_badge: "PR 프리뷰 데모",
+    preview_banner_text:
+      "샘플 항목이 자동 생성되었습니다. 검토, 필터, 수정 등 모든 기능을 이용할 수 있습니다.",
+    preview_banner_reset: "샘플 데이터 초기화",
+    preview_banner_exit: "데모 종료",
     evening_review: "하루의 리뷰",
     workspace_title: "나의 언어로 돌아보는 하루.",
     workspace_subtitle: "목소리를 다시 듣고, 세부 정보를 확인하고, 생각을 정리하세요.",

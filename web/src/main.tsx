@@ -23,11 +23,25 @@ import {
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Sparkles,
   Trash,
   Trash2,
   Watch,
 } from "lucide-react";
 import { supabase } from "./client";
+import {
+  DEMO_MODE_STORAGE_KEY,
+  DEMO_SESSION_ID,
+  DEMO_WATCH_ID,
+  DEMO_OWNER_ID,
+  isPreviewEnvironment,
+  isDemoSessionActive,
+  getStoredDemoRecords,
+  saveStoredDemoRecords,
+  clearDemoState,
+  generateSampleRecordings,
+  createDemoAudioBlob,
+} from "./demo";
 import { MobileWorkspace } from "./MobileWorkspace";
 import { NotionExport } from "./NotionExport";
 import { TranscriptEditor } from "./TranscriptEditor";
@@ -112,6 +126,8 @@ function App() {
   const [viewMode, setViewMode] = useState<"list" | "spatiotemporal" | "calendar">("list");
   const [stripDateKey, setStripDateKey] = useState<string>("ALL");
   const [lang, setLang] = useState<Language>(getInitialLanguage);
+  const [isDemo, setIsDemo] = useState(isDemoSessionActive);
+  const showTestLogin = isPreviewEnvironment();
   const t = translations[lang];
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
@@ -122,6 +138,22 @@ function App() {
   }
   const generation = useRef(0);
   const refreshConnection = useCallback(async () => {
+    if (isDemoSessionActive()) {
+      setIsDemo(true);
+      setConnection({
+        session_id: DEMO_SESSION_ID,
+        watch_id: DEMO_WATCH_ID,
+        owner_user_id: DEMO_OWNER_ID,
+        expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      });
+      const stored = getStoredDemoRecords() ?? generateSampleRecordings();
+      saveStoredDemoRecords(stored);
+      setRecords(stored);
+      setLoaded(true);
+      setChecking(false);
+      setLastChecked(new Date());
+      return;
+    }
     if (!supabase) {
       setChecking(false);
       return;
@@ -163,6 +195,13 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
   const load = useCallback(async () => {
+    if (isDemoSessionActive()) {
+      const stored = getStoredDemoRecords();
+      if (stored) setRecords(stored);
+      setLoaded(true);
+      setLastChecked(new Date());
+      return;
+    }
     if (!supabase || !connection) return;
     const epoch = generation.current;
     const { data: grants, error: grantError } = await supabase
@@ -246,7 +285,60 @@ function App() {
       setBusy(false);
     }
   }
+  function loginWithSampleData() {
+    setBusy(true);
+    setError("");
+    try {
+      const samples = generateSampleRecordings();
+      localStorage.setItem(DEMO_MODE_STORAGE_KEY, "true");
+      saveStoredDemoRecords(samples);
+      setIsDemo(true);
+      setConnection({
+        session_id: DEMO_SESSION_ID,
+        watch_id: DEMO_WATCH_ID,
+        owner_user_id: DEMO_OWNER_ID,
+        expires_at: new Date(Date.now() + 30 * 86400000).toISOString(),
+      });
+      setRecords(samples);
+      setLoaded(true);
+      setChecking(false);
+      setLastChecked(new Date());
+      setSelected(null);
+    } catch {
+      setError(
+        lang === "ko"
+          ? "샘플 데이터를 생성하지 못했습니다."
+          : "Could not initialize sample recordings.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function resetSampleData() {
+    const samples = generateSampleRecordings();
+    saveStoredDemoRecords(samples);
+    setRecords(samples);
+    setSelected(null);
+    setToast({
+      message:
+        lang === "ko"
+          ? "샘플 데이터를 초기화했습니다."
+          : "Sample recordings reset.",
+    });
+  }
+
   async function disconnect() {
+    if (isDemo) {
+      clearDemoState();
+      setIsDemo(false);
+      generation.current++;
+      setConnection(null);
+      setRecords([]);
+      setLoaded(false);
+      setSelected(null);
+      return;
+    }
     if (!supabase || !connection) return;
     setBusy(true);
     setError("");
@@ -272,12 +364,17 @@ function App() {
   const pendingTrashUpdates = useRef<Map<string, Promise<unknown>>>(new Map());
 
   async function moveToTrash(id: string) {
-    if (!supabase) return;
     const now = new Date().toISOString();
-    setRecords((prev) =>
-      prev.map((rec) => (rec.id === id ? { ...rec, deleted_at: now } : rec)),
-    );
+    setRecords((prev) => {
+      const updated = prev.map((rec) =>
+        rec.id === id ? { ...rec, deleted_at: now } : rec,
+      );
+      if (isDemo) saveStoredDemoRecords(updated);
+      return updated;
+    });
     setToast({ message: t.toast_moved_trash, undoId: id });
+    if (isDemo) return;
+    if (!supabase) return;
     const writePromise = (async () => {
       const { error } = await supabase
         .from("recordings")
@@ -294,11 +391,16 @@ function App() {
   }
 
   async function restoreRecording(id: string) {
-    if (!supabase) return;
-    setRecords((prev) =>
-      prev.map((rec) => (rec.id === id ? { ...rec, deleted_at: null } : rec)),
-    );
+    setRecords((prev) => {
+      const updated = prev.map((rec) =>
+        rec.id === id ? { ...rec, deleted_at: null } : rec,
+      );
+      if (isDemo) saveStoredDemoRecords(updated);
+      return updated;
+    });
     setToast(null);
+    if (isDemo) return;
+    if (!supabase) return;
     const pending = pendingTrashUpdates.current.get(id);
     if (pending) await pending.catch(() => {});
     const { data, error } = await supabase
@@ -330,12 +432,29 @@ function App() {
 
   async function deletePermanently(id: string) {
     if (!window.confirm(t.confirm_delete)) return;
+    if (isDemo) {
+      setRecords((prev) => {
+        const updated = prev.filter((rec) => rec.id !== id);
+        saveStoredDemoRecords(updated);
+        return updated;
+      });
+      if (selected === id) setSelected(null);
+      return;
+    }
     await completePurge([id]);
   }
 
   async function emptyTrash() {
     const ids = records.filter((r) => r.deleted_at).map((r) => r.id);
     if (!ids.length || !window.confirm(t.confirm_empty_trash(ids.length))) return;
+    if (isDemo) {
+      setRecords((prev) => {
+        const updated = prev.filter((r) => !r.deleted_at);
+        saveStoredDemoRecords(updated);
+        return updated;
+      });
+      return;
+    }
     await completePurge(ids);
   }
 
@@ -541,6 +660,32 @@ function App() {
                 </button>
               </form>
             )}
+            {showTestLogin && (
+              <div className="preview-test-card" data-testid="preview-test-login-card">
+                <div className="preview-divider">
+                  <span>{t.preview_divider_or}</span>
+                </div>
+                <div className="preview-test-header">
+                  <span className="preview-test-badge">
+                    <Sparkles size={12} />
+                    {t.preview_test_badge}
+                  </span>
+                </div>
+                <p className="preview-test-desc">
+                  {t.preview_test_desc}
+                </p>
+                <button
+                  type="button"
+                  className="test-login-btn"
+                  data-testid="preview-test-login-button"
+                  onClick={loginWithSampleData}
+                  disabled={busy}
+                >
+                  <Sparkles size={15} />
+                  <span>{t.preview_test_login_btn}</span>
+                </button>
+              </div>
+            )}
             <div className="pair-footnote">
               <Link2 size={15} />
               <span>
@@ -559,11 +704,43 @@ function App() {
           date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
           summary={summary} count={dateFilteredActiveRecords.length} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
+          isDemo={isDemo} onResetDemo={resetSampleData}
           renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
             onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
-            lang={lang} t={t} onDirtyChange={onDirtyChange} />} />
+            lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
       ) : (
         <main className="workspace">
+          {isDemo && (
+            <div className="demo-mode-banner" role="status" aria-label="Demo mode notice">
+              <div className="demo-banner-content">
+                <span className="demo-banner-badge">
+                  <Sparkles size={12} />
+                  {t.preview_banner_badge}
+                </span>
+                <span className="demo-banner-text">{t.preview_banner_text}</span>
+              </div>
+              <div className="demo-banner-actions">
+                <button
+                  type="button"
+                  className="demo-reset-btn"
+                  onClick={resetSampleData}
+                  title={t.preview_banner_reset}
+                >
+                  <RotateCcw size={13} />
+                  {t.preview_banner_reset}
+                </button>
+                <button
+                  type="button"
+                  className="demo-exit-btn"
+                  onClick={disconnect}
+                  title={t.preview_banner_exit}
+                >
+                  <LogOut size={13} />
+                  {t.preview_banner_exit}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="page-heading">
             <div>
               <span className="eyebrow">{t.evening_review}</span>
@@ -685,6 +862,7 @@ function App() {
                 aria-selected={viewMode === "calendar"}
                 className={viewMode === "calendar" ? "active" : ""}
                 onClick={() => {
+                  if (viewMode === "calendar") return;
                   if (category === "Trash") setCategory("All");
                   setSelected(null);
                   setViewMode("calendar");
@@ -817,7 +995,13 @@ function App() {
               }}
               t={t}
               lang={lang}
-              onDateChange={() => setSelected(null)}
+              onDateChange={() => {
+                if (draftInProgress && !window.confirm(lang === "ko"
+                  ? "저장하지 않은 변경을 버리고 날짜를 바꿀까요?"
+                  : "Discard unsaved changes and change the date?")) return false;
+                setSelected(null);
+                return true;
+              }}
             />
           ) : (
             <div className="review-layout">
@@ -950,6 +1134,7 @@ function App() {
                   onDeletePermanently={deletePermanently}
                   lang={lang}
                   t={t}
+                  isDemo={isDemo}
                 />
               ) : (
                 <div className="inspector-empty">
@@ -984,6 +1169,7 @@ function App() {
                 onDeletePermanently={deletePermanently}
                 lang={lang}
                 t={t}
+                isDemo={isDemo}
               />
             </section>
           )}
@@ -1014,6 +1200,7 @@ function Inspector({
   lang,
   t,
   onDirtyChange,
+  isDemo,
 }: {
   recording: Recording;
   onChange: () => Promise<void>;
@@ -1024,6 +1211,7 @@ function Inspector({
   lang: Language;
   t: TranslationKeys;
   onDirtyChange?: (dirty: boolean) => void;
+  isDemo?: boolean;
 }) {
   const e = latest(r),
     x = expense(r),
@@ -1038,7 +1226,10 @@ function Inspector({
   const [category, setCategory] = useState(x?.category ?? "");
   const [dirty, setDirty] = useState(false);
   const [transcriptDirty, setTranscriptDirty] = useState(false);
+  const onDirtyChangeRef = useRef(onDirtyChange);
+  onDirtyChangeRef.current = onDirtyChange;
   useEffect(() => { onDirtyChange?.(dirty || transcriptDirty || saving); }, [dirty, transcriptDirty, saving, onDirtyChange]);
+  useEffect(() => () => { onDirtyChangeRef.current?.(false); }, []);
   const player = useRef<HTMLAudioElement>(null);
   const objectUrl = useRef("");
   const mounted = useRef(true);
@@ -1058,7 +1249,14 @@ function Inspector({
     }
   }, [r.recording_corrections?.updated_at, e?.created_at, dirty]);
   async function prepareAudio() {
-    if (!supabase || !r.audio_path || audioUrl) return;
+    if (audioUrl) return;
+    if (isDemo || r.audio_path?.startsWith("demo/")) {
+      const blob = createDemoAudioBlob();
+      objectUrl.current = URL.createObjectURL(blob);
+      setAudioUrl(objectUrl.current);
+      return;
+    }
+    if (!supabase || !r.audio_path) return;
     setAudioBusy(true);
     const { data, error } = await supabase.storage
       .from("recordings")
@@ -1073,6 +1271,16 @@ function Inspector({
     setAudioBusy(false);
   }
   async function retry() {
+    if (isDemo || r.id.startsWith("demo-")) {
+      setRetryBusy(true);
+      setTimeout(async () => {
+        if (mounted.current) {
+          await onChange();
+          setRetryBusy(false);
+        }
+      }, 300);
+      return;
+    }
     if (!supabase) return;
     const consentText = lang === "ko"
       ? "AI 분석은 만 18세 이상만 사용할 수 있습니다. 음성과 녹음 시각이 Supabase 및 Google Gemini에서 처리됩니다. 민감한 내용은 보내지 마세요. 개인정보처리방침: https://haptilog.keepory.app/privacy.html\n만 18세 이상이며 이 처리에 동의합니까? 워치에서도 동의가 필요합니다."
@@ -1100,6 +1308,35 @@ function Inspector({
     }
   }
   async function saveCorrection(patch: Partial<Correction>) {
+    if (isDemo || r.id.startsWith("demo-")) {
+      setSaving(true);
+      const stored = getStoredDemoRecords() ?? [];
+      const updated = stored.map((rec) => {
+        if (rec.id !== r.id) return rec;
+        return {
+          ...rec,
+          recording_corrections: {
+            ...(rec.recording_corrections ?? {
+              recording_id: r.id,
+              amount: null,
+              currency: null,
+              merchant: null,
+              category: null,
+              completed_tasks: [],
+              updated_at: new Date().toISOString(),
+            }),
+            ...patch,
+            updated_at: new Date().toISOString(),
+          },
+        };
+      });
+      saveStoredDemoRecords(updated);
+      if (mounted.current) {
+        await onChange();
+        setSaving(false);
+      }
+      return true;
+    }
     if (!supabase) return false;
     setSaving(true);
     const { error } = await supabase
