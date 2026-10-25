@@ -112,7 +112,10 @@ class LocationTrackingService : Service() {
                                 repository = LocationHistoryRepository.get(applicationContext)
                                 repository.startSession()
                                 withContext(Dispatchers.Main.immediate) {
-                                    if (started && !stopping) requestLocationUpdates()
+                                    if (started && !stopping) {
+                                        requestLocationUpdates()
+                                        fetchInitialLocation()
+                                    }
                                 }
                             }
                             is Write.Samples -> write.locations.forEach { location ->
@@ -204,15 +207,24 @@ class LocationTrackingService : Service() {
     }
 
     @SuppressLint("MissingPermission")
+    private fun fetchInitialLocation() {
+        if (!hasPreciseLocationPermission()) return
+        locationUpdates?.getLastLocation { location ->
+            if (started && !stopping && location != null) {
+                writes.trySend(Write.Samples(listOf(location)))
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
     private fun requestLocationUpdates() {
         if (!started || stopping) return
         if (!hasPreciseLocationPermission()) {
             stopTracking(getString(R.string.location_service_permission_required))
             return
         }
-        val request = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 60_000L)
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60_000L)
             .setMinUpdateIntervalMillis(30_000L)
-            .setMaxUpdateDelayMillis(120_000L)
             .setMaxUpdateAgeMillis(0L)
             .setDurationMillis((sessionDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(1))
             .build()

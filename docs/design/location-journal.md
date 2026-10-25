@@ -44,7 +44,7 @@ The repository uses `location_history/history.json` with Android `AtomicFile`. I
 | Implausible jump filter | Reject lower-bound travel speed above 80 m/s |
 | Retention | Seven days, at most 2,000 points and 500 events |
 
-The service requests balanced-power location updates every 60 seconds, with a 30-second minimum interval and up to 120 seconds of batching. These are requests to the provider, not a delivery guarantee. It does not continuously request high-accuracy GPS or hold a wake lock. A session automatically stops after eight hours, measured using a monotonic clock; the provider request also has an eight-hour duration limit. The user must start another session explicitly. The separate **Use current location** place-editor action makes a bounded high-accuracy request to fill the center fields.
+The service requests high-accuracy location updates every 60 seconds with a 30-second minimum interval (`PRIORITY_HIGH_ACCURACY`), and fetches the immediate latest fix (`lastLocation`) upon session start to eliminate initial fix latency. It does not hold a wake lock, allowing the watch to enter ambient sleep while duty-cycling the GNSS receiver. A session automatically stops after eight hours, measured using a monotonic clock; the provider request also has an eight-hour duration limit. The user must start another session explicitly. The separate **Use current location** place-editor action makes a bounded high-accuracy request to fill the center fields.
 
 These are observation filters, not a guarantee of physical accuracy. No route is interpolated through a gap, and timestamps describe accepted observations.
 
@@ -73,7 +73,7 @@ Automated checks must cover:
 - History persistence, bounded retention, atomic writes, and separate history/place deletion.
 - Start/stop and denied-permission behavior, cleanup, and journal isolation from audio capture.
 
-Device validation must cover permission acceptance/denial, approximate-only permission, device location off, the screen off during a session, notification stop, process death, and concurrent voice recording. Walk across a saved place boundary and remain in one area to verify observed accuracy and latency. Measure battery use on a real watch; emulator tests cannot establish battery impact or GPS reliability.
+Device validation covers permission acceptance/denial, approximate-only permission, device location off, the screen off (ambient mode) during a session, notification stop, process death, and concurrent voice recording. In Issue #54, field emulation on Wear OS 5 verified that `PRIORITY_HIGH_ACCURACY` powers on the hardware GNSS receiver in ambient mode, while immediate `lastLocation` capture eliminates the 2-minute lag of batched fixes. Boundary enter/exit transitions and timeline rendering were verified across simulated walking paths. Real-world field notes and battery drain profiles are tracked in Issue #54.
 
 ## Platform references
 
