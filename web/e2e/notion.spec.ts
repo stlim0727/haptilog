@@ -212,6 +212,8 @@ test("mobile layout keeps selection and send controls accessible", async ({ page
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page);
   await page.goto("/");
+  await page.getByRole("button", { name: "More options" }).click();
+  await page.getByRole("button", { name: "Notion integration" }).click();
   const panel = page.getByRole("region", { name: "Notion export" });
   await panel.getByRole("button", { name: "Notion inbox", exact: false })
     .click();
@@ -225,4 +227,30 @@ test("mobile layout keeps selection and send controls accessible", async ({ page
       document.documentElement.scrollWidth <= window.innerWidth
     ),
   ).toBeTruthy();
+});
+
+test("mobile authorization return reveals the next step without reopening the menu", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = await setup(page, { connected: false });
+  await page.goto("/?notion=callback&code=mobile-code&state=mobile-state");
+  const panel = page.getByRole("region", { name: "Notion export" });
+  await expect(page).toHaveURL("/");
+  await expect(panel.getByRole("button", { name: "Notion inbox", exact: true })).toBeFocused();
+  await expect(panel.getByRole("button", { name: "Choose inbox", exact: true })).toBeInViewport();
+  expect(state.calls.filter(call => call.action === "complete")).toEqual([{ action: "complete", code: "mobile-code", state: "mobile-state" }]);
+  await panel.getByRole("button", { name: "Choose inbox", exact: true }).click();
+  await panel.getByRole("combobox", { name: "Inbox", exact: true }).selectOption("target");
+  await panel.getByRole("button", { name: "Use this inbox", exact: true }).click();
+  await expect(panel.getByRole("button", { name: "Send to Notion (0)", exact: true })).toBeVisible();
+});
+
+test("mobile authorization cancellation shows the error without reopening the menu", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = await setup(page, { connected: false });
+  await page.goto("/?notion=callback&error=access_denied");
+  const panel = page.getByRole("region", { name: "Notion export" });
+  await expect(page).toHaveURL("/");
+  await expect(panel.getByRole("alert")).toContainText("Authorization expired or was already used");
+  await expect(panel.getByRole("alert")).toBeInViewport();
+  expect(state.calls.filter(call => call.action === "complete")).toHaveLength(0);
 });

@@ -12,10 +12,12 @@ for (const check of checks)
     `${check.ready ? "READY" : "BLOCKED"}: ${check.name}${check.ready ? "" : `. ${check.remedy}`}`,
   );
 if (checks.some((check) => !check.ready)) process.exit(1);
+const isProduction = process.argv.includes("--production");
 const buildEnv = {
   ...publicEnv,
   VITE_SUPABASE_URL: config.url,
   VITE_SUPABASE_PUBLISHABLE_KEY: config.key,
+  ...(isProduction ? { VITE_DISABLE_TEST_LOGIN: "true" } : {}),
 };
 for (const { args, env } of deploymentCommands(
   process.argv.includes("--production"),

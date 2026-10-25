@@ -26,7 +26,7 @@ Codes use unbiased cryptographic randomness. A unique index reserves each non-nu
 
 The watch keeps the code screen awake for at most 60 seconds and clears that behavior when leaving the foreground. It also lists connected browser grants for revocation. Browser **Disconnect** revokes the grant before local Auth sign-out. RLS checks the grant on each subsequent request, so a still-valid JWT does not retain access to the watch's data after revocation. Already downloaded bytes cannot be recalled. An open portal rechecks grants every 15 seconds while visible and on return to the tab; revocation clears its displayed recording data and audio object URLs when detected.
 
-**Recovery boundary:** existing paired browsers retain their grants until expiry/revocation, even if the watch is lost. Clearing the watch's application data loses its anonymous credentials; neither its public Watch ID nor a cleared browser can recover them. Email/Google elevation, durable account recovery, and migrating a replacement watch are deferred. The app fails closed on lost/corrupt watch credentials rather than silently changing owners. This release does not claim that account recovery is implemented.
+**Recovery boundary:** optional [Google account linking and recovery](google-account-recovery.md) saves durable access to previously paired watches and restores a session grant after browser loss or watch replacement. Raw watch owners remain unchanged. Existing paired browsers retain their grants until expiry/revocation. Clearing the watch application data still loses its anonymous credentials; unuploaded audio and watches lost before account linking cannot be recovered through Google. Production Google OAuth activation is a separate deployment prerequisite. The watch fails closed on lost/corrupt credentials rather than silently changing owners.
 
 Deploy the code-only pairing migration first, then the `watch-access` Edge Function, then the web bundle. Older watch builds can keep generating codes and older web clients can still send the Watch ID. The watch UI update removes the ID from the code screen; existing browser grants are unchanged.
 
@@ -63,7 +63,7 @@ Audio uses a private JWT-authorized download into a transient browser object URL
 7. Install the new watch build. Its URL defaults to `https://haptilog.keepory.app`; override `HAPTILOG_WEB_PORTAL_URL` at build time for a different host.
 8. Perform a real watch → browser test: offline capture, restart, reconnect/upload, code pairing, original playback, provider failure/retry, session refresh, correction retention, and browser revocation. Automated browser tests use mocked Supabase responses; they do not prove a live pairing or paid Gemini request.
 
-No email/OAuth redirects are used by this pairing flow. A future account elevation flow must configure its own production redirect allowlist.
+Code-only pairing uses no OAuth redirects. Optional Google login requires the exact portal root redirect allowlist described in [Google account recovery](google-account-recovery.md).
 
 ## Validation
 

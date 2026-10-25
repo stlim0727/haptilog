@@ -2541,4 +2541,189 @@ audio {
 .time-strip-dots .dot-memo    { background: #d8b4fe; }
 .time-strip-dots .dot-voice   { background: #a1a1aa; }
 
+/* PR Preview / Demo Mode */
+.preview-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 22px 0 16px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.preview-divider::before,
+.preview-divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid var(--border);
+}
+.preview-divider span {
+  padding: 0 12px;
+}
+.preview-test-card {
+  margin-top: 10px;
+  padding: 18px 20px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px dashed rgba(129, 140, 248, 0.4);
+  border-radius: 12px;
+  text-align: left;
+}
+.preview-test-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.preview-test-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  padding: 3px 9px;
+  border-radius: 9999px;
+}
+.preview-test-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+  margin: 10px 0 16px;
+}
+.test-login-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #4f46e5;
+  color: #ffffff;
+  border: 1px solid #6366f1;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+.test-login-btn:hover:not(:disabled) {
+  background: #4338ca;
+  border-color: #818cf8;
+}
+.test-login-btn:active:not(:disabled) {
+  transform: scale(0.99);
+}
 
+.demo-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 18px;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.16), rgba(147, 51, 234, 0.12));
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 10px;
+  margin-bottom: 22px;
+  font-size: 13px;
+}
+.demo-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.demo-banner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(129, 140, 248, 0.3);
+}
+.demo-banner-text {
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.demo-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.demo-reset-btn,
+.demo-exit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 11px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.demo-reset-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--border-strong);
+}
+.demo-exit-btn:hover {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+@media (max-width: 700px) {
+  .demo-mode-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+  }
+  .demo-banner-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+
+
+
+.account-bar { padding: 10px max(16px, calc((100vw - 1440px) / 2)); display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--border, #454550); }
+.account-bar button { min-height: 44px; padding: 8px 14px; border: 1px solid currentColor; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.account-bar button:disabled { opacity: .5; cursor: default; }
+.account-panel { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+.account-panel p { margin: 12px 0; }
+.account-panel > button { margin: 4px; }
+.account-watch { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.recovery-notice { margin: 12px 20px; font-size: .9rem; }
+
+@media (max-width: 700px) {
+  .account-bar {
+    padding: 6px 16px;
+    gap: 6px;
+  }
+  .account-bar button {
+    min-height: 38px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .recovery-notice {
+    display: none;
+  }
+}
