@@ -6,6 +6,8 @@ import android.os.CombinedVibration
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.haptilog.watch.data.HapticIntensity
+import com.haptilog.watch.data.HapticPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -93,29 +95,15 @@ class HapticHeartbeatManager(private val context: Context) {
      * Eliminates the pathological 2.4s (25 bpm) bradycardia.
      * Uses PRIMITIVE_LOW_TICK to stimulate wrist Pacinian corpuscles without
      * high-frequency chassis vibration leaking into the microphone.
+     * Respects user-configured HapticIntensity (Off, Light, Medium, Strong).
      */
     fun startHeartbeatLoop() {
         heartbeatJob?.cancel()
-        heartbeatJob = scope.launch {
-            val supportsLowTick = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-                vibrator?.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_LOW_TICK) == true
-            val supportsTick = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-                vibrator?.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK) == true
+        val intensity = HapticPreferences.getIntensity(context)
+        if (intensity == HapticIntensity.OFF) return
 
-            val pulseEffect = when {
-                supportsLowTick -> VibrationEffect.startComposition()
-                    .addPrimitive(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, 0.45f)
-                    .compose()
-                supportsTick -> VibrationEffect.startComposition()
-                    .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 0.35f)
-                    .compose()
-                else -> {
-                    // Subtle waveform: short duration, low acoustic signature
-                    val timings = longArrayOf(0, 25, 40, 20)
-                    val amplitudes = intArrayOf(0, 50, 0, 35)
-                    VibrationEffect.createWaveform(timings, amplitudes, -1)
-                }
-            }
+        heartbeatJob = scope.launch {
+            val pulseEffect = createPulseEffect(intensity)
 
             while (isActive) {
                 delay(1200) // 1.2s cadence (~50 bpm natural resting pulse)
@@ -124,6 +112,48 @@ class HapticHeartbeatManager(private val context: Context) {
                 }
             }
         }
+    }
+
+    /**
+     * Generates a single tactile heartbeat pulse effect calibrated to the requested intensity.
+     */
+    private fun createPulseEffect(intensity: HapticIntensity): VibrationEffect {
+        val supportsLowTick = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            vibrator?.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_LOW_TICK) == true
+        val supportsTick = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            vibrator?.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK) == true
+
+        return when {
+            supportsLowTick -> {
+                val amp = (0.45f * intensity.scale).coerceIn(0.1f, 1.0f)
+                VibrationEffect.startComposition()
+                    .addPrimitive(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, amp)
+                    .compose()
+            }
+            supportsTick -> {
+                val amp = (0.35f * intensity.scale).coerceIn(0.1f, 1.0f)
+                VibrationEffect.startComposition()
+                    .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, amp)
+                    .compose()
+            }
+            else -> {
+                val a1 = (50 * intensity.scale).toInt().coerceIn(1, 255)
+                val a2 = (35 * intensity.scale).toInt().coerceIn(1, 255)
+                val timings = longArrayOf(0, 25, 40, 20)
+                val amplitudes = intArrayOf(0, a1, 0, a2)
+                VibrationEffect.createWaveform(timings, amplitudes, -1)
+            }
+        }
+    }
+
+    /**
+     * Plays a single tactile sample pulse of the specified intensity so the user
+     * immediately feels the haptic feedback level on their wrist when adjusting settings.
+     */
+    fun playPreviewPulse(testIntensity: HapticIntensity) {
+        if (testIntensity == HapticIntensity.OFF) return
+        val effect = createPulseEffect(testIntensity)
+        vibrator?.vibrate(effect)
     }
 
     /**

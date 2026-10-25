@@ -58,7 +58,14 @@
     <string name="merchant_label">Merchant</string>
     <string name="category_label">Category</string>
     <string name="notes_label">Notes</string>
-    <string name="connection_group">Connection</string>
+    <string name="connection_group">Connection &amp; Sync</string>
+    <string name="haptics_group">Haptics &amp; Sensors</string>
+    <string name="haptic_intensity_title">Heartbeat pulse</string>
+    <string name="haptic_intensity_hint">Tactile pulse while recording</string>
+    <string name="haptic_intensity_off">Off</string>
+    <string name="haptic_intensity_light">Light</string>
+    <string name="haptic_intensity_medium">Medium (Default)</string>
+    <string name="haptic_intensity_strong">Strong</string>
     <string name="help_group">Help &amp; privacy</string>
     <string name="about_group">About</string>
     <string name="cloud_sync_title">Cloud sync</string>
