@@ -129,4 +129,12 @@ class LocationEventDetectorTest {
         assertEquals("Home", event.placeName)
         assertEquals(sample(300, 5.0), event.sample)
     }
+
+    @Test fun preSessionCachedFixesAreExcludedFromInference() {
+        val detector = LocationEventDetector(listOf(place), dwellMinutes = 5, sessionStartElapsedMillis = 100_000L)
+        // Fix measured before session start (90s < 100s) must be rejected
+        assertFalse(detector.feed(90).accepted)
+        // Fix measured at or after session start (100s >= 100s) is accepted
+        assertTrue(detector.feed(100).accepted)
+    }
 }

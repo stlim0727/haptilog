@@ -100,7 +100,6 @@ class HapticHeartbeatManager(private val context: Context) {
     fun startHeartbeatLoop() {
         heartbeatJob?.cancel()
         val intensity = HapticPreferences.getIntensity(context)
-        if (intensity == HapticIntensity.OFF) return
 
         heartbeatJob = scope.launch {
             val pulseEffect = createPulseEffect(intensity)
@@ -125,20 +124,20 @@ class HapticHeartbeatManager(private val context: Context) {
 
         return when {
             supportsLowTick -> {
-                val amp = (0.45f * intensity.scale).coerceIn(0.1f, 1.0f)
+                val amp = (0.45f * intensity.scale).coerceIn(0.12f, 1.0f)
                 VibrationEffect.startComposition()
                     .addPrimitive(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, amp)
                     .compose()
             }
             supportsTick -> {
-                val amp = (0.35f * intensity.scale).coerceIn(0.1f, 1.0f)
+                val amp = (0.35f * intensity.scale).coerceIn(0.10f, 1.0f)
                 VibrationEffect.startComposition()
                     .addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, amp)
                     .compose()
             }
             else -> {
-                val a1 = (50 * intensity.scale).toInt().coerceIn(1, 255)
-                val a2 = (35 * intensity.scale).toInt().coerceIn(1, 255)
+                val a1 = (50 * intensity.scale).toInt().coerceIn(15, 255)
+                val a2 = (35 * intensity.scale).toInt().coerceIn(10, 255)
                 val timings = longArrayOf(0, 25, 40, 20)
                 val amplitudes = intArrayOf(0, a1, 0, a2)
                 VibrationEffect.createWaveform(timings, amplitudes, -1)
@@ -151,7 +150,6 @@ class HapticHeartbeatManager(private val context: Context) {
      * immediately feels the haptic feedback level on their wrist when adjusting settings.
      */
     fun playPreviewPulse(testIntensity: HapticIntensity) {
-        if (testIntensity == HapticIntensity.OFF) return
         val effect = createPulseEffect(testIntensity)
         vibrator?.vibrate(effect)
     }

@@ -56,8 +56,9 @@ class LocationTrackingService : Service() {
     }
 
     private sealed interface Write {
-        data object Start : Write
+        data class Start(val sessionStartElapsedMillis: Long) : Write
         data class Samples(val locations: List<Location>) : Write
+        data class InitialFix(val location: Location) : Write
         data object Stop : Write
     }
 
@@ -108,15 +109,26 @@ class LocationTrackingService : Service() {
                 for (write in writes) {
                     try {
                         when (write) {
-                            Write.Start -> {
+                            is Write.Start -> {
                                 repository = LocationHistoryRepository.get(applicationContext)
-                                repository.startSession()
+                                repository.startSession(write.sessionStartElapsedMillis)
                                 withContext(Dispatchers.Main.immediate) {
                                     if (started && !stopping) {
                                         requestLocationUpdates()
                                         fetchInitialLocation()
                                     }
                                 }
+                            }
+                            is Write.InitialFix -> {
+                                val location = write.location
+                                val sample = LocationSample(
+                                    latitude = location.latitude,
+                                    longitude = location.longitude,
+                                    accuracyMeters = if (location.hasAccuracy()) location.accuracy else Float.NaN,
+                                    timestampMillis = location.time,
+                                    elapsedRealtimeMillis = location.elapsedRealtimeNanos / 1_000_000L,
+                                )
+                                repository.setInitialFix(sample)
                             }
                             is Write.Samples -> write.locations.forEach { location ->
                                 // Monotonic timestamps reject stale cached/batched fixes even
@@ -190,8 +202,9 @@ class LocationTrackingService : Service() {
         owner = this
         mutableIsTracking.value = true
         mutableStatus.value = null
-        sessionDeadline = SystemClock.elapsedRealtime() + MAX_SESSION_MILLIS
-        writes.trySend(Write.Start)
+        val sessionStartElapsed = SystemClock.elapsedRealtime()
+        sessionDeadline = sessionStartElapsed + MAX_SESSION_MILLIS
+        writes.trySend(Write.Start(sessionStartElapsed))
         mainScope.launch {
             while (started && !stopping) {
                 delay(30_000L)
@@ -211,7 +224,7 @@ class LocationTrackingService : Service() {
         if (!hasPreciseLocationPermission()) return
         locationUpdates?.getLastLocation { location ->
             if (started && !stopping && location != null) {
-                writes.trySend(Write.Samples(listOf(location)))
+                writes.trySend(Write.InitialFix(location))
             }
         }
     }
