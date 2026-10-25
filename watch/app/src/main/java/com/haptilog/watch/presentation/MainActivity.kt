@@ -108,6 +108,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun togglePause() {
+        if (VoiceRecordingService.isRecording.value) {
+            startService(Intent(this, VoiceRecordingService::class.java).apply {
+                action = VoiceRecordingService.ACTION_TOGGLE_PAUSE
+            })
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -144,10 +152,13 @@ class MainActivity : ComponentActivity() {
             HaptiLogTheme {
                 AppScaffold {
                     val isRecording by VoiceRecordingService.isRecording.collectAsState()
+                    val isPaused by VoiceRecordingService.isPaused.collectAsState()
                     val elapsedSeconds by VoiceRecordingService.elapsedDurationSeconds.collectAsState()
                     val recordings by repository.recordings.collectAsState()
                     val playingId by audioPlayer.playingId.collectAsState()
                     val isPlaying by audioPlayer.isPlaying.collectAsState()
+                    val currentPositionMs by audioPlayer.currentPositionMs.collectAsState()
+                    val durationMs by audioPlayer.durationMs.collectAsState()
                     var showRecordings by rememberSaveable { mutableStateOf(false) }
                     var openDetailId by rememberSaveable { mutableStateOf<String?>(null) }
                     val listState = androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState()
@@ -187,8 +198,9 @@ class MainActivity : ComponentActivity() {
                     val detailItem = openDetailId?.let { id -> recordings.firstOrNull { it.id == id } }
 
                     if (isRecording) {
-                        CaptureScreen(isRecording = true, elapsedSeconds = elapsedSeconds,
-                            onToggleRecording = ::toggleRecording, onRecordings = {}, onSettings = {})
+                        CaptureScreen(isRecording = true, isPaused = isPaused, elapsedSeconds = elapsedSeconds,
+                            onToggleRecording = ::toggleRecording, onTogglePause = ::togglePause,
+                            onRecordings = {}, onSettings = {})
                     } else if (detailItem != null) {
                         // Playback has no control on the list, so leaving the detail screen must stop it.
                         BackHandler {
@@ -198,6 +210,9 @@ class MainActivity : ComponentActivity() {
                         RecordingDetailScreen(
                             item = detailItem,
                             isPlaying = playingId == detailItem.id && isPlaying,
+                            currentPositionMs = if (playingId == detailItem.id) currentPositionMs else 0,
+                            durationMs = if (playingId == detailItem.id) durationMs else (detailItem.durationSeconds * 1000),
+                            onSeekBy = { deltaMs -> audioPlayer.seekBy(deltaMs) },
                             onTogglePlay = { audioPlayer.togglePlay(detailItem.audioFile, detailItem.id) },
                             onExport = { exportRecording(detailItem) },
                             onRetry = {

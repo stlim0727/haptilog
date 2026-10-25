@@ -98,4 +98,9 @@
     <string name="recorded_at">Recorded at</string>
     <string name="expense_amount_krw">%1$s KRW</string>
     <string name="recordings_action">Records</string>
+    <string name="record_pause">Pause</string>
+    <string name="record_resume">Resume</string>
+    <string name="recording_paused">Paused</string>
+    <string name="seek_backward_5">Rewind 5s</string>
+    <string name="seek_forward_5">Forward 5s</string>
 </resources>

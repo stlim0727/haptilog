@@ -41,6 +41,9 @@ class VoiceRecordingService : Service() {
         const val ACTION_START = "com.haptilog.watch.action.START"
         const val ACTION_STOP = "com.haptilog.watch.action.STOP"
         const val ACTION_TOGGLE = "com.haptilog.watch.action.TOGGLE"
+        const val ACTION_PAUSE = "com.haptilog.watch.action.PAUSE"
+        const val ACTION_RESUME = "com.haptilog.watch.action.RESUME"
+        const val ACTION_TOGGLE_PAUSE = "com.haptilog.watch.action.TOGGLE_PAUSE"
 
         private const val CHANNEL_ID = "haptilog_recording_channel"
         private const val NOTIFICATION_ID = 1001
@@ -48,6 +51,9 @@ class VoiceRecordingService : Service() {
 
         private val _isRecording = MutableStateFlow(false)
         val isRecording: StateFlow<Boolean> = _isRecording
+
+        private val _isPaused = MutableStateFlow(false)
+        val isPaused: StateFlow<Boolean> = _isPaused
 
         private val _elapsedDurationSeconds = MutableStateFlow(0L)
         val elapsedDurationSeconds: StateFlow<Long> = _elapsedDurationSeconds
@@ -59,6 +65,7 @@ class VoiceRecordingService : Service() {
     private var currentSessionId: String? = null
     private var startTimeMs: Long = 0L
     private var elapsedStartMs: Long = 0L
+    private var accumulatedElapsedMs: Long = 0L
     private var metadata = JSONObject()
     private var locationJob: Job? = null
     private var timerJob: Job? = null
@@ -84,6 +91,13 @@ class VoiceRecordingService : Service() {
             ACTION_STOP -> stopRecording()
             ACTION_TOGGLE -> {
                 if (_isRecording.value) stopRecording() else startRecording()
+            }
+            ACTION_PAUSE -> if (_isRecording.value && !_isPaused.value) pauseRecording()
+            ACTION_RESUME -> if (_isRecording.value && _isPaused.value) resumeRecording()
+            ACTION_TOGGLE_PAUSE -> {
+                if (_isRecording.value) {
+                    if (_isPaused.value) resumeRecording() else pauseRecording()
+                }
             }
         }
         return START_NOT_STICKY
@@ -137,18 +151,13 @@ class VoiceRecordingService : Service() {
             }
             mediaRecorder = recorder
             _isRecording.value = true
+            _isPaused.value = false
+            accumulatedElapsedMs = 0L
             _elapsedDurationSeconds.value = 0L
             hapticManager.playStartFeedback()
             hapticManager.startHeartbeatLoop()
 
-            timerJob?.cancel()
-            timerJob = serviceScope.launch {
-                while (_isRecording.value) {
-                    val seconds = ((SystemClock.elapsedRealtime() - elapsedStartMs) / 1000L).coerceAtLeast(0L)
-                    _elapsedDurationSeconds.value = seconds
-                    delay(500L)
-                }
-            }
+            startTimer()
 
             val sessionId = currentSessionId
             locationJob = serviceScope.launch {
@@ -159,23 +168,75 @@ class VoiceRecordingService : Service() {
                 }
             }
 
-            // 4. Safety auto-timeout with tactile warning at 150s (30s before auto-stop)
-            timeoutJob?.cancel()
-            timeoutJob = serviceScope.launch {
-                val warningDelayMs = (MAX_RECORDING_MS - 30_000L).coerceAtLeast(0L)
-                delay(warningDelayMs)
-                if (_isRecording.value) {
-                    hapticManager.playTimeoutWarningFeedback()
-                }
-                delay(MAX_RECORDING_MS - warningDelayMs)
-                if (_isRecording.value) {
-                    stopRecording()
-                }
-            }
+            startTimeout(MAX_RECORDING_MS)
 
         } catch (e: Exception) {
             e.printStackTrace()
             cleanupFailure()
+        }
+    }
+
+    private fun startTimer() {
+        timerJob?.cancel()
+        timerJob = serviceScope.launch {
+            while (_isRecording.value && !_isPaused.value) {
+                val currentSessionMs = (SystemClock.elapsedRealtime() - elapsedStartMs).coerceAtLeast(0L)
+                val totalSeconds = ((accumulatedElapsedMs + currentSessionMs) / 1000L).coerceAtLeast(0L)
+                _elapsedDurationSeconds.value = totalSeconds
+                delay(500L)
+            }
+        }
+    }
+
+    private fun startTimeout(remainingMs: Long) {
+        timeoutJob?.cancel()
+        timeoutJob = serviceScope.launch {
+            val warningDelayMs = (remainingMs - 30_000L).coerceAtLeast(0L)
+            if (warningDelayMs > 0) {
+                delay(warningDelayMs)
+                if (_isRecording.value && !_isPaused.value) {
+                    hapticManager.playTimeoutWarningFeedback()
+                }
+                delay(remainingMs - warningDelayMs)
+            } else {
+                delay(remainingMs.coerceAtLeast(0L))
+            }
+            if (_isRecording.value) {
+                stopRecording()
+            }
+        }
+    }
+
+    private fun pauseRecording() {
+        if (!_isRecording.value || _isPaused.value) return
+        try {
+            mediaRecorder?.pause()
+            _isPaused.value = true
+            accumulatedElapsedMs += (SystemClock.elapsedRealtime() - elapsedStartMs).coerceAtLeast(0L)
+            _elapsedDurationSeconds.value = (accumulatedElapsedMs / 1000L).coerceAtLeast(0L)
+            timerJob?.cancel()
+            timeoutJob?.cancel()
+            hapticManager.playPauseFeedback()
+            updateForegroundNotification()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun resumeRecording() {
+        if (!_isRecording.value || !_isPaused.value) return
+        try {
+            mediaRecorder?.resume()
+            _isPaused.value = false
+            elapsedStartMs = SystemClock.elapsedRealtime()
+            hapticManager.playStartFeedback()
+            hapticManager.startHeartbeatLoop()
+            startTimer()
+            val remainingMs = (MAX_RECORDING_MS - accumulatedElapsedMs).coerceAtLeast(5000L)
+            startTimeout(remainingMs)
+            updateForegroundNotification()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -184,7 +245,6 @@ class VoiceRecordingService : Service() {
 
         timerJob?.cancel()
         timerJob = null
-        _elapsedDurationSeconds.value = 0L
 
         timeoutJob?.cancel()
         timeoutJob = null
@@ -201,10 +261,16 @@ class VoiceRecordingService : Service() {
             runCatching { mediaRecorder?.release() }
             mediaRecorder = null
         }
+        val finalElapsedMs = accumulatedElapsedMs + if (_isPaused.value) 0L else (SystemClock.elapsedRealtime() - elapsedStartMs).coerceAtLeast(0L)
+        val finalSeconds = (finalElapsedMs / 1000L).coerceAtLeast(0L).toInt()
+
         _isRecording.value = false
+        _isPaused.value = false
+        accumulatedElapsedMs = 0L
+        _elapsedDurationSeconds.value = 0L
         hapticManager.stop()
         try {
-            metadata.put("duration_seconds", ((SystemClock.elapsedRealtime() - elapsedStartMs) / 1000).toInt())
+            metadata.put("duration_seconds", finalSeconds)
             metadata.put("status", if (saved) "COMPLETED" else "FAILED")
             metadata.put("sync_status", if (saved) "PENDING_SYNC" else "CAPTURE_FAILED")
             writeMetadata()
@@ -293,13 +359,19 @@ class VoiceRecordingService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
+        val contentText = if (_isPaused.value) "Recording paused" else "Capturing voice & location..."
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("HaptiLog Recording")
-            .setContentText("Capturing voice & location...")
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .build()
+    }
+
+    private fun updateForegroundNotification() {
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(NOTIFICATION_ID, buildForegroundNotification())
     }
 
     override fun onDestroy() {

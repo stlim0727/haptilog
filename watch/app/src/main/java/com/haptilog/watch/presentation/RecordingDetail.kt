@@ -152,7 +152,10 @@ fun RecordingDetailScreen(
     onExport: () -> Unit,
     onRetry: () -> Unit,
     onOpenMap: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    currentPositionMs: Int = 0,
+    durationMs: Int = (item.durationSeconds * 1000),
+    onSeekBy: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -219,23 +222,101 @@ fun RecordingDetailScreen(
                     RecordingMetadata(item, Modifier.fillMaxWidth(0.94f), compact = true, centered = true)
                 }
                 item {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+                    val currentSec = (currentPositionMs / 1000).coerceAtLeast(0)
+                    val totalSec = ((if (durationMs > 0) durationMs else item.durationSeconds * 1000) / 1000).coerceAtLeast(0)
+                    val progressFraction = if (totalSec > 0) (currentSec.toFloat() / totalSec.toFloat()).coerceIn(0f, 1f) else 0f
+                    val timeDisplay = String.format(Locale.US, "%02d:%02d / %02d:%02d",
+                        currentSec / 60, currentSec % 60,
+                        totalSec / 60, totalSec % 60)
+
+                    Column(
+                        Modifier.fillMaxWidth(0.96f),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        val seekBackLabel = stringResource(R.string.seek_backward_5)
+                        val seekFwdLabel = stringResource(R.string.seek_forward_5)
                         val playLabel = stringResource(if (isPlaying) R.string.stop_playback else R.string.play_audio)
-                        IconButton(onClick = onTogglePlay, enabled = audioAvailable,
-                            modifier = Modifier.size(if (heroAmount != null) 48.dp else 52.dp)
-                                .semantics { contentDescription = playLabel },
-                            colors = IconButtonDefaults.iconButtonColors(
-                                containerColor = if (heroAmount != null) Color.Transparent else WatchColors.Record,
-                                contentColor = WatchColors.OnRecord)) {
-                            Box(Modifier.size(if (heroAmount != null) 28.dp else 52.dp)
-                                .background(WatchColors.Record, CircleShape), contentAlignment = Alignment.Center) {
-                                Icon(painterResource(if (isPlaying) R.drawable.ic_stop else R.drawable.ic_play), null,
-                                    Modifier.size(if (heroAmount != null) 18.dp else 28.dp))
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+                        ) {
+                            IconButton(
+                                onClick = { onSeekBy(-5000) },
+                                enabled = audioAvailable && isPlaying,
+                                modifier = Modifier.size(40.dp).semantics { contentDescription = seekBackLabel },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = Color(0xFF262626),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                                    Icon(painterResource(R.drawable.ic_seek_back), null, Modifier.size(16.dp))
+                                }
+                            }
+
+                            IconButton(
+                                onClick = onTogglePlay,
+                                enabled = audioAvailable,
+                                modifier = Modifier.size(52.dp).semantics { contentDescription = playLabel },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = WatchColors.Record,
+                                    contentColor = WatchColors.OnRecord
+                                )
+                            ) {
+                                Box(Modifier.size(52.dp).background(WatchColors.Record, CircleShape), contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
+                                        null,
+                                        Modifier.size(26.dp)
+                                    )
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { onSeekBy(5000) },
+                                enabled = audioAvailable && isPlaying,
+                                modifier = Modifier.size(40.dp).semantics { contentDescription = seekFwdLabel },
+                                colors = IconButtonDefaults.iconButtonColors(
+                                    containerColor = Color(0xFF262626),
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                                    Icon(painterResource(R.drawable.ic_seek_forward), null, Modifier.size(16.dp))
+                                }
                             }
                         }
-                        if (heroAmount != null) Text(recordingDuration(context, item.durationSeconds.toLong()),
-                            fontSize = 11.sp, color = WatchColors.Muted)
+
+                        // Progress Bar Track
+                        Box(
+                            Modifier
+                                .fillMaxWidth(0.82f)
+                                .height(8.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Box(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(3.dp)
+                                    .background(Color(0xFF333333), RoundedCornerShape(1.5.dp))
+                            )
+                            Box(
+                                Modifier
+                                    .fillMaxWidth(progressFraction)
+                                    .height(3.dp)
+                                    .background(WatchColors.Record, RoundedCornerShape(1.5.dp))
+                            )
+                        }
+
+                        Text(
+                            timeDisplay,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = WatchColors.Muted
+                        )
                     }
                 }
                 if (!audioAvailable) item { Text(stringResource(R.string.audio_missing), color = WatchColors.Error, fontSize = 14.sp) }

@@ -98,4 +98,9 @@
     <string name="recorded_at">녹음 시각</string>
     <string name="expense_amount_krw">%1$s원</string>
     <string name="recordings_action">기록</string>
+    <string name="record_pause">일시정지</string>
+    <string name="record_resume">이어서 녹음</string>
+    <string name="recording_paused">일시정지됨</string>
+    <string name="seek_backward_5">5초 뒤로</string>
+    <string name="seek_forward_5">5초 앞으로</string>
 </resources>
