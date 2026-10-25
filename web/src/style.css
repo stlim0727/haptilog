@@ -2209,3 +2209,12 @@ audio {
 .time-strip-dots .dot-voice   { background: #a1a1aa; }
 
 
+
+.account-bar { padding: 10px max(16px, calc((100vw - 1440px) / 2)); display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--border, #454550); }
+.account-bar button { min-height: 44px; padding: 8px 14px; border: 1px solid currentColor; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.account-bar button:disabled { opacity: .5; cursor: default; }
+.account-panel { flex-basis: 100%; min-width: 0; overflow-wrap: anywhere; }
+.account-panel p { margin: 12px 0; }
+.account-panel > button { margin: 4px; }
+.account-watch { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.recovery-notice { margin: 12px 20px; font-size: .9rem; }
