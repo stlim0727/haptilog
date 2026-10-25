@@ -15,6 +15,9 @@ if (key?.split(".").length === 3) {
       throw e;
   }
 }
+const callbackUrl = new URL(window.location.href);
+export const authCallbackFailed = !callbackUrl.searchParams.has("notion") &&
+  (callbackUrl.searchParams.has("error") || new URLSearchParams(callbackUrl.hash.slice(1)).has("error"));
 export const supabase =
   url && key
     ? createClient(url, key, {
@@ -22,7 +25,8 @@ export const supabase =
           storageKey: "haptilog-portal-session",
           persistSession: true,
           autoRefreshToken: true,
-          detectSessionInUrl: false,
+          flowType: "pkce",
+          detectSessionInUrl: true,
         },
       })
     : null;

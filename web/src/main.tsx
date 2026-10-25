@@ -1,3 +1,4 @@
+import { signInGoogle, watchAccount, type AccountWatch } from "./account";
 import React, { Fragment, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -27,7 +28,7 @@ import {
   Trash2,
   Watch,
 } from "lucide-react";
-import { supabase } from "./client";
+import { supabase, authCallbackFailed } from "./client";
 import { MobileWorkspace } from "./MobileWorkspace";
 import { NotionExport } from "./NotionExport";
 import { TranscriptEditor } from "./TranscriptEditor";
@@ -95,9 +96,14 @@ function App() {
     query.addEventListener("change", update);
     return () => query.removeEventListener("change", update);
   }, [draftInProgress, mobileDetailOpen]);
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [accountWatches, setAccountWatches] = useState<AccountWatch[]>([]);
+  const [addingWatch, setAddingWatch] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [checking, setChecking] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(authCallbackFailed
+    ? translations[getInitialLanguage()].google_error : "");
   const [records, setRecords] = useState<Recording[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [truncated, setTruncated] = useState(false);
@@ -121,19 +127,34 @@ function App() {
     localStorage.setItem("haptilog_language", next);
   }
   const generation = useRef(0);
+  const authenticatedUser = useRef<string | null>(null);
   const refreshConnection = useCallback(async () => {
     if (!supabase) {
       setChecking(false);
       return;
     }
+    const epoch = generation.current;
     const {
-      data: { session },
+      data: { session }, error: sessionError,
     } = await supabase.auth.getSession();
+    if (epoch !== generation.current) return;
+    if (sessionError) setError("Could not complete sign-in. Try Google sign-in again.");
+    const google = session && !session.user.is_anonymous && session.user.identities?.some(i => i.provider === "google");
+    setAccountEmail(google ? session.user.email ?? "Google" : null);
     if (!session) {
       setChecking(false);
       return;
     }
-    const { data, error } = await supabase
+    let watches: AccountWatch[] = [];
+    if (google) {
+      try {
+        watches = await watchAccount("list");
+        if (epoch !== generation.current) return;
+        setAccountWatches(watches);
+      }
+      catch { setError("Could not load account connections. Try again."); }
+    }
+    let { data, error } = await supabase
       .from("portal_connections")
       .select("session_id,watch_id,owner_user_id,expires_at")
       .eq("browser_user_id", session.user.id)
@@ -141,6 +162,18 @@ function App() {
       .gt("expires_at", new Date().toISOString())
       .limit(1)
       .maybeSingle();
+    if (epoch !== generation.current) return;
+    if (!error && !data && watches.length) {
+      try {
+        await watchAccount("restore", watches[0].owner_user_id);
+        const result = await supabase.from("portal_connections")
+          .select("session_id,watch_id,owner_user_id,expires_at")
+          .eq("browser_user_id", session.user.id).is("revoked_at", null)
+          .gt("expires_at", new Date().toISOString()).limit(1).maybeSingle();
+        data = result.data; error = result.error;
+      } catch { setError("Could not restore your watch. Open Account to try again."); }
+    }
+    if (epoch !== generation.current) return;
     if (error) setError("Could not check your connection. Try again.");
     setConnection(data);
     setChecking(false);
@@ -152,16 +185,27 @@ function App() {
     if (!supabase) return;
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const userId = session?.user.id ?? null;
+      const identityChanged = authenticatedUser.current !== userId;
+      authenticatedUser.current = userId;
+      if (event === "SIGNED_OUT" || identityChanged) {
         generation.current++;
         setConnection(null);
         setRecords([]);
         setLoaded(false);
+        setAccountEmail(null);
+        setAccountWatches([]);
+        setAccountOpen(false);
+        setAddingWatch(false);
+      }
+      if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED") {
+        // Defer Supabase calls until outside the Auth callback lock.
+        setTimeout(() => { void refreshConnection(); }, 0);
       }
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [refreshConnection]);
   const load = useCallback(async () => {
     if (!supabase || !connection) return;
     const epoch = generation.current;
@@ -237,6 +281,9 @@ function App() {
       });
       if (error) throw error;
       setCode("");
+      generation.current++;
+      setRecords([]); setLoaded(false); setSelected(null);
+      setAddingWatch(false);
       await refreshConnection();
     } catch {
       setError(
@@ -245,6 +292,31 @@ function App() {
     } finally {
       setBusy(false);
     }
+  }
+  async function googleLogin(existingAccount = false) {
+    setBusy(true); setError("");
+    try {
+      if (existingAccount && supabase) {
+        const { error } = await supabase.auth.signInWithOAuth({ provider: "google",
+          options: { redirectTo: `${window.location.origin}/`, queryParams: { prompt: "select_account" } } });
+        if (error) throw error;
+      } else await signInGoogle();
+    } catch { setError(t.google_error); }
+    finally { setBusy(false); }
+  }
+  async function accountOperation(operation: "save" | "restore" | "unlink", owner?: string) {
+    if (draftInProgress || busy) return;
+    if (operation === "unlink" && !window.confirm(t.unlink_confirm)) return;
+    setBusy(true); setError("");
+    // Unmount players/editors and invalidate in-flight reads when switching owners.
+    generation.current++; setRecords([]); setLoaded(false); setSelected(null);
+    setConnection(null);
+    try {
+      setAccountWatches(await watchAccount(operation, owner));
+      await refreshConnection();
+      setAddingWatch(false);
+    } catch { setError(t.account_error); await refreshConnection(); }
+    finally { setBusy(false); }
   }
   async function disconnect() {
     if (!supabase || !connection) return;
@@ -429,6 +501,34 @@ function App() {
           )}
         </div>
       </header>
+      {supabase && <section className="account-bar" aria-label={t.account}>
+        <button onClick={() => setAccountOpen(!accountOpen)} aria-expanded={accountOpen}>{t.account}</button>
+        {!accountEmail && <button disabled={busy || draftInProgress} onClick={() => googleLogin()}>{t.google_signin}</button>}
+        {accountOpen && <div className="account-panel">
+          {accountEmail ? <>
+            <p>{t.signed_in_as}: {accountEmail}</p>
+            {connection && (accountWatches.some(w => w.owner_user_id === connection.owner_user_id)
+              ? <p role="status">{t.account_saved}</p>
+              : <button disabled={busy || draftInProgress} onClick={() => accountOperation("save")}>{t.save_account}</button>)}
+            {accountWatches.map(w => <div className="account-watch" key={w.owner_user_id}>
+              <button disabled={busy || draftInProgress} onClick={() => accountOperation("restore", w.owner_user_id)}>{w.watch_id}</button>
+              <button disabled={busy || draftInProgress} onClick={() => accountOperation("unlink", w.owner_user_id)} aria-label={`${t.unlink_watch} ${w.watch_id}`}>{t.unlink_watch}</button>
+            </div>)}
+            <button disabled={busy || draftInProgress} onClick={() => { setAddingWatch(true); setAccountOpen(false); }}>{t.add_watch}</button>
+            <button disabled={busy || draftInProgress} onClick={async () => {
+              if (!supabase) return;
+              const { error } = await supabase.auth.signOut({ scope: "local" });
+              if (error) setError(t.account_error);
+            }}>{t.sign_out}</button>
+            <p>{t.signout_help}</p>
+          </> : <>
+            <p>{t.recovery_help}</p>
+            <button disabled={busy || draftInProgress} onClick={() => googleLogin(true)}>{t.google_existing}</button>
+            <p>{t.google_existing_help}</p>
+          </>}
+          <p>{t.recovery_limit}</p>
+        </div>}
+      </section>}
       {error && (
         <div className="error-banner" role="alert">
           {error}
@@ -459,11 +559,12 @@ function App() {
           </div>
         </div>
       )}
+      {connection && !accountEmail && <p className="recovery-notice">{t.recovery_help}</p>}
       {checking ? (
         <main className="loading">
           <LoaderCircle className="spin" /> {t.opening_space}
         </main>
-      ) : !connection ? (
+      ) : !connection || addingWatch ? (
         <main className="pair-page">
           <section className="pair-story">
             <span className="eyebrow">
@@ -506,7 +607,9 @@ function App() {
           </section>
           <section className="pair-card">
             <span className="step-label">{t.step_label}</span>
-            <h2>{t.connect_title}</h2>
+            <h2>{addingWatch ? t.add_watch : t.connect_title}</h2>
+            {addingWatch && connection && <button onClick={() => setAddingWatch(false)}>{t.cancel_pair}</button>}
+            {accountEmail && <p>{t.account_pair_help}</p>}
             <p>{t.connect_desc}</p>
             {!supabase ? (
               <div className="setup-note">
