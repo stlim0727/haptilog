@@ -247,9 +247,8 @@ export function MobileWorkspace(p: Props) {
     }
   }, [p.loaded, detailId, detail?.deleted_at, isTrash, !!detail]);
 
-  const revealNotion = useCallback(() => {
-    setNotionOpen(true);
-    requestAnimationFrame(() => {
+  useEffect(() => {
+    if (notionOpen) {
       const panel = document.querySelector<HTMLElement>(
         ".mobile-workspace .notion-panel",
       );
@@ -257,7 +256,11 @@ export function MobileWorkspace(p: Props) {
       panel?.querySelector<HTMLButtonElement>("button")?.focus({
         preventScroll: true,
       });
-    });
+    }
+  }, [notionOpen]);
+
+  const revealNotion = useCallback(() => {
+    setNotionOpen(true);
   }, []);
 
   function changeView(next: View) {

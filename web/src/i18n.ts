@@ -41,7 +41,6 @@ export const translations = {
     connect_btn: "Connect my watch",
     connecting: "Connecting…",
     pair_footnote:
-    pair_footnote:
       "Use a watch code for temporary access.\nLink Google for access after replacing your watch.",
     preview_test_badge: "PR Preview / Demo",
     preview_divider_or: "OR TRY WITH SAMPLE DATA",
@@ -228,7 +227,6 @@ export const translations = {
     expires_in: "5분 후 만료",
     connect_btn: "워치 연결하기",
     connecting: "연결 중…",
-    pair_footnote:
     pair_footnote:
       "워치 코드로 임시 접근할 수 있습니다.\n워치 교체 후에도 접근하려면 Google 계정을 연결하세요.",
     preview_test_badge: "PR 프리뷰 / 데모",

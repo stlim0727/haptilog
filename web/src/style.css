@@ -2379,3 +2379,18 @@ audio {
 .account-panel > button { margin: 4px; }
 .account-watch { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
 .recovery-notice { margin: 12px 20px; font-size: .9rem; }
+
+@media (max-width: 700px) {
+  .account-bar {
+    padding: 6px 16px;
+    gap: 6px;
+  }
+  .account-bar button {
+    min-height: 38px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  .recovery-notice {
+    display: none;
+  }
+}

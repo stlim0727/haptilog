@@ -679,7 +679,7 @@ function App() {
           </div>
         </div>
       )}
-      {connection && !accountEmail && <p className="recovery-notice">{t.recovery_help}</p>}
+      {!mobile && connection && !accountEmail && <p className="recovery-notice">{t.recovery_help}</p>}
       {checking ? (
         <main className="loading">
           <LoaderCircle className="spin" /> {t.opening_space}
