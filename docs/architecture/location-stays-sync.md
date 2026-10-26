@@ -1,6 +1,6 @@
 # Location stays contract v1
 
-Implementation baseline for Discussion #66, 2026-10-26. This contract does not imply a deployed feature. Touch events and AI classification are excluded.
+Implementation baseline for Discussion #66, 2026-10-26. The backend described here is applied to production; on-device and portal end-to-end validation remain open. Touch events and AI classification are excluded.
 
 ## Observation contract
 
@@ -21,7 +21,7 @@ Deletion serializes with upload, advances owner epoch and retains deleted IDs wi
 ## Parallel ownership
 
 - Watch worker: location model/detector/repository/service and their tests; no audio changes.
-- Backend worker: new migrations, location protocol fixtures/tests and new location backend modules only; no existing voice-enrich changes. No remote application or deployment.
+- Backend worker: new migrations, location protocol fixtures/tests and new location backend modules only; no existing voice-enrich changes. That batch did not apply or deploy anything; production application is recorded under Deployment status.
 - Web worker: new `web/src/location-stays/` modules/tests only initially. No production mounting until API and consent are implemented.
 - Coordinator: this contract, cross-area integration, shared fixture reconciliation and verification.
 
@@ -29,7 +29,7 @@ The initial parallel batch implements testable foundations. Recommendation thres
 
 ## Backend RPC foundation
 
-New migration adds `location_stays(p_owner uuid, p_action text, p_payload jsonb default '{}')`. This is a local, undeployed foundation. JWT caller must be the original watch owner or have a live session-bound portal connection; the server does not trust a payload owner. An authorized `snapshot` initializes absent state with consent disabled. Unauthorized actions return `{error:"FORBIDDEN"}`. Successful mutations return `{state: ...}` unless specified below. Errors are JSON outcomes, not HTTP status guarantees.
+New migration adds `location_stays(p_owner uuid, p_action text, p_payload jsonb default '{}')`. The migration is applied and the RPC is callable by an authenticated watch session. JWT caller must be the original watch owner or have a live session-bound portal connection; the server does not trust a payload owner. An authorized `snapshot` initializes absent state with consent disabled. Unauthorized actions return `{error:"FORBIDDEN"}`. Successful mutations return `{state: ...}` unless specified below. Errors are JSON outcomes, not HTTP status guarantees.
 
 | Action | Payload | Result / restrictions |
 | --- | --- | --- |
@@ -46,6 +46,18 @@ State includes `owner_user_id`, `consent_enabled`, `consent_revision`, `sync_epo
 
 Error codes: `FORBIDDEN`, `INVALID_PAYLOAD`, `CONSENT_REQUIRED`, `CONSENT_CONFLICT`, `REVISION_CONFLICT`, `EPOCH_CONFLICT`, `PLACE_LIMIT`, `CLOCK_DISCONTINUITY`, `OUTSIDE_CONSENT_WINDOW`, `EXPIRED`, `DELETED`, `UNSUPPORTED_ACTION`. Clients must stop/reconcile on conflict; never blindly substitute the newest epoch into old pending data.
 
-This batch deliberately does not implement stay-place association writes, arbitrary period purge, browser recommendation persistence, or a deployed cleanup schedule. Unsupported actions fail explicitly. `cleanup_location_stays()` is service-role-only; deployment must schedule it separately before release. Query/RLS expiry filtering works even if cleanup is delayed. ID-only deletion tombstones currently remain until owner deletion; compaction requires a future proven protocol.
+This contract does not implement stay-place association writes, arbitrary period purge, or browser recommendation persistence. Unsupported actions fail explicitly. `cleanup_location_stays()` is not callable through the API or by `authenticated`; it runs as the scheduled job described below. Query and RLS expiry filtering hides expired stays regardless of cleanup timing, so a delayed run is a storage concern rather than a disclosure one. ID-only deletion tombstones currently remain until owner deletion; compaction requires a future proven protocol.
 
 Browser-local hidden-suggestion coordinates are distinct from server persistence: they expire within seven days or at their source stays' earliest expiry, are pruned on access, and are cleared after stay deletion, observed access/consent revocation and sign-out. See the [follow-up checklist](../design/location-stays-followup.md) for regression expectations and remaining release evidence.
+
+## Deployment status
+
+Applied to the production project on 2026-10-26 as `20261026082252_location_stays_foundation`. The migration is purely additive: four tables, one expiry index, four RLS-enabled tables with SELECT-only `authenticated` policies, the security-definer dispatch function, and the two public functions.
+
+Expiry cleanup is scheduled inside the database rather than left to a release step: the `pg_cron` job `location-stays-cleanup` runs `select public.cleanup_location_stays()` on `15 4 * * *` as the role that scheduled it. Its first execution is 2026-10-27 04:15 UTC.
+
+Contract behaviour was checked against production over the real wire as `authenticated` with a live session JWT, not through a superuser SQL session: `snapshot`, `consent`, `ingest`, `apply_places` and the filtered read path; a `delete_stays` followed by an offline re-`ingest` of the same stay returns `DELETED`; a stale `sync_epoch` returns `EPOCH_CONFLICT`; a stay starting before `upload_cutoff` returns `OUTSIDE_CONSENT_WINDOW`.
+
+A shipping watch client has since driven the same path on its own: enabling consent, uploading a saved place, and ingesting closed stays whose `qualified_at` is start plus the ten-minute threshold, whose `expires_at` is exactly start plus seven days, and whose `source_revision` climbs as the active stay is re-persisted. A Wear OS 4 emulator run with a fresh anonymous account reproduced the whole sequence: consent with backfill off (so `upload_cutoff` is the opt-in instant), the place upload, a stay qualifying ten minutes after the first accepted sample, periodic runs advancing its revision while active, and stopping the journal closing it as `stopped` and triggering an immediate sync.
+
+Still open before this is called released: the portal browser and accessibility pass. Database advisors were run against a local mirror of the full schema and reported three pre-existing `auth_rls_initplan` warnings, none from this migration.
