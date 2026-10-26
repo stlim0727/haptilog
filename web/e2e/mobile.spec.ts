@@ -230,6 +230,38 @@ test("map selection preserves the view and Show all restores the filtered extent
   await page.screenshot({ path: "test-results/map-show-all-mobile.png", fullPage: true });
 });
 
+test("place selection offers one counted group per place", async ({ page }) => {
+  const state = await mobile(page, 3);
+  // mobile-1 lands ~50m from the shared coordinate, mobile-2 across the city.
+  state.additional[0].latitude = 37.5413;
+  state.additional[0].longitude = 127.0564;
+  state.additional[1].latitude = 37.49;
+  state.additional[1].longitude = 127.03;
+  await page.getByRole("button", { name: "Refresh recordings" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+
+  const select = page.locator(".mobile-place-select select");
+  const options = page.locator(".mobile-place-select option");
+  await expect(page.getByText("3 located recordings · 2 places"))
+    .toBeVisible();
+  await expect(options).toHaveCount(2);
+  await expect(options.nth(0)).toHaveText(/Place 1\s+·\s+2 recordings/);
+  await expect(options.nth(1)).toHaveText(/Place 2\s+·\s+1 recording/);
+  await expect(page.locator(".mobile-map-view [data-record-id]"))
+    .toHaveCount(2);
+
+  await select.selectOption({ index: 1 });
+  await expect(page.locator(".mobile-map-view [data-record-id]"))
+    .toHaveCount(1);
+  await expect(page.locator(".mobile-map-view [data-record-id='mobile-2']"))
+    .toBeVisible();
+
+  await select.selectOption({ index: 0 });
+  await expect(page.locator(".mobile-map-view [data-record-id]"))
+    .toHaveCount(2);
+  await page.screenshot({ path: "test-results/place-groups-mobile.png", fullPage: true });
+});
+
 test("mobile unsaved transcript warns on Back and cancellation preserves edits", async ({ page }) => {
   await mobile(page);
   await page.locator(".mobile-record").click();

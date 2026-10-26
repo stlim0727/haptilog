@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CLUSTER_MAX_ZOOM, clusterLocations } from "./mapClustering.ts";
+import {
+  CLUSTER_MAX_ZOOM,
+  clusterLocations,
+  clusterPlaces,
+} from "./mapClustering.ts";
 
 const point = (id, latitude, longitude) => ({ id, latitude, longitude });
 const ids = (clusters) => clusters.map((c) => c.members.map((m) => m.id).sort());
@@ -62,4 +66,44 @@ test("singles keep their exact coordinates instead of a centroid", () => {
   const [cluster] = clusterLocations([near], 12);
   assert.equal(cluster.latitude, near.latitude);
   assert.equal(cluster.longitude, near.longitude);
+});
+
+test("place groups merge stops a short walk apart", () => {
+  // 0.0011 degrees of longitude at 37.5N is about 97 m, 0.0051 is about 450 m.
+  const groups = clusterPlaces([
+    point("cafe", 37.541, 127.056),
+    point("same-cafe", 37.541, 127.0571),
+    point("across-street", 37.541, 127.0611),
+  ]);
+  assert.deepEqual(ids(groups).sort(), [
+    ["across-street"],
+    ["cafe", "same-cafe"],
+  ]);
+});
+
+test("place groups measure ground distance at any latitude", () => {
+  // 0.003 degrees of longitude spans ~167 m of ground at 60N, but Mercator
+  // stretches it to ~334 units, so an uncorrected radius would split this stop.
+  const merged = clusterPlaces([
+    point("a", 60, 10),
+    point("b", 60, 10.003),
+  ]);
+  assert.deepEqual(ids(merged), [["a", "b"]]);
+  const apart = clusterPlaces([point("a", 60, 10), point("b", 60, 10.01)]);
+  assert.deepEqual(ids(apart).sort(), [["a"], ["b"]]);
+});
+
+test("place groups keep every recording exactly once", () => {
+  const records = [];
+  for (let index = 0; index < 300; index++) {
+    records.push(point(
+      `r${index}`,
+      37.49 + Math.random() * 0.1,
+      126.98 + Math.random() * 0.14,
+    ));
+  }
+  const groups = clusterPlaces(records);
+  const flattened = groups.flatMap((group) => group.members.map((m) => m.id));
+  assert.equal(flattened.length, records.length);
+  assert.equal(new Set(flattened).size, records.length);
 });
