@@ -173,6 +173,10 @@ class SettingsActivity : ComponentActivity() {
                                     secondaryLabel = { Text(stringResource(R.string.web_access_hint), maxLines = Int.MAX_VALUE) },
                                     icon = { Icon(painterResource(R.drawable.ic_link), null, Modifier.size(22.dp), tint = Color(0xFFA8D8FF)) })
                             }
+                            item { FlexibleChip(onClick = {
+                                startActivity(Intent(this@SettingsActivity, LocationJournalActivity::class.java))
+                            }, label = { Text(stringResource(R.string.location_journal_title), maxLines = Int.MAX_VALUE) },
+                                secondaryLabel = { Text(stringResource(R.string.location_journal_hint), maxLines = Int.MAX_VALUE) }) }
                             item { SettingsSection(stringResource(R.string.haptics_group)) }
                             item {
                                 FlexibleChip(onClick = {
@@ -183,13 +187,6 @@ class SettingsActivity : ComponentActivity() {
                                 }, label = { Text(stringResource(R.string.haptic_intensity_title), maxLines = Int.MAX_VALUE) },
                                     secondaryLabel = { Text(stringResource(hapticIntensity.labelRes), maxLines = Int.MAX_VALUE) })
                             }
-                            item { FlexibleChip(onClick = {
-                                startActivity(Intent(this@SettingsActivity, LocationJournalActivity::class.java))
-                            }, label = { Text(stringResource(R.string.location_journal_title), maxLines = Int.MAX_VALUE) },
-                                secondaryLabel = { Text(stringResource(R.string.location_journal_hint), maxLines = Int.MAX_VALUE) }) }
-                            item { FlexibleChip(onClick = {
-                                startActivity(Intent(this@SettingsActivity, LocationSyncActivity::class.java))
-                            }, label = { Text(stringResource(R.string.location_sync_title), maxLines = Int.MAX_VALUE) }) }
                             item { FlexibleChip(onClick = {
                                 startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                                     .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))

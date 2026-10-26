@@ -83,11 +83,10 @@ for (const action of ["delete", "revoke", "logout"] as const) {
     const dialog = await openStays(page);
     await page.evaluate(({ key, owner }) => localStorage.setItem(key, JSON.stringify([{ owner, latitude: 37.5, longitude: 127, radius_meters: 200, expires_at: Date.now() + 60_000 }])), { key: hiddenKey, owner: stayOwner });
     if (action === "delete") {
-      await dialog.locator("summary").click();
-      await dialog.getByRole("button", { name: "Delete this stay", exact: true }).click();
+      await dialog.getByRole("button", { name: "Delete all server stays", exact: true }).click();
       await dialog.getByRole("button", { name: "Permanently delete stays", exact: true }).click();
     } else if (action === "revoke") {
-      await dialog.getByRole("button", { name: "Revoke synchronization consent", exact: true }).click();
+      await dialog.getByRole("button", { name: "Turn off sync", exact: true }).click();
     } else {
       await dialog.getByRole("button", { name: "Close", exact: true }).click();
       await page.getByRole("button", { name: "Disconnect browser", exact: true }).click();

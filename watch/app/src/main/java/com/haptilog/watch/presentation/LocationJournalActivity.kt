@@ -37,6 +37,7 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import com.haptilog.watch.R
 import com.haptilog.watch.data.location.*
 import com.haptilog.watch.sync.LocationConsent
+import com.haptilog.watch.sync.CloudClient
 import com.haptilog.watch.service.LocationTrackingService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -67,7 +68,12 @@ class LocationJournalActivity : ComponentActivity() {
         val action = pendingAction
         pendingAction = null
         if (hasFineLocation()) {
-            if (action == "start") startTracking() else if (action == "locate") locate()
+            if (action == "start") {
+                if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this,
+                        Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    notice = getString(R.string.location_service_notifications_required)
+                } else startTracking()
+            } else if (action == "locate") locate()
         } else notice = getString(R.string.location_permission_needed)
     }
 
@@ -153,6 +159,21 @@ class LocationJournalActivity : ComponentActivity() {
             setContent {
                 HaptiLogTheme { AppScaffold {
                     val history by repository.state.collectAsState()
+                    val syncScope = rememberCoroutineScope()
+                    var syncBusy by remember { mutableStateOf(false) }
+                    var syncFailed by remember { mutableStateOf(false) }
+                    var syncPending by remember { mutableStateOf(false) }
+                    var syncConsentOpen by rememberSaveable { mutableStateOf(false) }
+                    var syncDetails by rememberSaveable { mutableStateOf(false) }
+                    var syncBackfill by rememberSaveable { mutableStateOf(false) }
+                    var advanced by rememberSaveable { mutableStateOf(false) }
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            cloudManaged = LocationConsent.enabled(this@LocationJournalActivity)
+                            syncPending = getSharedPreferences("location_sync", MODE_PRIVATE).getBoolean("revoke_pending", false)
+                            kotlinx.coroutines.delay(2_000)
+                        }
+                    }
                     var displayNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
                     LaunchedEffect(Unit) {
                         while (true) { kotlinx.coroutines.delay(30_000); displayNow = System.currentTimeMillis() }
@@ -172,21 +193,21 @@ class LocationJournalActivity : ComponentActivity() {
                             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 38.dp, bottom = 48.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
                             item { Text(stringResource(R.string.location_journal_title), textAlign = TextAlign.Center) }
-                            (notice ?: serviceNotice)?.let { item { JournalText(it) } }
+                            if (page != "home") (notice ?: serviceNotice)?.let { item { JournalText(it) } }
                             if (page == "place") {
-                                item { JournalField(stringResource(R.string.location_place_name), name, !busy && !cloudManaged) { name = it.take(40) } }
-                                item { JournalAction(R.string.location_use_current, !busy && !active && !cloudManaged) { requestLocation("locate") } }
-                                item { JournalField(stringResource(R.string.location_latitude), latitude, !busy && !cloudManaged) { latitude = it } }
-                                item { JournalField(stringResource(R.string.location_longitude), longitude, !busy && !cloudManaged) { longitude = it } }
-                                item { DetailAction(enabled = !busy && !active && !cloudManaged, onClick = {
+                                item { JournalField(stringResource(R.string.location_place_name), name, !busy && !syncBusy && !cloudManaged) { name = it.take(40) } }
+                                item { JournalAction(R.string.location_use_current, !busy && !syncBusy && !active && !cloudManaged) { requestLocation("locate") } }
+                                item { JournalField(stringResource(R.string.location_latitude), latitude, !busy && !syncBusy && !cloudManaged) { latitude = it } }
+                                item { JournalField(stringResource(R.string.location_longitude), longitude, !busy && !syncBusy && !cloudManaged) { longitude = it } }
+                                item { DetailAction(enabled = !busy && !syncBusy && !active && !cloudManaged, onClick = {
                                     radius = when (radius) { 150 -> 200; 200 -> 500; 500 -> 1000; 1000 -> 2000; else -> 150 }
                                 }, label = { Text(stringResource(R.string.location_radius, radius)) }) }
-                                item { JournalAction(R.string.location_save_place, !busy && !active && !cloudManaged && validPlaceInput(name, latitude, longitude)) {
+                                item { JournalAction(R.string.location_save_place, !busy && !syncBusy && !active && !cloudManaged && validPlaceInput(name, latitude, longitude)) {
                                     val place = SavedPlace(editId ?: UUID.randomUUID().toString(), name.trim(),
                                         latitude.toDouble(), longitude.toDouble(), radius.toDouble())
                                     change(onSuccess = { page = "home" }) { repository.addPlace(place) }
                                 } }
-                                editId?.let { id -> item { JournalAction(R.string.location_delete_place, !busy && !active && !cloudManaged) {
+                                editId?.let { id -> item { JournalAction(R.string.location_delete_place, !busy && !syncBusy && !active && !cloudManaged) {
                                     change(onSuccess = { page = "home" }) { repository.removePlace(id) }
                                 } } }
                                 item { JournalAction(R.string.location_back, !busy) { page = "home"; notice = null } }
@@ -237,11 +258,55 @@ class LocationJournalActivity : ComponentActivity() {
                                 item { JournalAction(R.string.location_back) { page = "home" } }
                             } else {
                                 item { JournalText(stringResource(if (active) R.string.location_running else R.string.location_stopped)) }
-                                item { JournalText(stringResource(if (cloudManaged) R.string.location_disclosure_synced else R.string.location_disclosure)) }
-                                item { JournalAction(if (active) R.string.location_stop else R.string.location_start, !busy) {
+                                item { DetailAction(enabled = !busy, colors = ButtonDefaults.buttonColors(
+                                    containerColor = WatchColors.Record, contentColor = WatchColors.OnRecord), onClick = {
                                     if (active) startService(Intent(this@LocationJournalActivity, LocationTrackingService::class.java)
                                         .setAction(LocationTrackingService.ACTION_STOP)) else requestLocation("start")
-                                } }
+                                }, label = { Text(stringResource(if (active) R.string.location_stop else R.string.location_start)) }) }
+                                item { JournalText(stringResource(if (cloudManaged) R.string.location_sync_on else R.string.location_sync_off)) }
+                                if (cloudManaged) {
+                                    item { JournalAction(R.string.location_sync_disable, !syncBusy) {
+                                        try {
+                                            LocationConsent.disable(this@LocationJournalActivity)
+                                            cloudManaged = false; syncPending = true; syncFailed = false
+                                        } catch (_: Exception) { syncFailed = true }
+                                    } }
+                                } else if (!syncConsentOpen) {
+                                    item { JournalAction(R.string.location_sync_setup, !syncPending && !syncBusy && CloudClient.configured) {
+                                        syncConsentOpen = true; syncFailed = false
+                                    } }
+                                    if (!CloudClient.configured) item { JournalText(stringResource(R.string.location_sync_unavailable)) }
+                                } else {
+                                    item { JournalText(stringResource(R.string.location_sync_summary)) }
+                                    item { DetailAction(enabled = !syncBusy, onClick = { syncDetails = !syncDetails },
+                                        label = { Text(stringResource(if (syncDetails) R.string.location_sync_details_hide else R.string.location_sync_details)) }) }
+                                    if (syncDetails) {
+                                        item { JournalText(stringResource(R.string.location_sync_disclosure)) }
+                                        item { JournalText(stringResource(R.string.location_sync_places_disclosure)) }
+                                    }
+                                    item { DetailAction(enabled = !syncBusy && !syncPending, onClick = { syncBackfill = !syncBackfill },
+                                        label = { Text(stringResource(if (syncBackfill) R.string.location_sync_backfill_on else R.string.location_sync_backfill_off)) }) }
+                                    if (active) item { JournalText(stringResource(R.string.location_sync_backfill_current)) }
+                                    item { JournalAction(if (syncBusy) R.string.location_sync_busy else R.string.location_sync_agree,
+                                        !syncBusy && !syncPending && CloudClient.configured) {
+                                        syncBusy = true; syncFailed = false
+                                        syncScope.launch {
+                                            try {
+                                                withContext(Dispatchers.IO) { LocationConsent.enable(this@LocationJournalActivity, syncBackfill) }
+                                                cloudManaged = LocationConsent.enabled(this@LocationJournalActivity)
+                                                syncConsentOpen = false; syncBackfill = false
+                                            } catch (e: CancellationException) { throw e }
+                                            catch (_: Exception) { syncFailed = true }
+                                            finally { syncBusy = false }
+                                        }
+                                    } }
+                                    item { JournalAction(R.string.location_sync_cancel, !syncBusy) { syncConsentOpen = false; syncBackfill = false; syncFailed = false } }
+                                }
+                                if (syncPending) item { JournalText(stringResource(R.string.location_sync_withdrawal)) }
+                                if (syncFailed) item { JournalText(stringResource(R.string.location_sync_error)) }
+                                (notice ?: serviceNotice)?.let { item { JournalText(it) } }
+                                item { JournalText(stringResource(R.string.location_collection_summary)) }
+                                if (cloudManaged && active) item { JournalText(stringResource(R.string.location_sync_next_session)) }
                                 item { JournalText(stringResource(R.string.location_counts, history.points.size, history.events.size)) }
                                 (history.latestSample ?: history.points.lastOrNull())?.let { point -> item { JournalText(stringResource(R.string.location_last_fix, journalTime(point.timestampMillis))) } }
                                 if (active && history.latestSample == null) item { JournalText(stringResource(R.string.location_waiting_fix)) }
@@ -250,23 +315,28 @@ class LocationJournalActivity : ComponentActivity() {
                                         android.net.Uri.parse("package:$packageName")))
                                 } }
                                 item { JournalAction(R.string.location_events) { limit = 30; page = "events" } }
-                                item { JournalAction(R.string.location_points) { limit = 30; page = "points" } }
-                                item { DetailAction(enabled = !busy && !active && !cloudManaged, onClick = {
-                                    val next = when (history.dwellMinutes) { 5 -> 10; 10 -> 20; 20 -> 30; else -> 5 }
-                                    change { repository.setDwellMinutes(next) }
-                                }, label = { Text(stringResource(R.string.location_dwell_setting, history.dwellMinutes)) }) }
-                                item { JournalText(stringResource(R.string.location_places_hint)) }
-                                if (cloudManaged) item { JournalText(stringResource(R.string.location_manage_on_web)) }
-                                history.places.forEach { place -> item {
-                                    DetailAction(enabled = !busy && !active && !cloudManaged, onClick = {
-                                        editId = place.id; name = place.name; latitude = place.latitude.toString()
-                                        longitude = place.longitude.toString(); radius = place.radiusMeters.toInt(); page = "place"
-                                    }, label = { Text("${place.name} · ${place.radiusMeters.toInt()} m") })
-                                } }
-                                item { JournalAction(R.string.location_add_place, !busy && !active && !cloudManaged && history.places.size < 20) {
-                                    editId = null; name = ""; latitude = ""; longitude = ""; radius = 200; notice = null; page = "place"
-                                } }
-                                item { JournalAction(R.string.location_clear, !busy && !active) { page = "clear" } }
+                                item { DetailAction(onClick = { advanced = !advanced },
+                                    label = { Text(stringResource(if (advanced) R.string.location_less_settings else R.string.location_more_settings)) }) }
+                                if (advanced) {
+                                    item { JournalText(stringResource(if (cloudManaged) R.string.location_disclosure_synced else R.string.location_disclosure)) }
+                                    item { JournalAction(R.string.location_points) { limit = 30; page = "points" } }
+                                    item { DetailAction(enabled = !busy && !syncBusy && !active && !cloudManaged, onClick = {
+                                        val next = when (history.dwellMinutes) { 5 -> 10; 10 -> 20; 20 -> 30; else -> 5 }
+                                        change { repository.setDwellMinutes(next) }
+                                    }, label = { Text(stringResource(R.string.location_dwell_setting, history.dwellMinutes)) }) }
+                                    item { JournalText(stringResource(R.string.location_places_hint)) }
+                                    if (cloudManaged) item { JournalText(stringResource(R.string.location_manage_on_web)) }
+                                    history.places.forEach { place -> item {
+                                        DetailAction(enabled = !busy && !syncBusy && !active && !cloudManaged, onClick = {
+                                            editId = place.id; name = place.name; latitude = place.latitude.toString()
+                                            longitude = place.longitude.toString(); radius = place.radiusMeters.toInt(); page = "place"
+                                        }, label = { Text("${place.name} · ${place.radiusMeters.toInt()} m") })
+                                    } }
+                                    item { JournalAction(R.string.location_add_place, !busy && !syncBusy && !active && !cloudManaged && history.places.size < 20) {
+                                        editId = null; name = ""; latitude = ""; longitude = ""; radius = 200; notice = null; page = "place"
+                                    } }
+                                    item { JournalAction(R.string.location_clear, !busy && !active) { page = "clear" } }
+                                }
                             }
                         }
                     }

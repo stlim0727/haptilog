@@ -20,3 +20,22 @@
 .location-workspace li { margin-block: .5rem; overflow-wrap: anywhere; }
 /* Narrow-viewport guard: the launcher renders bare in the mobile header flow. */
 .secondary-button[aria-haspopup="dialog"] { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.category-stay { color: var(--text-primary); background: var(--bg-surface-elevated); }
+.dot-stay { background: #60b9ac; }
+.stay-inspector { display: grid; gap: 1rem; min-width: 0; }
+.stay-inspector h2, .stay-inspector p { margin: 0; overflow-wrap: anywhere; }
+.stay-inspector .eyebrow, .stay-duration { display: flex; gap: .5rem; align-items: center; }
+.stay-duration { font-size: 1.25rem; font-weight: 600; }
+.location-secondary, .location-feed-note { color: var(--text-secondary); line-height: 1.6; }
+.location-feed-note { padding: 1rem; }
+.stay-observations { display: grid; gap: .75rem; margin: 0; }
+.stay-observations div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
+.stay-observations dt { color: var(--text-secondary); }
+.stay-observations dd { margin: 0; }
+.stay-actions, .stay-delete-confirm { display: flex; flex-wrap: wrap; gap: .75rem; }
+.stay-delete-confirm p { flex-basis: 100%; }
+.stay-inspector .recording-map { min-height: 220px; }
+.record-card strong, .mobile-record strong { overflow-wrap: anywhere; }
+.stay-card-context { color: var(--text-secondary); font-size: .75rem; }
+[data-journal-kind="stay"] .record-bottom, [data-journal-kind="stay"] .mobile-record-foot { flex-wrap: wrap; gap: .5rem; }
+[data-journal-kind="stay"] .record-meta, [data-journal-kind="stay"] .mobile-record-meta { flex-wrap: wrap; gap: .5rem; }

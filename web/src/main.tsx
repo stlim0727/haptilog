@@ -33,6 +33,12 @@ import {
   Watch,
 } from "lucide-react";
 import { supabase, authCallbackFailed } from "./client";
+import { journalItems, matchesJournal, journalDates } from "./journal";
+import type { JournalItem } from "./journal";
+import { useLocationJournal } from "./location-stays/useLocationJournal";
+import { JournalStayCard } from "./JournalStayCard";
+import { StayInspector } from "./location-stays/StayInspector";
+import type { Stay } from "./location-stays/types";
 import { clearAllDismissals } from "./location-stays/dismissals";
 import {
   DEMO_MODE_STORAGE_KEY,
@@ -156,6 +162,11 @@ function App() {
   }, [accountOpen]);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [checking, setChecking] = useState(true);
+  const locationJournal = useLocationJournal(connection?.owner_user_id, connection?.session_id, isDemoSessionActive());
+  const [placeRequest, setPlaceRequest] = useState(0);
+  const [savePlaceStay, setSavePlaceStay] = useState<Stay | null>(null);
+  const [savePlaceOwner, setSavePlaceOwner] = useState<string | undefined>();
+  const requestPlace = (stay: Stay) => { setSavePlaceOwner(connection?.owner_user_id); setSavePlaceStay(stay); setPlaceRequest(n => n + 1); };
   const [error, setError] = useState(authCallbackFailed
     ? translations[getInitialLanguage()].google_error : "");
   const [records, setRecords] = useState<Recording[]>([]);
@@ -594,25 +605,18 @@ function App() {
   const trashedCount = records.filter((r) => Boolean(r.deleted_at)).length;
   const activeRecords = records.filter((r) => !r.deleted_at);
 
-  const filtered = records.filter((r) => {
-    const isTrashed = Boolean(r.deleted_at);
-    if (isTrashView !== isTrashed) return false;
-    const e = latest(r);
-    const day = localDate(r.recorded_at),
-      today = toLocalDateString();
-    return (
-      (date === "all" ||
-        (date === "today"
-          ? day === today
-          : day.slice(0, 7) === today.slice(0, 7))) &&
-      (isTrashView || category === "All" || e?.intent_type === category.toUpperCase()) &&
-      (!search ||
-        `${e?.summary ?? ""} ${transcript(r)}`
-          .toLowerCase()
-          .includes(search.toLowerCase()))
-    );
-  });
-  const active = filtered.find((r) => r.id === selected) ?? filtered[0];
+  const allItems = journalItems(records, locationJournal.snapshot?.stays ?? [], locationJournal.snapshot?.places ?? [], locationJournal.now);
+  const filteredItems = allItems.filter(item => matchesJournal(item, { category, date, search }));
+  const stayEmptyMessage = search || date !== "all"
+    ? (lang === "ko" ? "조건에 맞는 체류가 없습니다." : "No stays match these filters.")
+    : locationJournal.snapshot?.state.consent_enabled
+      ? (lang === "ko" ? `아직 확인된 체류가 없어요. 한곳에 ${locationJournal.snapshot.state.threshold_minutes}분 이상 머무르면 기록돼요.` : `No stays confirmed yet. Stay in one area for at least ${locationJournal.snapshot.state.threshold_minutes} minutes.`)
+      : (lang === "ko" ? "워치에서 체류 기록을 시작하고 웹 동기화를 켜 주세요." : "Start stay recording on your watch and enable web sync to see places here.");
+  const filtered = filteredItems.flatMap(item => item.kind === "voice" ? [item.recording] : []);
+  const activeItem = filteredItems.find(item => item.id === selected) ?? (selected ? undefined : filteredItems[0]);
+  const active = activeItem?.kind === "voice" ? activeItem.recording : undefined;
+  const displayItems = viewMode === "list" && showTimeSlider && stripDateKey !== "ALL" ? filteredItems.filter(item => journalDates(item).includes(stripDateKey)) : filteredItems;
+  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
   const displayRecordings =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
       ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)
@@ -627,6 +631,8 @@ function App() {
         : day.slice(0, 7) === today.slice(0, 7))
     );
   });
+  const dateJournal = allItems.filter(item => matchesJournal(item, { date }));
+  const stayMinutes = dateJournal.reduce((total, item) => total + (item.kind === "stay" ? Math.floor(item.stay.observed_duration_millis / 60_000) : 0), 0);
   const totalSeconds = dateFilteredActiveRecords.reduce(
     (n, r) => n + (r.duration_seconds ?? 0),
     0,
@@ -1024,12 +1030,12 @@ function App() {
           </section>
         </main>
       ) : mobile ? (
-        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} loaded={loaded} truncated={truncated}
+        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
           date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
-          summary={summary} count={dateFilteredActiveRecords.length} seconds={totalSeconds} lastChecked={lastChecked}
+          summary={summary} count={dateJournal.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
           isDemo={isDemo} onResetDemo={resetSampleData}
-          locationControl={<Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} sessionId={connection.session_id} records={records} lang={lang} isDemo={isDemo} /></Suspense>}
+          locationControl={<Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} request={savePlaceOwner === connection.owner_user_id && savePlaceStay ? placeRequest : 0} initialStay={savePlaceOwner === connection.owner_user_id ? savePlaceStay : null} onClose={() => setSavePlaceStay(null)} /></Suspense>}
           renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
             onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
             lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
@@ -1088,12 +1094,12 @@ function App() {
             <div>
               <span className="eyebrow">{t.evening_review}</span>
               <h1>
-                {t.workspace_title}
+                {lang === "ko" ? "기록" : "Journal"}
               </h1>
-              <p>{t.workspace_subtitle}</p>
+              <p>{lang === "ko" ? "음성과 머문 장소를 한곳에서 돌아보세요." : "Your voice and the places you stayed, together."}</p>
             </div>
             <div className="heading-actions">
-              <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} sessionId={connection.session_id} records={records} lang={lang} isDemo={isDemo} /></Suspense>
+              <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} request={savePlaceOwner === connection.owner_user_id && savePlaceStay ? placeRequest : 0} initialStay={savePlaceOwner === connection.owner_user_id ? savePlaceStay : null} onClose={() => setSavePlaceStay(null)} /></Suspense>
               <label className="date-picker">
                 <CalendarDays size={16} />
                 <span className="sr-only">Date range</span>
@@ -1109,7 +1115,7 @@ function App() {
                 disabled={!filtered.length}
               >
                 <ArrowDownToLine size={16} />
-                {t.export_csv}
+                {lang === "ko" ? "음성 CSV" : "Voice CSV"}
               </button>
               {!isTrashView && <button
                 className="secondary-button"
@@ -1118,7 +1124,7 @@ function App() {
                 onClick={() => setNotionOpen(!notionOpen)}
               >
                 <ArrowDownToLine size={16} />
-                {lang === "ko" ? "Notion으로 내보내기" : "Export to Notion"}
+                {lang === "ko" ? "음성을 Notion으로 내보내기" : "Export voice to Notion"}
               </button>}
             </div>
           </div>
@@ -1143,13 +1149,13 @@ function App() {
             <section>
               <span className="metric-label">{t.moments_label}</span>
               <strong>
-                {dateFilteredActiveRecords.length}
-                <span className="metric-unit"> {t.recordings_unit}</span>
+                {dateJournal.length}
+                <span className="metric-unit"> {lang === "ko" ? "개 기록" : "records"}</span>
               </strong>
               <small>
                 {lang === "ko"
-                  ? `${Math.floor(totalSeconds / 60)}분 ${totalSeconds % 60}초 녹음됨`
-                  : `${Math.floor(totalSeconds / 60)}m ${totalSeconds % 60}s captured`}
+                  ? `음성 ${Math.floor(totalSeconds / 60)}분 ${totalSeconds % 60}초 · 확인된 체류 ${stayMinutes}분`
+                  : `Voice ${Math.floor(totalSeconds / 60)}m ${totalSeconds % 60}s · stays ${stayMinutes} min observed`}
               </small>
             </section>
             <section>
@@ -1175,7 +1181,7 @@ function App() {
             <button
               onClick={() => {
                 setError("");
-                void load();
+                void load(); void locationJournal.load();
               }}
               aria-label="Refresh recordings"
             >
@@ -1246,6 +1252,8 @@ function App() {
               {(
                 [
                   ["All", t.all_cat, null],
+                  ["Voice", lang === "ko" ? "음성" : "Voice", Mic],
+                  ["Stay", lang === "ko" ? "체류" : "Stays", MapPin],
                   ["Expense", t.expense_cat, Receipt],
                   ["Travel", t.travel_cat, Luggage],
                   ["Workout", t.workout_cat, Activity],
@@ -1274,8 +1282,8 @@ function App() {
             <input
               className="search"
               type="search"
-              aria-label="Search transcripts"
-              placeholder={t.search_placeholder}
+              aria-label="Search journal"
+              placeholder={lang === "ko" ? "음성·장소 검색" : "Search voice and places"}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -1313,7 +1321,8 @@ function App() {
                         heading={t.map_heading}
                         lang={lang}
                         recordings={filtered.filter((r) => localDate(r.recorded_at) === calendarDateKey)}
-                        selectedId={active?.id ?? null}
+                        journalItems={filteredItems.filter(item => journalDates(item).includes(calendarDateKey))}
+                        selectedId={activeItem?.id ?? null}
                         onSelect={(id, revealDetails) => {
                           setSelected(id);
                           if (revealDetails) {
@@ -1332,7 +1341,8 @@ function App() {
               )}
               <CalendarView
                 recordings={filtered}
-                selectedId={active?.id ?? null}
+                journalItems={filteredItems}
+                selectedId={activeItem?.id ?? null}
                 onSelect={(id, revealDetails) => {
                   setSelected(id);
                   if (revealDetails) {
@@ -1362,6 +1372,7 @@ function App() {
                 <div className="workbench-slider-wrapper">
                   <TimeSliderStrip
                     recordings={filtered}
+                    journalItems={filteredItems}
                     selectedDateKey={stripDateKey}
                     onSelectDate={setStripDateKey}
                     t={t}
@@ -1391,7 +1402,8 @@ function App() {
                           heading={t.map_heading}
                           lang={lang}
                           recordings={displayRecordings}
-                          selectedId={active?.id ?? null}
+                          journalItems={displayItems}
+                          selectedId={activeItem?.id ?? null}
                           onSelect={(id, revealDetails) => {
                             setSelected(id);
                             if (revealDetails) {
@@ -1420,15 +1432,17 @@ function App() {
                           {t.empty_trash}
                         </button>
                       )}
-                      <span>{displayRecordings.length}</span>
+                      <span>{displayItems.length}</span>
                     </div>
                   </div>
+                  {locationJournal.error && !isTrashView && <p className="location-feed-note" role="status">{lang === "ko" ? "체류를 불러오지 못했습니다. 음성 기록은 계속 사용할 수 있습니다." : "Could not refresh stays. Voice recordings remain available."} <button className="text-button" onClick={() => void locationJournal.load()}>{lang === "ko" ? "다시 시도" : "Retry"}</button></p>}
+                  {category === "Stay" && !displayItems.length && <p className="location-feed-note">{stayEmptyMessage}</p>}
                   {!loaded ? (
                     <div className="empty">
                       <LoaderCircle className="spin" />
                       <h3>{t.finding_moments}</h3>
                     </div>
-                  ) : !displayRecordings.length ? (
+                  ) : !displayItems.length ? (
                     <div className="empty">
                       {isTrashView ? (
                         <>
@@ -1459,13 +1473,17 @@ function App() {
                     </div>
                   ) : (
                     <div className="record-list">
-                      {displayRecordings.map((r) => {
+                      {displayItems.map((item) => {
+                    if (item.kind === "stay") return <JournalStayCard key={`stay:${item.id}`} item={item} lang={lang} now={locationJournal.now} selected={activeItem?.id === item.id} onSelect={() => setSelected(item.id)} />;
+                    const r = item.recording;
                     const e = latest(r),
                       state = processingState(r),
                       x = expense(r);
                     return (
                       <button
-                        key={r.id}
+                        key={`voice:${r.id}`}
+                        data-record-id={r.id}
+                        data-journal-kind="voice"
                         className={`record-card ${active?.id === r.id ? "selected" : ""}`}
                         onClick={() => setSelected(r.id)}
                       >
@@ -1508,7 +1526,7 @@ function App() {
               )}
             </section>
             <section className="inspector" aria-label="Recording details">
-              {active ? (
+              {activeItem?.kind === "stay" ? renderStay(activeItem) : active ? (
                 <Inspector
                   key={`${active.id}:${connection.session_id}`}
                   recording={active}
@@ -1543,6 +1561,7 @@ function App() {
           </>
           )}
 
+          {viewMode === "calendar" && activeItem?.kind === "stay" && selected === activeItem.id && <section className="inspector" aria-label="Journal details">{renderStay(activeItem)}</section>}
           {viewMode === "calendar" && active && selected === active.id && (
             <section className="inspector" style={{ marginTop: "24px" }} aria-label="Selected recording details">
               <Inspector

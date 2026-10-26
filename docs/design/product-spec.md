@@ -32,6 +32,17 @@ Smartwatch voice recorders require the user to look at the screen to verify reco
 
 ## 4. Optional Location Journal
 
-Users can explicitly start a location journal from watch settings, save named GPS places, and review filtered movement, arrival/departure, and sustained-stay records on the watch. This session continues independently of voice recording and displays an ongoing notification with a stop action. Location accuracy and sampling frequency limit event precision; this is a personal history feature, not a safety or emergency monitoring service.
+Users can explicitly start stay recording from watch settings, save named GPS places, and review filtered movement, arrival/departure, and sustained-stay records on the watch. This session continues independently of voice recording and displays an ongoing notification with a stop action. Location accuracy and sampling frequency limit event precision; this is a personal history feature, not a safety or emergency monitoring service.
 
 The journal is off until the user starts it. Its data remains on the watch unless the user separately enables place/stay synchronization; voice-recording cloud consent does not enable location synchronization. That optional path uploads saved places and stay summaries, not the raw movement trail, to Supabase. The portal provides place management, stay exploration and provisional frequent-place recommendations. Location synchronization does not start collection or send journal data to Gemini. It does not provide remote child tracking, family accounts or Bluetooth beacon scanning. The [location journal design](location-journal.md) and [synchronization contract](../architecture/location-stays-sync.md) define the supported scope, the current production state of the synchronization backend, and the acceptance criteria that still require device evidence.
+
+
+## 5. Unified journal UX revision (2026-10-26)
+
+The agreed implementation target combines voice recordings and observed stays in one **기록 / Journal** experience. This is a UI integration, not a conversion of stays into audio recordings. Voice and stay items share chronological cards, selection, date/search filters, calendar/map discovery and a detail region; each keeps its own source identity and applicable actions. A stay shows its observed place area, time range and confirmed observed duration. Missing observations never extend duration or prove current presence. Current saved-place matches are labelled as candidates, not historical assignments. Cross-midnight stays remain one source record while appearing on intersecting dates.
+
+The watch target is one **체류 기록 / Stay recording** settings entry. Collection start/stop and optional **웹에도 표시 / Show on the web** synchronization are available together. Explicit location synchronization consent remains separate from audio consent, but enabling it does not require stopping collection. Retained-history upload is optional and off by default. Sync errors or pending withdrawal do not prevent local capture. Downloaded place and threshold changes still apply at the next session; the UI must state this when pending.
+
+The web target places sync, saved-place management, suggestions and cloud-data deletion in **장소 설정 / Place settings**, rather than a second stay timeline. Voice export controls identify their voice-only scope. Stay deletion is a separately confirmed permanent operation; audio trash behavior remains distinct. Location failures must leave voice records usable.
+
+These decisions were reviewed twice by UX and product marketing before implementation. They describe the intended revision, not a deployment claim. See [the review and acceptance scenarios](2026-10-26-unified-journal-review.md) for scope and validation boundaries.

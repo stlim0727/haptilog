@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="location_journal_title">위치 기록</string>
-    <string name="location_journal_hint">장소 방문과 머문 시간</string>
+    <string name="location_journal_title">체류 기록</string>
+    <string name="location_journal_hint">머문 장소와 시간 · 선택적 웹 동기화</string>
     <string name="location_permission_needed">앱 권한에서 정확한 위치를 허용해 주세요.</string>
     <string name="location_start_failed">시작하지 못했습니다. 이 화면에서 다시 시도해 주세요.</string>
     <string name="location_enable_gps">워치 설정에서 위치를 켜 주세요.</string>
@@ -26,16 +26,16 @@
     <string name="location_minutes">%1$d분</string>
     <string name="location_no_points">아직 위치 표본이 없습니다. 야외에서 기록을 시작해 보세요.</string>
     <string name="location_more">더 보기</string>
-    <string name="location_running">위치 기록 중</string>
-    <string name="location_stopped">위치 기록 꺼짐</string>
-    <string name="location_disclosure">선택 기능 · 실행 중 화면이 꺼져도 위치를 워치에 저장합니다. 클라우드 전송이나 공유는 없습니다. 배터리를 사용하며 8시간 뒤 종료됩니다. 계속하려면 다시 시작하세요.</string>
-    <string name="location_stop">위치 기록 중지</string>
-    <string name="location_start">위치 기록 시작</string>
+    <string name="location_running">체류 기록 중</string>
+    <string name="location_stopped">체류 기록 꺼짐</string>
+    <string name="location_disclosure">화면이 꺼져도 머문 장소와 시간을 워치에 보관합니다. 배터리를 사용하며 8시간 후 자동 종료됩니다. 웹 동기화는 아래에서 선택합니다.</string>
+    <string name="location_stop">체류 기록 중지</string>
+    <string name="location_start">체류 기록 시작</string>
     <string name="location_counts">위치 %1$d개 · 이벤트 %2$d개</string>
     <string name="location_last_fix">최근 위치: %1$s</string>
     <string name="location_waiting_fix">정확한 위치를 기다리고 있습니다. 야외에서 시도해 주세요. 위치 수신이 지연될 수 있습니다.</string>
     <string name="location_open_settings">권한 및 알림 설정</string>
-    <string name="location_events">방문 타임라인</string>
+    <string name="location_events">체류 기록 보기</string>
     <string name="location_points">위치 표본 보기</string>
     <string name="location_dwell_setting">체류 %1$d분 · 눌러 변경</string>
     <string name="location_places_hint">GPS 지정 장소 · 편집하려면 기록을 중지하세요. 최대 20곳. 기록은 7일간 위치 2,000개·이벤트 500개까지 보관됩니다.</string>
@@ -47,5 +47,8 @@
     <string name="location_stay_gap">체류 · 위치 관측 끊김</string>
     <string name="location_stay_interrupted">체류 · 추적 중단</string>
     <string name="location_manage_on_web">위치 동기화가 켜져 있으면 장소와 체류 기준은 웹에서 관리합니다.</string>
-    <string name="location_disclosure_synced">직접 시작한 동안만 위치를 수집합니다. 위치 동기화가 켜져 있어 저장한 장소와 체류 요약이 음성 기록과 별도로 동기화됩니다. 이동 위치 표본은 워치에만 보관합니다.</string>
+    <string name="location_disclosure_synced">실행 중 머문 장소와 시간을 기록합니다. 배터리를 사용하며 8시간 후 자동 종료됩니다. 체류 요약은 웹에 동기화하고 이동 경로는 워치에만 남습니다.</string>
+    <string name="location_more_settings">추가 설정</string>
+    <string name="location_less_settings">추가 설정 접기</string>
+    <string name="location_collection_summary">배터리 사용 · 8시간 후 자동 종료</string>
 </resources>
