@@ -35,7 +35,7 @@ export function validateResult(value: unknown) {
     typeof v.transcript !== "string" ||
     typeof v.summary !== "string" ||
     typeof v.intent_type !== "string" ||
-    !["EXPENSE", "TRAVEL", "WORKOUT", "MEMO"].includes(v.intent_type) ||
+    !["EXPENSE", "TRAVEL", "WORKOUT", "MEMO", "UNKNOWN"].includes(v.intent_type) ||
     !v.structured_data ||
     typeof v.structured_data !== "object" ||
     Array.isArray(v.structured_data)
