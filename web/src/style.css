@@ -1680,6 +1680,8 @@ audio {
 .voice-pin path { fill: currentColor; stroke: white; stroke-width: 1.5px; }
 .voice-pin circle { fill: white; }
 .voice-marker.active { color: #b85625; z-index: 1000 !important; }
+.voice-marker.muted { opacity: .25; }
+.voice-marker.muted:hover, .voice-marker.muted:focus-visible { opacity: .8; }
 .voice-pin-count { position: absolute; top: 0; left: 25px; min-width: 17px; height: 17px; padding: 0 3px; border: 1.5px solid white; border-radius: 10px; background: #233f32; color: white; font-size: 10px; line-height: 14px; text-align: center; font-weight: 700; }
 .voice-marker:focus-visible { outline: 3px solid var(--ph-lemon); outline-offset: 1px; border-radius: 8px; }
 .recording-popup .leaflet-popup-content { margin: 10px 24px 10px 12px; }

@@ -604,6 +604,9 @@ export function MobileWorkspace(p: Props) {
                         heading={t.map_heading}
                         recordings={filtered}
                         selectedId={mapSelected}
+                        groupIds={selectedPlace
+                          ? placeRecords.map((r) => r.id)
+                          : undefined}
                         showRoute={false}
                         lang={lang}
                         onSelect={(id, reveal) => {

@@ -8,6 +8,7 @@ import type { Recording } from "./domain";
 export default function RecordingMap({
   recordings,
   selectedId,
+  groupIds,
   onSelect,
   className,
   showRoute = true,
@@ -16,6 +17,8 @@ export default function RecordingMap({
 }: {
   recordings: Recording[];
   selectedId: string | null;
+  /** Recordings of the place the user chose; every other pin is dimmed. */
+  groupIds?: string[];
   onSelect: (id: string, revealDetails?: boolean) => void;
   className?: string;
   showRoute?: boolean;
@@ -27,9 +30,12 @@ export default function RecordingMap({
   const markers = useRef<L.LayerGroup | null>(null);
   const routeLayer = useRef<L.Polyline | null>(null);
   const markersById = useRef(new Map<string, L.Marker>());
+  const idsByMarker = useRef(new Map<L.Marker, string[]>());
   const clusterSizes = useRef(new Map<string, number>());
   const selected = useRef(selectedId);
   selected.current = selectedId;
+  const group = useRef(groupIds);
+  group.current = groupIds;
   const pinSelection = useRef<string | null>(null);
   const previousSelection = useRef(selectedId);
   const zooming = useRef(false);
@@ -61,6 +67,7 @@ export default function RecordingMap({
       (r) => [r.id, r.latitude, r.longitude, r.recorded_at, latest(r)?.summary],
     ),
   );
+  const groupSignature = groupIds?.join(",") ?? "";
   const initialBounds = useRef("");
 
   useEffect(() => {
@@ -117,6 +124,7 @@ export default function RecordingMap({
     if (!instance || !layer) return;
     layer.clearLayers();
     markersById.current.clear();
+    idsByMarker.current.clear();
     clusterSizes.current.clear();
     if (routeLayer.current) {
       routeLayer.current.remove();
@@ -180,6 +188,7 @@ export default function RecordingMap({
         markersById.current.set(r.id, marker);
         clusterSizes.current.set(r.id, entries.length);
       });
+      idsByMarker.current.set(marker, entries.map((r) => r.id));
       const popup = document.createElement("div");
       popup.className = "map-recordings";
       for (const r of entries) {
@@ -229,14 +238,22 @@ export default function RecordingMap({
   useEffect(() => {
     const instance = map.current;
     if (!instance) return;
-    for (const marker of markersById.current.values()) {
-      marker.getElement()?.classList.remove("active");
+    const chosen = new Set(group.current ?? []);
+    for (const [marker, ids] of idsByMarker.current) {
+      const element = marker.getElement();
+      if (!element) continue;
+      const inGroup = ids.some((id) => chosen.has(id));
+      // A chosen place keeps its pins lit and the rest of the map fades back.
+      element.classList.toggle(
+        "active",
+        inGroup || ids.includes(selectedId ?? ""),
+      );
+      element.classList.toggle("muted", chosen.size > 0 && !inGroup);
     }
     const changed = previousSelection.current !== selectedId;
     previousSelection.current = selectedId;
     if (selectedId) {
       const activeMarker = markersById.current.get(selectedId);
-      activeMarker?.getElement()?.classList.add("active");
       const active = located.find((r) => r.id === selectedId);
       // A direct pin tap never changes the view. External selections only reveal
       // an offscreen place, retaining the user's zoom.
@@ -249,7 +266,7 @@ export default function RecordingMap({
       if (!mobile && changed) activeMarker?.openPopup();
     }
     pinSelection.current = null;
-  }, [selectedId, markerData, mobile, lang, showRoute, clusterRevision]);
+  }, [selectedId, groupSignature, markerData, mobile, lang, showRoute, clusterRevision]);
 
   const active = located.find((r) => r.id === selectedId);
   const placeCount = active ? clusterSizes.current.get(active.id) ?? 0 : 0;
