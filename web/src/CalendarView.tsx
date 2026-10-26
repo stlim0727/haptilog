@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -6,7 +6,7 @@ import {
   MapPin,
   Clock,
 } from "lucide-react";
-import { CategoryBadge } from "./TimelineView";
+import { CategoryBadge } from "./CategoryBadge";
 import { expense, hasLocation, latest, localDate, money, toLocalDateString } from "./domain";
 import type { Recording } from "./domain";
 import type { TranslationKeys } from "./i18n";
@@ -18,9 +18,11 @@ export default function CalendarView({
   t,
   lang = "en",
   onDateChange,
+  onSelectedDateChange,
 }: {
   lang?: "en" | "ko";
   onDateChange?: () => boolean | void;
+  onSelectedDateChange?: (dateKey: string) => void;
   recordings: Recording[];
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
@@ -28,6 +30,10 @@ export default function CalendarView({
 }) {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => toLocalDateString());
+
+  useEffect(() => {
+    onSelectedDateChange?.(selectedDateKey);
+  }, [selectedDateKey, onSelectedDateChange]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth(); // 0-indexed

@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>HaptiLog — header variant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --canvas:#141416; --card:#1c1d24; --card-subtle:#24252f;
+  --ink:#f4f4f6; --ink-2:#a1a1aa; --ink-3:#71717a;
+  --border:#383844; --border-subtle:#272730; --border-strong:#4a4a5a;
+  --accent:#f7a501; --accent-hover:#f54e00;
+  --cat-expense-bg:#3f2214; --cat-expense-br:#f59e0b; --cat-expense-ink:#fde68a;
+  --cat-travel-bg:#14352b; --cat-travel-br:#10b981; --cat-travel-ink:#a7f3d0;
+  --cat-workout-bg:#132f4c; --cat-workout-br:#0ea5e9; --cat-workout-ink:#bae6fd;
+  --cat-memo-bg:#2d1a45; --cat-memo-br:#a855f7; --cat-memo-ink:#e9d5ff;
+}
+* { box-sizing: border-box; }
+html,body { margin:0; padding:0; }
+body {
+  background:var(--canvas); color:var(--ink);
+  font-family:"DM Sans", system-ui, sans-serif; font-size:14px; line-height:1.55;
+  min-height:100vh; width:1440px; margin:0 auto;
+}
+button { font:inherit; color:inherit; background:none; border:none; cursor:default; }
+
+/* Top bar */
+.topbar { padding:14px 32px; border-bottom:1px solid var(--border-subtle);
+  display:flex; align-items:center; justify-content:space-between; }
+.brand { font-weight:700; font-size:17px; letter-spacing:-0.2px; }
+.brand .dot { color:var(--accent); }
+.top-right { display:flex; align-items:center; gap:12px; }
+.pill { padding:6px 12px; border:1px solid var(--border); border-radius:999px; font-size:12.5px; color:var(--ink-2);
+  display:inline-flex; align-items:center; gap:6px; }
+.pill .avatar { width:18px; height:18px; border-radius:50%; background:var(--accent); color:#111; display:inline-flex;
+  align-items:center; justify-content:center; font-weight:700; font-size:11px; }
+.pill.watch { border-color:var(--border-strong); color:var(--ink); }
+.icon-btn { width:32px; height:32px; border-radius:8px; border:1px solid var(--border); display:inline-flex;
+  align-items:center; justify-content:center; color:var(--ink-2); font-size:14px; }
+
+main { padding:22px 32px 40px; }
+
+/* Variant A header */
+.head-A .eyebrow { color:var(--accent); font-size:11px; letter-spacing:1.4px; font-weight:600; }
+.head-A h1 { font-size:28px; margin:6px 0 4px; font-weight:600; letter-spacing:-0.4px; }
+.head-A .sub { color:var(--ink-2); margin:0; font-size:14px; }
+.head-A .heading { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:18px; }
+.head-A .heading-actions { display:flex; gap:8px; align-items:center; }
+.btn-ghost { padding:7px 12px; border:1px solid var(--border); border-radius:8px; color:var(--ink-2); font-size:12.5px; }
+select.btn-ghost { background:var(--card); }
+.metrics-A { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; margin-bottom:14px; }
+.metric-card { background:var(--card); border:1px solid var(--border-subtle); border-radius:12px; padding:16px 18px;
+  box-shadow:2.5px 2.5px 0 #000; }
+.metric-card .lbl { color:var(--ink-3); font-size:11px; text-transform:uppercase; letter-spacing:0.8px; }
+.metric-card .val { font-size:22px; font-weight:600; margin-top:4px; }
+.metric-card .val .unit { color:var(--ink-2); font-size:14px; font-weight:500; }
+.metric-card .note { color:var(--ink-3); font-size:12px; margin-top:2px; }
+.metric-card .dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--accent); margin-right:6px; }
+.sync-note { background:transparent; border:1px dashed var(--border); border-radius:8px;
+  padding:8px 14px; color:var(--ink-2); font-size:12px; display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+.sync-note .activity { color:var(--accent); }
+.sync-note .refresh { margin-left:auto; }
+
+/* Variant B header (compact status row) */
+.head-B .status-row { display:flex; align-items:center; gap:14px;
+  padding:12px 16px; background:var(--card); border:1px solid var(--border-subtle); border-radius:10px;
+  box-shadow:2.5px 2.5px 0 #000; margin-bottom:16px; font-size:13px; }
+.head-B .eyebrow { color:var(--accent); font-size:11px; letter-spacing:1.2px; font-weight:600; }
+.head-B .status-row .sep { color:var(--ink-3); }
+.head-B .status-row .date { color:var(--ink-2); }
+.head-B .status-row .metrics-inline { color:var(--ink); font-weight:500; margin-left:8px; }
+.head-B .status-row .metrics-inline .metric-val { color:var(--ink); font-weight:600; }
+.head-B .status-row .cloud { color:var(--ink-2); margin-left:auto; display:inline-flex; align-items:center; gap:6px; }
+.head-B .icon-btn.tiny { width:26px; height:26px; font-size:13px; }
+
+/* Hybrid header */
+.head-H .eyebrow { color:var(--accent); font-size:11px; letter-spacing:1.4px; font-weight:600; }
+.head-H h1 { font-size:24px; margin:4px 0 2px; font-weight:600; letter-spacing:-0.3px; }
+.head-H .sub { color:var(--ink-2); margin:0; font-size:13px; }
+.head-H .heading { margin-bottom:12px; }
+.head-H .status-inline { display:flex; align-items:center; gap:14px;
+  padding:10px 14px; background:var(--card); border:1px solid var(--border-subtle); border-radius:10px;
+  box-shadow:2.5px 2.5px 0 #000; margin-bottom:16px; font-size:13px; }
+.head-H .status-inline .chip { color:var(--ink); }
+.head-H .status-inline .chip .lbl { color:var(--ink-3); font-size:11.5px; margin-right:4px; }
+.head-H .status-inline .cloud { color:var(--ink-2); margin-left:auto; }
+.head-H .heading-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-bottom:12px; }
+
+/* Common: view row */
+.view-row { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+.view-row .spacer { flex:1; }
+.tab { padding:6px 12px; border-radius:8px; border:1px solid var(--border-subtle); color:var(--ink-2); font-size:12.5px;
+  display:inline-flex; align-items:center; gap:6px; }
+.tab.active { background:var(--card); color:var(--ink); border-color:var(--border-strong); box-shadow:2px 2px 0 #000; }
+.tab .dot-active { width:6px; height:6px; background:var(--accent); border-radius:50%; }
+.toggle { padding:6px 12px; border-radius:999px; border:1px solid var(--border-subtle); color:var(--ink-2); font-size:12.5px;
+  display:inline-flex; align-items:center; gap:6px; }
+.toggle.active { background:var(--accent); color:#111; border-color:var(--accent); font-weight:600; }
+
+/* Filter bar */
+.filter-row { display:flex; align-items:center; gap:8px; margin-bottom:16px; padding:10px 12px;
+  background:var(--card); border:1px solid var(--border-subtle); border-radius:10px; }
+.chip { padding:4px 10px; border-radius:999px; font-size:12px; color:var(--ink-2); border:1px solid transparent; }
+.chip.active { background:var(--card-subtle); color:var(--ink); border-color:var(--border-strong); }
+.chip.trash { color:var(--ink-3); }
+.search { flex:1; max-width:280px; margin-left:auto; padding:6px 10px; border-radius:8px;
+  background:var(--card-subtle); border:1px solid var(--border-subtle); color:var(--ink-3); font-size:12.5px; }
+
+/* Two-col body */
+.body-grid { display:grid; grid-template-columns:1fr 480px; gap:20px; }
+.record-card { background:var(--card); border:1px solid var(--border-subtle); border-radius:10px; padding:12px 14px;
+  margin-bottom:8px; box-shadow:2.5px 2.5px 0 #000; }
+.record-card.selected { border-color:var(--accent); }
+.record-card .meta { display:flex; align-items:center; gap:8px; color:var(--ink-3); font-size:11.5px; }
+.badge { padding:1px 7px; border-radius:4px; font-size:10px; font-weight:600; }
+.badge.memo { background:var(--cat-memo-bg); color:var(--cat-memo-ink); border:1px solid var(--cat-memo-br); }
+.badge.expense { background:var(--cat-expense-bg); color:var(--cat-expense-ink); border:1px solid var(--cat-expense-br); }
+.badge.travel { background:var(--cat-travel-bg); color:var(--cat-travel-ink); border:1px solid var(--cat-travel-br); }
+.badge.workout { background:var(--cat-workout-bg); color:var(--cat-workout-ink); border:1px solid var(--cat-workout-br); }
+.record-card strong { display:block; margin:6px 0 4px; font-size:14.5px; font-weight:500; }
+.record-card .bot { display:flex; align-items:center; gap:8px; color:var(--ink-2); font-size:11.5px; }
+.record-card .status-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); }
+.record-card .chev { margin-left:auto; color:var(--ink-3); }
+
+.inspector { background:var(--card); border:1px solid var(--border-subtle); border-radius:12px; padding:18px 20px;
+  box-shadow:2.5px 2.5px 0 #000; height:fit-content; }
+.inspector h2 { font-size:17px; margin:0 0 6px; font-weight:600; }
+.inspector .time { color:var(--ink-3); font-size:12px; margin:0 0 14px; }
+.audio-player { background:var(--card-subtle); border:1px solid var(--border-subtle); border-radius:8px;
+  padding:12px; display:flex; align-items:center; gap:10px; color:var(--ink-2); font-size:12px; margin-bottom:14px; }
+.audio-player .play { width:32px; height:32px; border-radius:50%; background:var(--accent); color:#111;
+  display:inline-flex; align-items:center; justify-content:center; font-weight:700; }
+.audio-player .wave { flex:1; height:24px; background:linear-gradient(90deg, transparent, var(--border-strong), transparent); border-radius:4px; }
+.section-label { color:var(--ink-3); font-size:11px; text-transform:uppercase; letter-spacing:0.8px; margin:14px 0 6px; }
+.transcript { color:var(--ink-2); font-size:13px; line-height:1.6; padding:10px 12px; background:var(--card-subtle);
+  border:1px solid var(--border-subtle); border-radius:8px; }
+.field-row { display:grid; grid-template-columns:1fr 100px; gap:8px; }
+.field { background:var(--card-subtle); border:1px solid var(--border-subtle); border-radius:8px; padding:8px 10px;
+  color:var(--ink); font-size:13px; margin-top:8px; }
+.save-btn { background:var(--accent); color:#111; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px;
+  margin-top:12px; border:1px solid var(--accent); box-shadow:2px 2px 0 #000; }
+.location-line { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle);
+  color:var(--ink-2); font-size:12px; display:flex; align-items:center; gap:8px; }
+.location-line .link { color:var(--accent); margin-left:auto; }
+
+/* Legend / annotation strip */
+.variant-tag { display:inline-block; padding:3px 10px; border-radius:6px; background:var(--accent); color:#111;
+  font-weight:700; font-size:11px; letter-spacing:0.8px; margin-right:8px; }
+.annot { color:var(--ink-3); font-size:11.5px; margin-left:12px; }
+
+/* Variant body selectors */
+body[data-variant="A"] .head-B, body[data-variant="A"] .head-H { display:none; }
+body[data-variant="B"] .head-A, body[data-variant="B"] .head-H { display:none; }
+body[data-variant="H"] .head-A, body[data-variant="H"] .head-B { display:none; }
+</style>
+</head>
+<body data-variant="A">
+
+<header class="topbar">
+  <div class="brand">haptilog<span class="dot">.</span></div>
+  <div class="top-right">
+    <span class="icon-btn">☀</span>
+    <span class="pill">EN</span>
+    <span class="pill"><span class="avatar">S</span>Account</span>
+    <span class="pill watch">⌚ watch-A17</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ VARIANT A: Rich header ============ -->
+<div class="head-A">
+  <div class="heading">
+    <div>
+      <span class="eyebrow">EVENING REVIEW</span>
+      <h1>Your day, on the wrist</h1>
+      <p class="sub">Review what your watch captured, without scrolling forever.</p>
+    </div>
+    <div class="heading-actions">
+      <button class="btn-ghost">This month ▾</button>
+      <button class="btn-ghost">⬇ Export CSV</button>
+      <button class="btn-ghost">⬡ Notion</button>
+    </div>
+  </div>
+  <div class="metrics-A">
+    <div class="metric-card">
+      <div class="lbl">Spending</div>
+      <div class="val"><span style="color:var(--cat-expense-ink)">₩42,300</span></div>
+      <div class="note">2 recordings missing amount</div>
+    </div>
+    <div class="metric-card">
+      <div class="lbl">Moments</div>
+      <div class="val">18<span class="unit"> recordings</span></div>
+      <div class="note">12m 4s captured</div>
+    </div>
+    <div class="metric-card">
+      <div class="lbl">Ready</div>
+      <div class="val">16<span class="unit"> / 18</span></div>
+      <div class="note"><span class="dot"></span>2 waiting on analysis</div>
+    </div>
+  </div>
+  <div class="sync-note">
+    <span class="activity">⚡</span>
+    <span>Cloud checked 14:32 · Watch queue unknown</span>
+    <button class="refresh">↻</button>
+  </div>
+</div>
+
+<!-- ============ VARIANT B: Compact status row ============ -->
+<div class="head-B">
+  <div class="status-row">
+    <span class="variant-tag">B</span>
+    <span class="eyebrow">EVENING REVIEW</span>
+    <span class="sep">·</span>
+    <span class="date">This month ▾</span>
+    <span class="metrics-inline">
+      <span class="sep"> </span>
+      <span class="metric-val" style="color:var(--cat-expense-ink)">₩42,300</span> ·
+      <span class="metric-val">18</span> recs ·
+      <span class="metric-val">16/18</span> Ready
+    </span>
+    <span class="cloud">⚡ 14:32 <button class="icon-btn tiny">↻</button> <button class="icon-btn tiny">⬇</button> <button class="icon-btn tiny">⬡</button></span>
+  </div>
+</div>
+
+<!-- ============ VARIANT H: Hybrid ============ -->
+<div class="head-H">
+  <div class="heading">
+    <span class="eyebrow">EVENING REVIEW</span>
+    <h1>Your day, on the wrist</h1>
+    <p class="sub">Review what your watch captured, without scrolling forever.</p>
+  </div>
+  <div class="heading-actions">
+    <button class="btn-ghost">This month ▾</button>
+    <button class="btn-ghost">⬇ CSV</button>
+    <button class="btn-ghost">⬡ Notion</button>
+  </div>
+  <div class="status-inline">
+    <span class="variant-tag">H</span>
+    <span class="chip"><span class="lbl">Spending</span> <span style="color:var(--cat-expense-ink); font-weight:600">₩42,300</span></span>
+    <span class="sep" style="color:var(--ink-3)">·</span>
+    <span class="chip"><span class="lbl">Moments</span> <span style="font-weight:600">18 recs</span></span>
+    <span class="sep" style="color:var(--ink-3)">·</span>
+    <span class="chip"><span class="lbl">Ready</span> <span style="font-weight:600">16/18</span></span>
+    <span class="sep" style="color:var(--ink-3)">·</span>
+    <span class="cloud">⚡ 14:32 <button class="icon-btn tiny" style="width:22px;height:22px;font-size:12px;">↻</button></span>
+  </div>
+</div>
+
+<!-- ============ Common below header ============ -->
+<div class="view-row">
+  <span class="variant-tag" id="tag">A</span>
+  <span style="color:var(--ink-3); font-size:12px;">No view tabs. Just toggles.</span>
+  <span class="spacer"></span>
+  <button class="toggle">🗺 Map</button>
+  <button class="toggle">📅 Calendar</button>
+</div>
+
+<div class="filter-row">
+  <button class="chip active">All</button>
+  <button class="chip">🧾 Expense</button>
+  <button class="chip">🧳 Travel</button>
+  <button class="chip">🏃 Workout</button>
+  <button class="chip">📝 Memo</button>
+  <button class="chip trash">🗑 Trash (3)</button>
+  <div class="search">🔍 Search transcripts…</div>
+</div>
+
+<div class="body-grid">
+  <div class="feed">
+    <div class="record-card selected">
+      <div class="meta"><span>Oct 24 · 14:32</span> <span class="badge memo">MEMO</span></div>
+      <strong>Lunch with Minji — split check, she owes ₩8,500</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 42 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 24 · 12:05</span> <span class="badge expense">EXPENSE</span></div>
+      <strong>Seoul Cafe — Americano ₩4,500</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 8 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 23 · 07:14</span> <span class="badge workout">WORKOUT</span></div>
+      <strong>Morning run — 5.2 km along Han River</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 22 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 22 · 19:48</span> <span class="badge travel">TRAVEL</span></div>
+      <strong>Bus 271 schedule change — check Monday</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 15 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 22 · 11:20</span> <span class="badge memo">MEMO</span></div>
+      <strong>Idea: batch voice memos into a daily digest email</strong>
+      <div class="bot"><span style="color:var(--ink-3)"><span class="status-dot" style="background:var(--ink-3)"></span>Waiting</span><span>· 31 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 21 · 22:03</span> <span class="badge expense">EXPENSE</span></div>
+      <strong>Groceries at Emart — ₩38,200</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 19 sec</span><span class="chev">›</span></div>
+    </div>
+  </div>
+
+  <aside class="inspector">
+    <h2>Lunch with Minji — split check</h2>
+    <p class="time">Oct 24, 2026 14:32 · 42 seconds</p>
+    <div class="audio-player">
+      <span class="play">▶</span>
+      <div class="wave"></div>
+      <span>0:00 / 0:42</span>
+      <span>1×</span>
+    </div>
+    <div class="section-label">Transcript</div>
+    <div class="transcript">"Lunch with Minji at the Sindorim place. Total was 27,000 won, split the check. She still owes me 8,500."</div>
+    <div class="section-label">Expense</div>
+    <div class="field-row">
+      <div class="field">₩ 12,000</div>
+      <div class="field">KRW</div>
+    </div>
+    <div class="field">Minji</div>
+    <div class="field">Lunch split</div>
+    <button class="save-btn">✓ Save corrections</button>
+    <div class="location-line">📍录音 위치 <span class="link">Open in Maps ↗</span></div>
+  </aside>
+</div>
+
+<p style="color:var(--ink-3); font-size:11px; margin-top:24px; text-align:center;">
+  Times shown in Asia/Seoul · This is a static mockup for header-density comparison.
+</p>
+
+</main>
+
+<script>
+  const p = new URLSearchParams(location.search).get('v') || 'A';
+  document.body.dataset.variant = p.toUpperCase();
+  document.getElementById('tag').textContent = p.toUpperCase();
+</script>
+</body>
+</html>
