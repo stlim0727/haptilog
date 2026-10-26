@@ -361,11 +361,94 @@ test("switches between List and Calendar and toggles the time slider and map", a
   await expect(page.locator(".map-section")).toHaveCount(0);
   await page.getByRole("button", { name: "Show map" }).click();
   await expect(page.locator(".map-section")).toBeVisible();
-  await expect(page.locator(".recording-map")).toBeVisible();
 
   // 6. Return to List
   await page.getByRole("tab", { name: "List" }).click();
   await expect(page.locator(".review-layout")).toBeVisible();
+});
+
+test("Calendar map follows the selected day, hides pins for empty days, and opens the recording on tap", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-25T12:00:00Z"));
+  const state = await fixture(page);
+  state.additional.push({
+    ...structuredClone(baseRecording),
+    id: "88888888-8888-4888-8888-888888888888",
+    recorded_at: "2026-10-14T09:00:00Z",
+    created_at: "2026-10-14T09:00:00Z",
+    latitude: 37.49,
+    longitude: 127.03,
+    voice_enrichments: [{
+      ...structuredClone(baseRecording.voice_enrichments[0]),
+      summary: "Earlier coffee",
+      transcript: "Earlier day transcript",
+    }],
+  });
+  await page.route("https://tile.openstreetmap.org/**", (route) =>
+    route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf6kAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Calendar" }).click();
+  await page.getByRole("button", { name: "Show map" }).click();
+
+  // Today (2026-10-25) has no recordings — the map should show zero pins, not the two elsewhere.
+  await expect(page.getByText("0 of 0 recordings have a saved location")).toBeVisible();
+  await expect(page.locator(".voice-marker")).toHaveCount(0);
+
+  // Select 2026-10-16 (base recording, single pin).
+  await page.getByRole("button", { name: "1 recording on 2026-10-16", exact: true }).click();
+  await expect(page.getByText("1 of 1 recordings have a saved location")).toBeVisible();
+  await expect(page.locator(".voice-marker")).toHaveCount(1);
+
+  // Tapping the pin and choosing its recording opens the inspector.
+  await page.locator(".voice-marker").first().click();
+  await page.locator(".map-recordings button").filter({ hasText: "Coffee on the corner" }).click();
+  await expect(page.locator(".transcript")).toHaveText("아이스 라떼 5,000원");
+
+  // Switching to a different day re-scopes the map to that day's recording.
+  await page.getByRole("button", { name: "1 recording on 2026-10-14", exact: true }).click();
+  await expect(page.getByText("1 of 1 recordings have a saved location")).toBeVisible();
+  await expect(page.locator(".voice-marker")).toHaveCount(1);
+  await page.locator(".voice-marker").first().click();
+  await page.locator(".map-recordings button").filter({ hasText: "Earlier coffee" }).click();
+  await expect(page.locator(".transcript")).toHaveText("Earlier day transcript");
+});
+
+test("Time Slider day pick stays visible when returning from Calendar so the day filter is never silent", async ({ page }) => {
+  const state = await fixture(page);
+  state.additional.push({
+    ...structuredClone(baseRecording),
+    id: "99999999-9999-4999-8999-999999999999",
+    recorded_at: "2026-10-14T09:00:00Z",
+    created_at: "2026-10-14T09:00:00Z",
+    voice_enrichments: [{
+      ...structuredClone(baseRecording.voice_enrichments[0]),
+      summary: "Earlier coffee",
+      transcript: "Earlier day transcript",
+    }],
+  });
+  await page.goto("/");
+
+  // Turn on the Time Slider and pick 2026-10-14; only that day's card shows.
+  await page.getByRole("button", { name: "Time Slider", exact: true }).click();
+  await expect(page.locator(".time-strip-container")).toBeVisible();
+  await page.locator('[data-date-key="2026-10-14"]').click();
+  await expect(page.locator(".record-card")).toHaveCount(1);
+  await expect(page.locator(".record-card").first()).toContainText("Earlier coffee");
+
+  // Round-trip through Calendar: strip and its day selection must survive the trip.
+  await page.getByRole("tab", { name: "Calendar" }).click();
+  await expect(page.getByRole("button", { name: "Time Slider", exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "List" }).click();
+  await expect(page.locator(".time-strip-container")).toBeVisible();
+  await expect(page.locator(".time-strip-card.selected")).toHaveAttribute("data-date-key", "2026-10-14");
+  await expect(page.locator(".record-card")).toHaveCount(1);
+  await expect(page.locator(".record-card").first()).toContainText("Earlier coffee");
 });
 
 test("desktop calendar preserves drafts on reselect and guards date changes, then releases the layout lock", async ({ page }) => {

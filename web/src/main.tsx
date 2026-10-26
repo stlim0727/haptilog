@@ -171,6 +171,7 @@ function App() {
   const [showTimeSlider, setShowTimeSlider] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [stripDateKey, setStripDateKey] = useState<string>("ALL");
+  const [calendarDateKey, setCalendarDateKey] = useState<string>(() => toLocalDateString());
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     const saved = localStorage.getItem("haptilog_theme");
@@ -1309,7 +1310,7 @@ function App() {
                       <RecordingMap
                         heading={t.map_heading}
                         lang={lang}
-                        recordings={filtered}
+                        recordings={filtered.filter((r) => localDate(r.recorded_at) === calendarDateKey)}
                         selectedId={active?.id ?? null}
                         onSelect={(id, revealDetails) => {
                           setSelected(id);
@@ -1350,6 +1351,7 @@ function App() {
                   setSelected(null);
                   return true;
                 }}
+                onSelectedDateChange={setCalendarDateKey}
               />
             </>
           ) : (
