@@ -21,8 +21,8 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
         @Volatile private var active: CloudClient? = null
         fun cancelActive() { active?.cancelRequests() }
         fun schedule(context: Context) {
-            val prefs = LocationConsent.preferences(context)
-            if ((!LocationConsent.enabled(context) && !prefs.getBoolean("reconcile_pending", false)) || !CloudClient.configured) return
+            val pending = LocationConsent.reconciliationPending(context)
+            if ((!LocationConsent.enabled(context) && !pending) || !CloudClient.configured) return
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED)
                 .setRequiresBatteryNotLow(true).build()
             val manager = WorkManager.getInstance(context)
@@ -102,10 +102,11 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
     override suspend fun doWork(): Result = mutex.withLock { withContext(Dispatchers.IO) {
         val context = applicationContext
         val prefs = LocationConsent.preferences(context)
+        val pending = LocationConsent.reconciliationPending(context)
         val withdrawing = !LocationConsent.enabled(context)
         // Off and already agreed: no reason to wake the radio. A moved switch always leaves a
         // pending marker, so withdrawal is never skipped.
-        if (!CloudClient.configured || (withdrawing && !prefs.getBoolean("reconcile_pending", false)))
+        if (!CloudClient.configured || (withdrawing && !pending))
             return@withContext Result.success()
         // Do not compete with the sacred audio capture path.
         if (com.haptilog.watch.service.VoiceRecordingService.isRecording.value) return@withContext Result.retry()
@@ -113,9 +114,8 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
         active = api
         try {
             val client = LocationSyncClient(api)
-            val snapshot = client.call("snapshot")
-            val state = LocationConsent.reconcile(context, client, snapshot)
-            if (state !== snapshot.getJSONObject("state")) snapshot.put("state", state)
+            val snapshot = LocationConsent.reconciledSnapshot(context, client, client.call("snapshot"))
+            val state = snapshot.getJSONObject("state")
             if (withdrawing) {
                 // Withdrawal is confirmed; nothing left to send until the switch moves again.
                 val manager = WorkManager.getInstance(context)

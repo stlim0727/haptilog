@@ -14,6 +14,15 @@ object LocationConsent {
     internal fun preferences(context: Context) = context.getSharedPreferences("location_sync", Context.MODE_PRIVATE)
     fun enabled(context: Context): Boolean = RecordingSyncWorker.enabled(context)
 
+    /** Preserve a withdrawal queued by a build that used the previous marker. */
+    @Synchronized internal fun reconciliationPending(context: Context): Boolean {
+        val prefs = preferences(context)
+        if (prefs.getBoolean("revoke_pending", false)) {
+            check(prefs.edit().putBoolean("reconcile_pending", true).remove("revoke_pending").commit())
+        }
+        return prefs.getBoolean("reconcile_pending", false)
+    }
+
     /** The switch moved: stop in-flight sends, then push the new position before work can idle. */
     fun onCloudSwitchChanged(context: Context) {
         LocationSyncWorker.cancelActive()
@@ -26,16 +35,23 @@ object LocationConsent {
         val state = snapshot.getJSONObject("state")
         val desired = enabled(context)
         val prefs = preferences(context)
-        if (state.optBoolean("consent_enabled") == desired) {
-            prefs.edit().remove("reconcile_pending").commit()
-            return state
-        }
-        val next = client.call("consent", JSONObject().put("enabled", desired).put("backfill", desired)
-            .put("expected_revision", state.getLong("consent_revision"))).getJSONObject("state")
-        prefs.edit().remove("reconcile_pending").commit()
+        var next = if (state.optBoolean("consent_enabled") == desired) state else
+            client.call("consent", JSONObject().put("enabled", desired).put("backfill", desired)
+                .put("expected_revision", state.getLong("consent_revision"))).getJSONObject("state")
         // Places named while offline become the starting cloud collection; afterwards the cloud wins.
-        if (!desired || prefs.getBoolean("places_imported", false)) return next
-        return importPlaces(context, client, next, snapshot.getJSONArray("places"))
+        // A previous attempt may have consented before its import failed.
+        if (desired && !prefs.getBoolean("places_imported", false)) {
+            next = importPlaces(context, client, next, snapshot.getJSONArray("places"))
+        }
+        check(prefs.edit().remove("reconcile_pending").commit())
+        return next
+    }
+
+    /** A revision and its places must come from the same post-import snapshot. */
+    internal fun reconciledSnapshot(context: Context, client: LocationSyncClient, snapshot: JSONObject): JSONObject {
+        val before = snapshot.getJSONObject("state")
+        val after = reconcile(context, client, snapshot)
+        return if (after !== before) client.call("snapshot") else snapshot
     }
 
     private fun importPlaces(context: Context, client: LocationSyncClient, state: JSONObject,

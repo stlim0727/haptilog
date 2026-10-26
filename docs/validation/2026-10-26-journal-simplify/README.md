@@ -38,3 +38,15 @@ The single-consent derivation and the flag reconcile in both directions are cove
 ## Checks
 
 `./gradlew assembleDebug lintDebug testDebugUnitTest` passed: 147 unit tests, 0 failures, 0 skipped.
+
+## Review follow-up: sync correctness
+
+The three inline review findings were repaired after the original emulator pass:
+
+- Incomplete place imports resume even when the server flag already matches. A partial upload never becomes an authoritative replacement for retained local places.
+- The worker obtains one complete post-import snapshot before applying/acknowledging settings, keeping its revision and place contents coherent.
+- Pending withdrawals stored as `revoke_pending` are translated before the new off-and-idle guards; failed withdrawals retain the pending work.
+
+Three regression tests cover partial-import retry, coherent first-import application/acknowledgement, and old-marker withdrawal through a network failure. After isolating the in-process repository between tests, all 150 unit tests, `lintDebug` and `assembleDebug` passed locally.
+
+This validates the correctness fixes, not selection of this PR's shared audio/location consent policy. The independent-consent consolidated alternative is #84; this branch remains a draft pending the cross-PR decision. No production merge or live data upload was performed for this follow-up.
