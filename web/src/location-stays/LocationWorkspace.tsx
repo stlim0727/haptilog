@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { latest } from "../domain.ts";
 import type { Recording } from "../domain.ts";
-import { dateKey, distanceMeters, recordingAssociation, visibleStay } from "./domain.ts";
+import { dateKey, distanceMeters, recordingAssociation, visibleStay, RETENTION_MS } from "./domain.ts";
 import { clearDismissals, loadDismissals, saveDismissal } from "./dismissals.ts";
 import { PlaceEditor } from "./PlaceEditor.tsx";
 import type { PlaceDraft } from "./PlaceEditor.tsx";
@@ -30,27 +30,40 @@ export function LocationWorkspace({ owner, repository, records, lang = "ko" }: {
       const next = await repository.snapshot();
       if (!mounted.current || token !== generation.current) return;
       setSnapshot(next); setError(""); setCheckedAt(Date.now());
+      if (!next.state.consent_enabled) { clearDismissals(localStorage, owner); setDismissals([]); }
+      return next;
     } catch (e) {
       if (!mounted.current || token !== generation.current) return;
-      setSnapshot(null); setEditor(null); setError(e instanceof LocationError ? e.code : "NETWORK");
+      const code = e instanceof LocationError ? e.code : "NETWORK";
+      if (code === "FORBIDDEN") {
+        setSnapshot(null); setEditor(null); setDeleteConfirm(null);
+        clearDismissals(localStorage, owner); setDismissals([]);
+      }
+      setError(code);
     }
-  }, [repository]);
+  }, [repository, owner]);
   useEffect(() => {
     mounted.current = true; void load();
     const timer = setInterval(() => {
-      setNow(Date.now());
+      setNow(Date.now()); setDismissals(loadDismissals(localStorage, owner));
       if (document.visibilityState === "visible" && !mutating.current) void load();
     }, 30_000);
     const visible = () => { setNow(Date.now()); if (document.visibilityState === "visible" && !mutating.current) void load(); };
     document.addEventListener("visibilitychange", visible);
     return () => { mounted.current = false; generation.current++; clearInterval(timer); document.removeEventListener("visibilitychange", visible); };
-  }, [load]);
+  }, [load, owner]);
   const mutate = async (operation: () => Promise<unknown>) => {
     if (mutating.current) throw new LocationError("BUSY");
     mutating.current = true; generation.current++; setBusy(true); setError(""); setMessage("");
     try {
       await operation();
       if (mounted.current) await load();
+    } catch (e) {
+      if (mounted.current && e instanceof LocationError && e.code === "FORBIDDEN") {
+        setSnapshot(null); setEditor(null); setDeleteConfirm(null);
+        clearDismissals(localStorage, owner); setDismissals([]); setError("FORBIDDEN");
+      }
+      throw e;
     } finally {
       mutating.current = false;
       if (mounted.current) setBusy(false);
@@ -92,7 +105,7 @@ export function LocationWorkspace({ owner, repository, records, lang = "ko" }: {
         {!snapshot.state.consent_enabled && <label><input type="checkbox" checked={backfill} disabled={busy} onChange={e => setBackfill(e.target.checked)} />{ko ? "최근 7일의 기존 체류도 업로드 허용" : "Also allow upload of retained stays from the last seven days"}</label>}
         <button type="button" disabled={busy} onClick={() => {
           const state = snapshot.state;
-          if (state.consent_enabled) { setSnapshot({ ...snapshot, stays: [] }); setEditor(null); }
+          if (state.consent_enabled) { setSnapshot({ ...snapshot, stays: [] }); setEditor(null); clearDismissals(localStorage, owner); setDismissals([]); }
           void perform(() => repository.consent(!state.consent_enabled, state.consent_revision, backfill), ko ? "설정을 저장했습니다. 워치가 다음 동기화 시 수신합니다." : "Saved. The watch receives this at its next synchronization.");
         }}>{snapshot.state.consent_enabled ? (ko ? "동기화 동의 철회" : "Revoke synchronization consent") : (ko ? "동의하고 동기화 켜기" : "Consent and enable synchronization")}</button>
         <p>{ko ? "동의 철회는 기존 서버 데이터를 삭제하지 않습니다. 아래 삭제 기능을 별도로 사용하세요. 오프라인 워치는 다음 연결 때 변경을 받습니다." : "Revoking consent does not delete existing server data. Use deletion separately below. Offline watches receive changes on their next connection."}</p>
@@ -112,7 +125,11 @@ export function LocationWorkspace({ owner, repository, records, lang = "ko" }: {
         </li>)}</ul>
         <button type="button" disabled={!snapshot.state.consent_enabled || places.length >= 20} onClick={() => newPlace()}>{ko ? "지도에서 장소 추가" : "Add a place on the map"}</button>
       </fieldset>
-      {editor && snapshot.state.consent_enabled && <PlaceEditor key={`${editor.id ?? "new"}:${editor.initial.latitude}:${editor.initial.longitude}`} initial={editor.initial} places={places} editingId={editor.id} expectedRevision={editor.revision} lang={lang} onCancel={() => setEditor(null)} onSave={async (draft, revision) => {
+      {editor && snapshot.state.consent_enabled && <PlaceEditor key={`${editor.id ?? "new"}:${editor.initial.latitude}:${editor.initial.longitude}`} initial={editor.initial} places={places} editingId={editor.id} expectedRevision={editor.revision} lang={lang} onCancel={() => setEditor(null)} onReloadForReview={async () => {
+        const next = await load();
+        if (!next) throw new LocationError("NETWORK");
+        return { revision: next.state.places_revision, place: next.places.find(place => place.id === editor.id) ?? null };
+      }} onSave={async (draft, revision) => {
         try {
           await mutate(() => repository.putPlace({ ...draft, id: editor.id ?? crypto.randomUUID() }, revision!));
           if (mounted.current) { setEditor(null); setMessage(ko ? "장소를 저장했습니다. 과거 기록은 자동 변경되지 않습니다." : "Place saved. Past records were not changed automatically."); }
@@ -122,12 +139,14 @@ export function LocationWorkspace({ owner, repository, records, lang = "ko" }: {
       {snapshot.state.consent_enabled && <section aria-label={ko ? "자주 머문 곳 추천" : "Frequent stay suggestions"}>
         <h3>{ko ? "자주 머문 곳" : "Frequently visited areas"}</h3>
         <p>{ko ? "최근 7일 중 서로 다른 2일 이상, 3회 이상 체류한 곳입니다. 추천 조건은 초기 기준이며 실제 방문과 다를 수 있습니다." : "Areas with at least three stays on two different days in the last seven days. These provisional rules may differ from actual visits."}</p>
+        <p>{ko ? "숨긴 추천은 이 브라우저에서 관련 체류가 만료되기 전까지 최대 7일 유지됩니다. 체류 삭제·동의 철회·로그아웃 시 숨김 설정도 지웁니다." : "Hidden suggestions remain in this browser for up to seven days, ending when their source stays expire. Deleting stays, revoking consent or signing out also clears hidden suggestions."}</p>
         {!suggestions.length && <p>{ko ? "추천할 만큼 확인된 체류가 없습니다." : "Not enough confirmed stays for suggestions."}</p>}
         <ul>{suggestions.map(suggestion => <li key={`${suggestion.latitude}:${suggestion.longitude}`}>
           {suggestion.visits}{ko ? "회" : " visits"} · {suggestion.distinctDays}{ko ? "일" : " days"} · {Math.floor(suggestion.observedMillis / 60_000)}{ko ? "분 관측" : " minutes observed"}
           <button type="button" disabled={busy || places.length >= 20} onClick={() => newPlace(suggestion.latitude, suggestion.longitude)}>{ko ? "장소로 저장" : "Save as a place"}</button>
           <button type="button" disabled={busy} onClick={() => {
-            const saved = saveDismissal(localStorage, owner, { latitude: suggestion.latitude, longitude: suggestion.longitude, radius_meters: 200 });
+            const sourceExpiry = Math.min(...stays.filter(stay => suggestion.stayIds.includes(stay.id)).map(stay => Date.parse(stay.started_at) + RETENTION_MS));
+            const saved = saveDismissal(localStorage, owner, { latitude: suggestion.latitude, longitude: suggestion.longitude, radius_meters: 200 }, sourceExpiry);
             if (saved) setDismissals(loadDismissals(localStorage, owner));
             else setMessage(ko ? "이 브라우저에 추천 숨김을 저장하지 못했습니다." : "Could not save hidden suggestions in this browser.");
           }}>{ko ? "추천 숨기기" : "Hide suggestion"}</button>
@@ -156,7 +175,8 @@ export function LocationWorkspace({ owner, repository, records, lang = "ko" }: {
           setSnapshot({ ...snapshot, stays: [] }); setEditor(null);
           void perform(async () => {
             await repository.deleteStays(ids, snapshot.state.sync_epoch);
-            if (ids === null) { clearDismissals(localStorage, owner); setDismissals([]); }
+            // Hidden-area summaries cannot reliably map to a single deleted segment: clear conservatively.
+            clearDismissals(localStorage, owner); setDismissals([]);
             if (mounted.current) setDeleteConfirm(null);
           });
         }}>{ko ? "체류 영구 삭제" : "Permanently delete stays"}</button>

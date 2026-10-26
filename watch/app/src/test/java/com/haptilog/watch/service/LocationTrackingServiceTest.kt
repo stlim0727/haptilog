@@ -35,6 +35,22 @@ class LocationTrackingServiceTest {
     @Before fun setUp() {
         application = RuntimeEnvironment.getApplication()
         updates = FakeUpdates()
+        // The WorkManager singleton can survive between Robolectric SDK variants.
+        // Initialize only when the test application has no instance yet.
+        try { androidx.work.WorkManager.getInstance(application) }
+        catch (_: IllegalStateException) {
+            androidx.work.WorkManager.initialize(application, androidx.work.Configuration.Builder().build())
+        }
+        // The repository singleton also survives SDK test variants. Each scenario starts
+        // with local defaults, not a prior scenario's downloaded 20-minute threshold.
+        application.getSharedPreferences("location_sync", android.content.Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        LocationHistoryRepository.get(application).apply {
+            stopSession()
+            clearHistory()
+            setDwellMinutes(10)
+            state.value.places.forEach { removePlace(it.id) }
+        }
         // Robolectric does not automatically grant the merged signature permission.
         shadowOf(application).grantPermissions("${application.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
         shadowOf(application).denyPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -169,6 +185,45 @@ class LocationTrackingServiceTest {
         val closed = repository.state.value.stays.single { it.id == activeId }
         assertEquals(LocationStayEndReason.USER_STOP, closed.endReason)
         assertEquals(600_000L, closed.observedDurationMillis)
+        controller.destroy()
+    }
+
+    @Test fun downloadedSettingsApplyBeforeNextSessionAndRecordAppliedRevision() {
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val prefs = application.getSharedPreferences("location_sync", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("enabled", true)
+            .putString("policy_version", com.haptilog.watch.sync.LocationConsent.POLICY_VERSION)
+            .putString("pending_places", org.json.JSONObject().put("revision", 11).put("owner_user_id", "owner")
+                .put("threshold_minutes", 20).put("places", org.json.JSONArray().put(org.json.JSONObject()
+                    .put("id", "33333333-3333-4333-8333-333333333333").put("name", "Office")
+                    .put("latitude", 37.0).put("longitude", 127.0).put("radius_meters", 200))).toString())
+            .commit()
+        val controller = controller()
+        val service = controller.get()
+        service.onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        val repository = LocationHistoryRepository.get(application)
+        assertEquals(20, repository.state.value.dwellMinutes)
+        assertEquals("Office", repository.state.value.places.single().name)
+        assertEquals(11L, prefs.getLong("applied_places_revision", -1))
+        service.onStartCommand(Intent(application, LocationTrackingService::class.java)
+            .setAction(LocationTrackingService.ACTION_STOP), 0, 2)
+        await { !LocationTrackingService.isTracking.value }
+        controller.destroy()
+    }
+
+    @Test fun revokedConsentDoesNotApplyDownloadedSettingsAtNextStart() {
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val prefs = application.getSharedPreferences("location_sync", android.content.Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("enabled", false)
+            .putString("pending_places", "not valid JSON").commit()
+        val controller = controller()
+        controller.get().onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        assertEquals(-1L, prefs.getLong("applied_places_revision", -1))
+        controller.get().onStartCommand(Intent(application, LocationTrackingService::class.java)
+            .setAction(LocationTrackingService.ACTION_STOP), 0, 2)
+        await { !LocationTrackingService.isTracking.value }
         controller.destroy()
     }
 

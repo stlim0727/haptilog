@@ -24,6 +24,7 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.Priority
+import com.haptilog.watch.sync.LocationSyncWorker
 import com.haptilog.watch.R
 import com.haptilog.watch.data.location.LocationHistoryRepository
 import com.haptilog.watch.data.location.LocationStayEndReason
@@ -113,6 +114,8 @@ class LocationTrackingService : Service() {
                         when (write) {
                             is Write.Start -> {
                                 repository = LocationHistoryRepository.get(applicationContext)
+                                // Apply already downloaded settings before freezing this session's detector.
+                                LocationSyncWorker.applyPending(applicationContext, repository)
                                 repository.startSession(write.sessionStartElapsedMillis)
                                 withContext(Dispatchers.Main.immediate) {
                                     if (started && !stopping) {
@@ -150,6 +153,7 @@ class LocationTrackingService : Service() {
                             is Write.Stop -> {
                                 try {
                                     if (::repository.isInitialized) repository.stopSession(write.reason, System.currentTimeMillis())
+                                    LocationSyncWorker.schedule(applicationContext)
                                 } finally {
                                     withContext(Dispatchers.Main.immediate) { finishStop() }
                                 }

@@ -8,7 +8,7 @@ export type SyncState = {
 };
 export type Snapshot = { protocol_version: 1; state: SyncState; places: SavedPlace[]; stays: Stay[]; deleted_ids: string[] };
 export type LocationAction = "snapshot" | "consent" | "put_place" | "delete_place" | "set_threshold" | "delete_stays";
-export type RpcTransport = (name: string, args: { p_owner: string; p_action: LocationAction; p_payload: Record<string, unknown> }) => PromiseLike<{ data: unknown; error: unknown }>;
+export type RpcTransport = (name: string, args: { p_owner: string; p_action: LocationAction; p_payload: Record<string, unknown> }) => PromiseLike<{ data: unknown; error: unknown; status?: number }>;
 export class LocationError extends Error {
   readonly code: string;
   constructor(code: string) { super(code); this.code = code; this.name = "LocationError"; }
@@ -35,10 +35,11 @@ export function parseSnapshot(value: unknown): Snapshot {
 /** Owner comes from the existing portal connection; the RPC must independently authorize it. */
 export function createLocationRepository(owner: string, rpc: RpcTransport) {
   async function call(action: LocationAction, payload: Record<string, unknown> = {}) {
-    const { data, error } = await rpc("location_stays", { p_owner: owner, p_action: action, p_payload: payload });
+    const { data, error, status } = await rpc("location_stays", { p_owner: owner, p_action: action, p_payload: payload });
     if (error) {
       const code = object(error) && typeof error.code === "string" ? error.code : "NETWORK";
-      throw new LocationError(["PGRST202", "42883"].includes(code) ? "UNAVAILABLE" : ["401", "403", "42501"].includes(code) ? "FORBIDDEN" : "NETWORK");
+      const forbidden = status === 401 || status === 403 || ["401", "403", "42501", "PGRST301", "PGRST302", "PGRST303"].includes(code);
+      throw new LocationError(forbidden ? "FORBIDDEN" : ["PGRST202", "42883"].includes(code) ? "UNAVAILABLE" : "NETWORK");
     }
     if (!object(data)) throw new LocationError("INVALID_RESPONSE");
     if (typeof data.error === "string") throw new LocationError(data.error);

@@ -11,6 +11,7 @@ class LocationStayDetector(
     private var anchor: LocationSample? = null
     private var previous: LocationSample? = null
     private var previousInside = false
+    private var lastInsideElapsedMillis: Long? = null
     private var durationMillis = 0L
     private var outsideSince: Long? = null
     private var active: LocationStay? = null
@@ -20,7 +21,8 @@ class LocationStayDetector(
         val changes = mutableListOf<LocationStay>()
         val last = previous
         if (last != null && sample.elapsedRealtimeMillis <= last.elapsedRealtimeMillis) return emptyList()
-        if (last != null && sample.elapsedRealtimeMillis - last.elapsedRealtimeMillis > GAP_MILLIS) {
+        val evidenceAt = lastInsideElapsedMillis ?: last?.elapsedRealtimeMillis
+        if (evidenceAt != null && sample.elapsedRealtimeMillis - evidenceAt > GAP_MILLIS) {
             finish(LocationStayEndReason.OBSERVATION_GAP, sample.timestampMillis)?.let(changes::add)
         }
         val origin = anchor
@@ -35,6 +37,7 @@ class LocationStayDetector(
         val inside = distance + sample.accuracyMeters <= RADIUS_METERS
         val outside = distance - sample.accuracyMeters > RADIUS_METERS
         if (inside) {
+            lastInsideElapsedMillis = sample.elapsedRealtimeMillis
             outsideSince = null
             if (previousInside && last != null) durationMillis += sample.elapsedRealtimeMillis - last.elapsedRealtimeMillis
             if (active == null && durationMillis >= thresholdMinutes * 60_000L) {
@@ -75,8 +78,8 @@ class LocationStayDetector(
 
     /** A timer can expire a silent provider without waiting for another fix. */
     fun expire(nowElapsedRealtimeMillis: Long, nowMillis: Long): LocationStay? {
-        val last = previous ?: return null
-        return if (nowElapsedRealtimeMillis - last.elapsedRealtimeMillis > GAP_MILLIS)
+        val evidenceAt = lastInsideElapsedMillis ?: previous?.elapsedRealtimeMillis ?: return null
+        return if (nowElapsedRealtimeMillis - evidenceAt > GAP_MILLIS)
             finish(LocationStayEndReason.OBSERVATION_GAP, nowMillis) else null
     }
 
@@ -85,6 +88,7 @@ class LocationStayDetector(
         anchor = null
         previous = null
         previousInside = false
+        lastInsideElapsedMillis = null
         durationMillis = 0
         outsideSince = null
         active = null
@@ -96,6 +100,7 @@ class LocationStayDetector(
         anchor = sample
         previous = sample
         previousInside = sample.accuracyMeters <= RADIUS_METERS
+        lastInsideElapsedMillis = sample.elapsedRealtimeMillis.takeIf { previousInside }
         durationMillis = 0
         outsideSince = null
         clockDiscontinuity = false

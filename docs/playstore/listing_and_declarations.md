@@ -144,11 +144,12 @@ HaptiLog 매니페스트에 등록된 포그라운드 서비스 타입:
   ```
   HaptiLog captures location during user-started voice recording to geotag memos. Users may separately start a local location journal from watch settings to record filtered movement, arrival/departure at saved GPS places, and sustained stays.
 
-  Voice-memo location acquisition ends when recording stops. A journal session uses its own location foreground service with an ongoing notification and stop action so sampling can continue while the watch display is off. The user can stop it from the journal or notification. Journal data stays on the watch and does not join voice-recording cloud sync. The journal does not require microphone access or hold a wake lock.
+  Voice-memo location acquisition ends when recording stops. A journal session uses its own location foreground service with an ongoing notification and stop action so sampling can continue while the watch display is off. The user can stop it from the journal or notification. Journal data is local by default and does not join voice-recording cloud sync. Separate optional place/stay consent allows an independent worker to upload saved places and stay summaries to Supabase; raw movement points remain local and journal data is not sent to Gemini. The journal does not require microphone access or hold a wake lock.
   ```
 - **사용자 시작 조건 (User-initiated trigger)**:
   `Triggered by a voice recording, or by the user explicitly pressing Start in the separate watch location journal.`
 - **위치 일지 출시 확인**: 공개 개인정보처리방침 변경본 배포, 위치 FGS 선언 설명/데모 갱신, 워치에서 시작·화면 꺼짐·알림 정지 동작 검증 후 심사 제출. 이 문서 변경 자체가 콘솔 저장이나 배포를 뜻하지 않습니다.
+- **장소·체류 동기화 출시 확인**: 독립 동의·소급 선택 문구, 위치 데이터 수집 및 7일 클라우드 보존 안내, 서버 migration·만료 정리 일정·advisors, 삭제 후 재접속 검증, 실제 착용 배터리 증거를 확인합니다. 아래 [후속 작업 목록](../design/location-stays-followup.md)은 코드 병합과 서비스 출시를 구분합니다.
 
 ---
 

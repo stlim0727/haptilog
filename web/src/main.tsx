@@ -33,6 +33,7 @@ import {
   Watch,
 } from "lucide-react";
 import { supabase, authCallbackFailed } from "./client";
+import { clearAllDismissals } from "./location-stays/dismissals";
 import {
   DEMO_MODE_STORAGE_KEY,
   DEMO_SESSION_ID,
@@ -279,6 +280,7 @@ function App() {
       const identityChanged = authenticatedUser.current !== userId;
       authenticatedUser.current = userId;
       if (event === "SIGNED_OUT" || identityChanged) {
+        if (event === "SIGNED_OUT") clearAllDismissals(localStorage);
         generation.current++;
         setConnection(null);
         setRecords([]);
