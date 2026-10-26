@@ -188,6 +188,9 @@ class SettingsActivity : ComponentActivity() {
                             }, label = { Text(stringResource(R.string.location_journal_title), maxLines = Int.MAX_VALUE) },
                                 secondaryLabel = { Text(stringResource(R.string.location_journal_hint), maxLines = Int.MAX_VALUE) }) }
                             item { FlexibleChip(onClick = {
+                                startActivity(Intent(this@SettingsActivity, LocationSyncActivity::class.java))
+                            }, label = { Text(stringResource(R.string.location_sync_title), maxLines = Int.MAX_VALUE) }) }
+                            item { FlexibleChip(onClick = {
                                 startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                                     .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))
                             }, label = { Text(stringResource(R.string.notification_settings), maxLines = Int.MAX_VALUE) },

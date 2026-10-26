@@ -36,6 +36,7 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.haptilog.watch.R
 import com.haptilog.watch.data.location.*
+import com.haptilog.watch.sync.LocationConsent
 import com.haptilog.watch.service.LocationTrackingService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,12 @@ class LocationJournalActivity : ComponentActivity() {
     private var latitude by mutableStateOf("")
     private var longitude by mutableStateOf("")
     private var pendingAction: String? = null
+    private var cloudManaged by mutableStateOf(false)
+
+    override fun onResume() {
+        super.onResume()
+        cloudManaged = LocationConsent.enabled(this)
+    }
 
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         val action = pendingAction
@@ -146,6 +153,10 @@ class LocationJournalActivity : ComponentActivity() {
             setContent {
                 HaptiLogTheme { AppScaffold {
                     val history by repository.state.collectAsState()
+                    var displayNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
+                    LaunchedEffect(Unit) {
+                        while (true) { kotlinx.coroutines.delay(30_000); displayNow = System.currentTimeMillis() }
+                    }
                     val active by LocationTrackingService.isTracking.collectAsState()
                     val serviceNotice by LocationTrackingService.status.collectAsState()
                     var page by rememberSaveable { mutableStateOf("home") }
@@ -163,19 +174,19 @@ class LocationJournalActivity : ComponentActivity() {
                             item { Text(stringResource(R.string.location_journal_title), textAlign = TextAlign.Center) }
                             (notice ?: serviceNotice)?.let { item { JournalText(it) } }
                             if (page == "place") {
-                                item { JournalField(stringResource(R.string.location_place_name), name, !busy) { name = it.take(40) } }
-                                item { JournalAction(R.string.location_use_current, !busy && !active) { requestLocation("locate") } }
-                                item { JournalField(stringResource(R.string.location_latitude), latitude, !busy) { latitude = it } }
-                                item { JournalField(stringResource(R.string.location_longitude), longitude, !busy) { longitude = it } }
-                                item { DetailAction(enabled = !busy && !active, onClick = {
+                                item { JournalField(stringResource(R.string.location_place_name), name, !busy && !cloudManaged) { name = it.take(40) } }
+                                item { JournalAction(R.string.location_use_current, !busy && !active && !cloudManaged) { requestLocation("locate") } }
+                                item { JournalField(stringResource(R.string.location_latitude), latitude, !busy && !cloudManaged) { latitude = it } }
+                                item { JournalField(stringResource(R.string.location_longitude), longitude, !busy && !cloudManaged) { longitude = it } }
+                                item { DetailAction(enabled = !busy && !active && !cloudManaged, onClick = {
                                     radius = when (radius) { 150 -> 200; 200 -> 500; 500 -> 1000; 1000 -> 2000; else -> 150 }
                                 }, label = { Text(stringResource(R.string.location_radius, radius)) }) }
-                                item { JournalAction(R.string.location_save_place, !busy && !active && validPlaceInput(name, latitude, longitude)) {
+                                item { JournalAction(R.string.location_save_place, !busy && !active && !cloudManaged && validPlaceInput(name, latitude, longitude)) {
                                     val place = SavedPlace(editId ?: UUID.randomUUID().toString(), name.trim(),
                                         latitude.toDouble(), longitude.toDouble(), radius.toDouble())
                                     change(onSuccess = { page = "home" }) { repository.addPlace(place) }
                                 } }
-                                editId?.let { id -> item { JournalAction(R.string.location_delete_place, !busy && !active) {
+                                editId?.let { id -> item { JournalAction(R.string.location_delete_place, !busy && !active && !cloudManaged) {
                                     change(onSuccess = { page = "home" }) { repository.removePlace(id) }
                                 } } }
                                 item { JournalAction(R.string.location_back, !busy) { page = "home"; notice = null } }
@@ -187,7 +198,22 @@ class LocationJournalActivity : ComponentActivity() {
                                 item { JournalAction(R.string.location_back, !busy) { page = "home" } }
                             } else if (page == "events" || page == "points") {
                                 if (page == "events") {
-                                    if (history.events.isEmpty()) item { JournalText(stringResource(R.string.location_no_events)) }
+                                    if (history.events.isEmpty() && history.stays.isEmpty()) item { JournalText(stringResource(R.string.location_no_events)) }
+                                    history.stays.asReversed().take(limit).forEach { stay -> item {
+                                        val fresh = stay.status == LocationStayStatus.ACTIVE && active && !stay.clockDiscontinuity &&
+                                            displayNow - stay.lastObservedAtMillis in 0..180_000L
+                                        val stateLabel = stringResource(if (fresh) R.string.location_stay_observed
+                                            else if (stay.status == LocationStayStatus.ACTIVE) R.string.location_stay_stale
+                                            else when (stay.endReason) {
+                                                LocationStayEndReason.MOVED -> R.string.location_stay_moved
+                                                LocationStayEndReason.OBSERVATION_GAP -> R.string.location_stay_gap
+                                                LocationStayEndReason.INTERRUPTED, LocationStayEndReason.SERVICE_DESTROYED -> R.string.location_stay_interrupted
+                                                else -> R.string.location_stay_closed
+                                            })
+                                        JournalText("$stateLabel\n" + journalTime(stay.startedAtMillis) + " – " +
+                                            journalTime(stay.lastObservedAtMillis) + "\n" +
+                                            stringResource(R.string.location_minutes, stay.observedDurationMillis / 60_000))
+                                    } }
                                     history.events.asReversed().take(limit).forEach { event -> item {
                                         val label = stringResource(when (event.type) {
                                             LocationEventType.ENTER -> R.string.location_enter
@@ -206,12 +232,12 @@ class LocationJournalActivity : ComponentActivity() {
                                             String.format(Locale.getDefault(), "%.5f, %.5f · ±%.0f m", point.latitude, point.longitude, point.accuracyMeters))
                                     } }
                                 }
-                                val total = if (page == "events") history.events.size else history.points.size
+                                val total = if (page == "events") maxOf(history.events.size, history.stays.size) else history.points.size
                                 if (limit < total) item { JournalAction(R.string.location_more) { limit += 30 } }
                                 item { JournalAction(R.string.location_back) { page = "home" } }
                             } else {
                                 item { JournalText(stringResource(if (active) R.string.location_running else R.string.location_stopped)) }
-                                item { JournalText(stringResource(R.string.location_disclosure)) }
+                                item { JournalText(stringResource(if (cloudManaged) R.string.location_disclosure_synced else R.string.location_disclosure)) }
                                 item { JournalAction(if (active) R.string.location_stop else R.string.location_start, !busy) {
                                     if (active) startService(Intent(this@LocationJournalActivity, LocationTrackingService::class.java)
                                         .setAction(LocationTrackingService.ACTION_STOP)) else requestLocation("start")
@@ -225,18 +251,19 @@ class LocationJournalActivity : ComponentActivity() {
                                 } }
                                 item { JournalAction(R.string.location_events) { limit = 30; page = "events" } }
                                 item { JournalAction(R.string.location_points) { limit = 30; page = "points" } }
-                                item { DetailAction(enabled = !busy && !active, onClick = {
+                                item { DetailAction(enabled = !busy && !active && !cloudManaged, onClick = {
                                     val next = when (history.dwellMinutes) { 5 -> 10; 10 -> 20; 20 -> 30; else -> 5 }
                                     change { repository.setDwellMinutes(next) }
                                 }, label = { Text(stringResource(R.string.location_dwell_setting, history.dwellMinutes)) }) }
                                 item { JournalText(stringResource(R.string.location_places_hint)) }
+                                if (cloudManaged) item { JournalText(stringResource(R.string.location_manage_on_web)) }
                                 history.places.forEach { place -> item {
-                                    DetailAction(enabled = !busy && !active, onClick = {
+                                    DetailAction(enabled = !busy && !active && !cloudManaged, onClick = {
                                         editId = place.id; name = place.name; latitude = place.latitude.toString()
                                         longitude = place.longitude.toString(); radius = place.radiusMeters.toInt(); page = "place"
                                     }, label = { Text("${place.name} · ${place.radiusMeters.toInt()} m") })
                                 } }
-                                item { JournalAction(R.string.location_add_place, !busy && !active && history.places.size < 20) {
+                                item { JournalAction(R.string.location_add_place, !busy && !active && !cloudManaged && history.places.size < 20) {
                                     editId = null; name = ""; latitude = ""; longitude = ""; radius = 200; notice = null; page = "place"
                                 } }
                                 item { JournalAction(R.string.location_clear, !busy && !active) { page = "clear" } }
