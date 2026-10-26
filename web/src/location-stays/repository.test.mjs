@@ -30,6 +30,16 @@ test("schema absence and JSON application conflicts never look like empty succes
     await assert.rejects(repository.snapshot(), e => e.code === code);
   }
 });
+test("JWT/auth failures clear sensitive state instead of behaving like transient network errors", async () => {
+  for (const result of [
+    ...["PGRST301", "PGRST302", "PGRST303", "42501"].map(code => ({ data: null, error: { code } })),
+    { data: null, error: { code: "unknown" }, status: 401 },
+    { data: null, error: { code: "unknown" }, status: 403 },
+  ]) {
+    const repository = createLocationRepository("owner", async () => result);
+    await assert.rejects(repository.snapshot(), e => e.code === "FORBIDDEN");
+  }
+});
 test("snapshot rejects corrupt records, strips place owner fields and honors deletion IDs", () => {
   const value = snapshot();
   value.places = [{ ...mockPlaces[0], owner_user_id: "private-owner" }];

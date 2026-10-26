@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 import java.util.concurrent.TimeUnit
@@ -38,6 +39,8 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
             if (!LocationConsent.enabled(context)) return null
             val raw = LocationConsent.preferences(context).getString("pending_places", null) ?: return null
             val pending = JSONObject(raw)
+            // Old unscoped pending data cannot prove which watch owner it belongs to.
+            if (!pending.has("owner_user_id")) return null
             val places = pending.getJSONArray("places")
             val parsed = (0 until places.length()).map { index ->
                 val place = places.getJSONObject(index)
@@ -46,8 +49,53 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
             }
             if (!repository.applySyncedPlaces(parsed, pending.getInt("threshold_minutes"))) return null
             check(LocationConsent.preferences(context).edit()
-                .putLong("applied_places_revision", pending.getLong("revision")).commit())
+                .putLong("applied_places_revision", pending.getLong("revision"))
+                .putString("applied_places_signature", settingsSignature(pending)).commit())
             return pending.getLong("revision")
+        }
+
+        /** Stable proof of what was applied, scoped to the owner, not a consent or stay epoch. */
+        private fun settingsSignature(pending: JSONObject): String {
+            val places = pending.getJSONArray("places")
+            val normalized = (0 until places.length()).map { places.getJSONObject(it) }
+                .sortedBy { it.getString("id") }.map { place ->
+                    JSONObject().put("id", place.getString("id")).put("name", place.getString("name"))
+                        .put("latitude", place.getDouble("latitude")).put("longitude", place.getDouble("longitude"))
+                        .put("radius_meters", place.getDouble("radius_meters"))
+                }
+            return JSONObject().put("owner_user_id", pending.getString("owner_user_id"))
+                .put("revision", pending.getLong("revision"))
+                .put("threshold_minutes", pending.getInt("threshold_minutes"))
+                .put("places", JSONArray(normalized)).toString()
+        }
+
+        /** Can ACK a prior pre-start application even while this session defers new settings. */
+        internal fun syncPlaces(context: Context, repository: LocationHistoryRepository,
+                                client: LocationSyncClient, snapshot: JSONObject) {
+            if (!LocationConsent.enabled(context)) return
+            val prefs = LocationConsent.preferences(context)
+            val state = snapshot.getJSONObject("state")
+            val desired = state.getLong("places_revision")
+            val pending = JSONObject().put("owner_user_id", state.getString("owner_user_id"))
+                .put("revision", desired).put("threshold_minutes", state.getInt("threshold_minutes"))
+                .put("places", snapshot.getJSONArray("places"))
+            check(prefs.edit().putString("pending_places", pending.toString()).commit())
+            applyPending(context, repository)
+            val local = repository.state.value
+            val current = JSONObject(pending.toString()).put("threshold_minutes", local.dwellMinutes)
+                .put("places", JSONArray(local.places.map { place ->
+                    JSONObject().put("id", place.id).put("name", place.name)
+                        .put("latitude", place.latitude).put("longitude", place.longitude)
+                        .put("radius_meters", place.radiusMeters)
+                }))
+            // A bare historical revision could belong to another owner or reset settings.
+            // Only the exact persisted application proof can acknowledge this snapshot.
+            if (prefs.getLong("applied_places_revision", -1) == desired &&
+                prefs.getString("applied_places_signature", null) == settingsSignature(pending) &&
+                settingsSignature(current) == settingsSignature(pending) &&
+                desired > state.getLong("applied_places_revision") && LocationConsent.enabled(context)) {
+                client.call("apply_places", JSONObject().put("revision", desired))
+            }
         }
     }
 
@@ -87,14 +135,7 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
                 .put("acknowledgements", acknowledgements)
             check(prefs.edit().putString("checkpoint", checkpoint().toString()).commit())
             val repository = LocationHistoryRepository.get(context)
-            val pending = JSONObject().put("revision", state.getLong("places_revision"))
-                .put("threshold_minutes", state.getInt("threshold_minutes"))
-                .put("places", snapshot.getJSONArray("places"))
-            check(prefs.edit().putString("pending_places", pending.toString()).commit())
-            val applied = applyPending(context, repository)
-            if (applied != null && applied != state.getLong("applied_places_revision")) {
-                client.call("apply_places", JSONObject().put("revision", applied))
-            }
+            syncPlaces(context, repository, client, snapshot)
             val cutoff = Instant.parse(state.getString("upload_cutoff")).toEpochMilli()
             val purgedBefore = state.optString("purged_before").takeUnless { it.isBlank() || it == "null" }
                 ?.let { Instant.parse(it).toEpochMilli() }
