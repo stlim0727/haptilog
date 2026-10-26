@@ -10,7 +10,7 @@ The journal is separate from voice recording. Starting it never starts the micro
 
 ## User journey
 
-1. Open **Settings → Location journal**. The initial state is stopped. The screen is the Start/Stop control and the recent stays, with one line explaining that place names and the stay threshold are set in the portal.
+1. Open **Settings → Location journal**. The initial state is stopped. The screen is the Start/Stop control and the recent stays, with one line explaining that place names are set in the portal.
 2. Press **Start**. The system asks for precise location (and notification posting on API 33+); that prompt is the only consent step. The location foreground service starts while the activity is visible and displays an ongoing notification with a stop action. Approximate-only access prevents a journal session; voice recording remains available. A blocked notification shade does not stop a session — the service still posts its ongoing notification.
 3. Places are defined in the portal. Downloaded places and the common stay threshold apply between sessions; the watch does not offer radius, threshold, or place-name editing. The radius represents a GPS area, not a precise building boundary, and the portal offers radii of 150, 200, 500, 1,000, and 2,000 m.
 4. Review the recent stays below the control: one line each for how the observation ended, which named place contains it, the minutes observed, and the time range. Position uncertainty and missing samples can delay or prevent a stay.

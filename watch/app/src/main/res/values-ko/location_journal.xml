@@ -15,7 +15,7 @@
     <string name="location_stop">위치 기록 중지</string>
     <string name="location_last_fix">최근 위치: %1$s</string>
     <string name="location_waiting_fix">정확한 위치를 기다리고 있습니다. 야외에서 시도해 주세요. 위치 수신이 지연될 수 있습니다.</string>
-    <string name="location_web_managed">장소 이름과 체류 기준은 웹에서 설정합니다. 클라우드 동기가 켜져 있으면 체류가 음성 기록과 함께 표시됩니다.</string>
+    <string name="location_web_managed">장소 이름은 웹에서 정하세요. 클라우드 동기가 켜져 있으면 체류가 음성 기록과 함께 표시됩니다.</string>
     <string name="location_stay_observed">체류 · 마지막 확인</string>
     <string name="location_stay_stale">체류 · 최근 위치 확인 안 됨</string>
     <string name="location_stay_closed">체류 · 종료</string>

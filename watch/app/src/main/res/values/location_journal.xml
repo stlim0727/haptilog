@@ -15,7 +15,7 @@
     <string name="location_stop">Stop location journal</string>
     <string name="location_last_fix">Latest location: %1$s</string>
     <string name="location_waiting_fix">Waiting for an accurate location. Try outdoors; location updates can be delayed.</string>
-    <string name="location_web_managed">Name places and set the stay length in the web portal. With cloud sync on, stays appear beside your voice records.</string>
+    <string name="location_web_managed">Name places in the web portal. With cloud sync on, stays appear with your voice records.</string>
     <string name="location_stay_observed">Stay · last confirmed</string>
     <string name="location_stay_stale">Stay · awaiting fresh location</string>
     <string name="location_stay_closed">Stay · ended</string>
