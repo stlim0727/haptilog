@@ -20,7 +20,7 @@ import com.haptilog.watch.presentation.MainActivity
 class HaptiLogComplicationService : SuspendingComplicationDataSourceService() {
 
     override fun getPreviewData(type: ComplicationType): ComplicationData? {
-        val icon = Icon.createWithResource(this, com.haptilog.watch.R.drawable.ic_complication_monolith)
+        val icon = Icon.createWithResource(this, com.haptilog.watch.R.drawable.ic_haptilog_monochrome)
         return when (type) {
             ComplicationType.SHORT_TEXT -> {
                 ShortTextComplicationData.Builder(
@@ -52,7 +52,7 @@ class HaptiLogComplicationService : SuspendingComplicationDataSourceService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val icon = Icon.createWithResource(this, com.haptilog.watch.R.drawable.ic_complication_monolith)
+        val icon = Icon.createWithResource(this, com.haptilog.watch.R.drawable.ic_haptilog_monochrome)
 
         return when (request.complicationType) {
             ComplicationType.SHORT_TEXT -> {
