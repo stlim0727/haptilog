@@ -112,14 +112,18 @@ async function invoke(body: Record<string, unknown>) {
   return data;
 }
 export function NotionExport(
-  { records, ko, onAuthorizationReturn }: {
+  { records, ko, onAuthorizationReturn, expanded, onExpandedChange }: {
+    expanded?: boolean;
+    onExpandedChange?: (open: boolean) => void;
     records: Recording[];
     ko: boolean;
     onAuthorizationReturn?: () => void;
   },
 ) {
   const [status, setStatus] = useState<Status | null>(null);
-  const [open, setOpen] = useState(Boolean(callback));
+  const [internalOpen, setInternalOpen] = useState(Boolean(callback));
+  const open = expanded ?? internalOpen;
+  const setOpen = onExpandedChange ?? setInternalOpen;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [targets, setTargets] = useState<Target[]>([]);
@@ -132,8 +136,11 @@ export function NotionExport(
   const running = useRef(false);
   const locale = (en: string, kr: string) => ko ? kr : en;
   useEffect(() => {
-    if (callback) onAuthorizationReturn?.();
-  }, [onAuthorizationReturn]);
+    if (callback) {
+      onAuthorizationReturn?.();
+      onExpandedChange?.(true);
+    }
+  }, [onAuthorizationReturn, onExpandedChange]);
   useEffect(() => {
     alive.current = true;
     const run = async () => {
@@ -280,17 +287,18 @@ export function NotionExport(
     ).map((x) => x.recording_id) ?? [];
   return (
     <section
-      className="notion-panel"
+      className={`notion-panel${expanded !== undefined && !open ? " notion-panel-collapsed" : ""}`}
+      id={expanded !== undefined ? "desktop-notion-export" : undefined}
       aria-label={locale("Notion export", "Notion 내보내기")}
     >
-      <button
+      {expanded === undefined && <button
         className="secondary-button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
         {locale("Notion inbox", "Notion 인박스")}
         {status?.target ? ` · ${status.target.name}` : ""}
-      </button>
+      </button>}
       {open && (
         <div className="notion-content">
           <p>

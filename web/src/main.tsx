@@ -124,6 +124,7 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
 }
 function App() {
   const [draftInProgress, setDraftInProgress] = useState(false);
+  const [notionOpen, setNotionOpen] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 700px)").matches);
   useEffect(() => {
@@ -1107,9 +1108,19 @@ function App() {
                 <ArrowDownToLine size={16} />
                 {t.export_csv}
               </button>
+              {!isTrashView && <button
+                className="secondary-button"
+                aria-expanded={notionOpen}
+                aria-controls="desktop-notion-export"
+                onClick={() => setNotionOpen(!notionOpen)}
+              >
+                <ArrowDownToLine size={16} />
+                {lang === "ko" ? "Notion으로 내보내기" : "Export to Notion"}
+              </button>}
             </div>
           </div>
-          {!isTrashView && <NotionExport key={connection.session_id} records={filtered} ko={lang === "ko"} />}
+          {!isTrashView && <NotionExport key={connection.session_id} records={filtered} ko={lang === "ko"}
+            expanded={notionOpen} onExpandedChange={setNotionOpen} />}
           <div className="metrics">
             <section>
               <span className="metric-label">{t.spending_label}</span>

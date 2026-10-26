@@ -54,3 +54,7 @@
   margin: 5px 0 0 24px;
   overflow-wrap: anywhere;
 }
+
+.notion-panel-collapsed {
+  display: none;
+}
