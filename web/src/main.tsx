@@ -616,7 +616,13 @@ function App() {
   const activeItem = filteredItems.find(item => item.id === selected) ?? (selected ? undefined : filteredItems[0]);
   const active = activeItem?.kind === "voice" ? activeItem.recording : undefined;
   const displayItems = viewMode === "list" && showTimeSlider && stripDateKey !== "ALL" ? filteredItems.filter(item => journalDates(item).includes(stripDateKey)) : filteredItems;
-  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = (recording: Recording) => setSelected(recording.id)) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} records={records} onOpenRecording={onOpenRecording} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
+  const openRelatedRecording = (recording: Recording) => {
+    setSelected(recording.id);
+    if (!filteredItems.some(item => item.kind === "voice" && item.id === recording.id)) {
+      setCategory("All"); setSearch(""); setDate("all"); setStripDateKey("ALL");
+    }
+  };
+  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} records={records} onOpenRecording={onOpenRecording} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
   const displayRecordings =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
       ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)

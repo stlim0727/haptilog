@@ -214,3 +214,17 @@ test("overlapping stays do not both claim the same voice recording", async ({ pa
   await expect(links).toContainText("No unambiguous voice candidates.");
   await expect(links.getByRole("button")).toHaveCount(0);
 });
+
+test("opening a related voice clears desktop filters that would hide its detail", async ({ page }) => {
+  const { portal } = await staysFixture(page);
+  portal.recording.recorded_at = "2026-10-26T05:30:00Z";
+  portal.recording.latitude = 37.5; portal.recording.longitude = 127;
+  await page.goto("/");
+  await page.getByRole("button", { name: "Stays", exact: true }).click();
+  await page.getByRole("searchbox", { name: "Search journal" }).fill("Original cafe");
+  await page.locator(`.record-list ${stayCard}`).click();
+  await page.getByRole("region", { name: "Voice candidates during this stay" }).getByRole("button", { name: "Coffee on the corner", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Load original audio", exact: true })).toBeVisible();
+  await expect(page.locator(`.record-list ${voiceCard}`)).toHaveClass(/selected/);
+  await expect(page.getByRole("searchbox", { name: "Search journal" })).toHaveValue("");
+});

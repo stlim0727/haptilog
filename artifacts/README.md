@@ -25,3 +25,5 @@ No production deployment, database migration, physical-watch GPS accuracy, long-
 ## PR review consolidation follow-up
 
 The #82–#85 disposition and compatibility decisions are recorded in [the review resolution](../docs/design/2026-10-26-pr82-85-resolution.md). After importing #83's evidence and adapting its locale scenarios, fixing dismissal expiry, and porting #85's voice association/navigation behavior, the consolidated branch passed 51 web unit tests, all 86 browser scenarios, 2 production-bundle scenarios and the production build. The earlier screenshots remain representative layout evidence; the added association section and query alias are covered by current tests.
+
+Additional review boundary check: following a related voice while the desktop is filtered to stays or a saved-place search now clears incompatible filters. All four focused association/navigation scenarios passed after that correction, alongside the preceding full 86-scenario run and 2 production-bundle checks.
