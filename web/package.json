@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --experimental-strip-types --test src/*.test.mjs tests/*.test.mjs",
+    "test": "node --experimental-strip-types --test src/*.test.mjs src/location-stays/*.test.mjs tests/*.test.mjs",
     "deploy": "node scripts/deploy.mjs",
     "test:e2e": "playwright test",
     "test:production": "playwright test --config playwright.production.config.ts",

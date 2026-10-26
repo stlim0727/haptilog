@@ -74,6 +74,7 @@ import "./style.css";
 import "./mobile.css";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
+const LocationLauncher = lazy(() => import("./location-stays/LocationLauncher"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
@@ -1028,6 +1029,7 @@ function App() {
           summary={summary} count={dateFilteredActiveRecords.length} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
           isDemo={isDemo} onResetDemo={resetSampleData}
+          locationControl={<Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} sessionId={connection.session_id} records={records} lang={lang} isDemo={isDemo} /></Suspense>}
           renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
             onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
             lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
@@ -1091,6 +1093,7 @@ function App() {
               <p>{t.workspace_subtitle}</p>
             </div>
             <div className="heading-actions">
+              <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} sessionId={connection.session_id} records={records} lang={lang} isDemo={isDemo} /></Suspense>
               <label className="date-picker">
                 <CalendarDays size={16} />
                 <span className="sr-only">Date range</span>

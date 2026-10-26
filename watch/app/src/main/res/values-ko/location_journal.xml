@@ -40,4 +40,12 @@
     <string name="location_dwell_setting">체류 %1$d분 · 눌러 변경</string>
     <string name="location_places_hint">GPS 지정 장소 · 편집하려면 기록을 중지하세요. 최대 20곳. 기록은 7일간 위치 2,000개·이벤트 500개까지 보관됩니다.</string>
     <string name="location_add_place">장소 추가</string>
+    <string name="location_stay_observed">체류 · 마지막 확인</string>
+    <string name="location_stay_stale">체류 · 최근 위치 확인 안 됨</string>
+    <string name="location_stay_closed">체류 · 종료</string>
+    <string name="location_stay_moved">체류 · 이동 확인</string>
+    <string name="location_stay_gap">체류 · 위치 관측 끊김</string>
+    <string name="location_stay_interrupted">체류 · 추적 중단</string>
+    <string name="location_manage_on_web">위치 동기화가 켜져 있으면 장소와 체류 기준은 웹에서 관리합니다.</string>
+    <string name="location_disclosure_synced">직접 시작한 동안만 위치를 수집합니다. 위치 동기화가 켜져 있어 저장한 장소와 체류 요약이 음성 기록과 별도로 동기화됩니다. 이동 위치 표본은 워치에만 보관합니다.</string>
 </resources>

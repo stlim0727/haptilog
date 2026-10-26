@@ -83,6 +83,7 @@ type Props = {
   emptyTrash: () => Promise<void>;
   isDemo?: boolean;
   onResetDemo?: () => void;
+  locationControl?: React.ReactNode;
   renderInspector: (
     recording: Recording,
     onDirtyChange: (dirty: boolean) => void,
@@ -397,6 +398,7 @@ export function MobileWorkspace(p: Props) {
               <MoreHorizontal />
             </button>
           </div>
+          {p.locationControl}
           {isTrash
             ? (
               <div className="mobile-toolbar">

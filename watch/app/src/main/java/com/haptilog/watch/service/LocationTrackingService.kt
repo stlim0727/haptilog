@@ -26,6 +26,7 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.Priority
 import com.haptilog.watch.R
 import com.haptilog.watch.data.location.LocationHistoryRepository
+import com.haptilog.watch.data.location.LocationStayEndReason
 import com.haptilog.watch.data.location.LocationSample
 import com.haptilog.watch.presentation.LocationJournalActivity
 import kotlinx.coroutines.CoroutineScope
@@ -59,7 +60,8 @@ class LocationTrackingService : Service() {
         data class Start(val sessionStartElapsedMillis: Long) : Write
         data class Samples(val locations: List<Location>) : Write
         data class InitialFix(val location: Location) : Write
-        data object Stop : Write
+        data class Stop(val reason: LocationStayEndReason) : Write
+        data class Expire(val elapsedMillis: Long, val wallMillis: Long) : Write
     }
 
     internal var locationUpdates: JournalLocationUpdates? = null
@@ -78,14 +80,14 @@ class LocationTrackingService : Service() {
         override fun onLocationResult(result: LocationResult) {
             if (!started || stopping) return
             if (SystemClock.elapsedRealtime() >= sessionDeadline) {
-                stopTracking(getString(R.string.location_service_timeout))
+                stopTracking(getString(R.string.location_service_timeout), LocationStayEndReason.SESSION_TIMEOUT)
             } else writes.trySend(Write.Samples(result.locations))
         }
     }
 
     private val providerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (started && !isLocationEnabled()) stopTracking(getString(R.string.location_service_disabled))
+            if (started && !isLocationEnabled()) stopTracking(getString(R.string.location_service_disabled), LocationStayEndReason.LOCATION_DISABLED)
         }
     }
 
@@ -144,9 +146,10 @@ class LocationTrackingService : Service() {
                                     nowElapsedRealtimeMillis = SystemClock.elapsedRealtime(),
                                 )
                             }
-                            Write.Stop -> {
+                            is Write.Expire -> repository.expireStay(write.elapsedMillis, write.wallMillis)
+                            is Write.Stop -> {
                                 try {
-                                    if (::repository.isInitialized) repository.stopSession()
+                                    if (::repository.isInitialized) repository.stopSession(write.reason, System.currentTimeMillis())
                                 } finally {
                                     withContext(Dispatchers.Main.immediate) { finishStop() }
                                 }
@@ -154,7 +157,7 @@ class LocationTrackingService : Service() {
                         }
                     } catch (_: Exception) {
                         withContext(Dispatchers.Main.immediate) {
-                            stopTracking(getString(R.string.location_service_storage_error))
+                            stopTracking(getString(R.string.location_service_storage_error), LocationStayEndReason.STORAGE_ERROR)
                         }
                     }
                 }
@@ -181,21 +184,21 @@ class LocationTrackingService : Service() {
             return
         }
         if (!hasPreciseLocationPermission()) {
-            stopTracking(getString(R.string.location_service_permission_required))
+            stopTracking(getString(R.string.location_service_permission_required), LocationStayEndReason.PERMISSION_LOST)
             return
         }
         if (!isLocationEnabled()) {
-            stopTracking(getString(R.string.location_service_disabled))
+            stopTracking(getString(R.string.location_service_disabled), LocationStayEndReason.LOCATION_DISABLED)
             return
         }
         if (!notificationsEnabled()) {
-            stopTracking(getString(R.string.location_service_notifications_required))
+            stopTracking(getString(R.string.location_service_notifications_required), LocationStayEndReason.NOTIFICATIONS_DISABLED)
             return
         }
         try {
             startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
         } catch (_: RuntimeException) {
-            stopTracking(getString(R.string.location_service_start_error))
+            stopTracking(getString(R.string.location_service_start_error), LocationStayEndReason.PROVIDER_ERROR)
             return
         }
         started = true
@@ -208,12 +211,13 @@ class LocationTrackingService : Service() {
         mainScope.launch {
             while (started && !stopping) {
                 delay(30_000L)
+                if (started && !stopping) writes.trySend(Write.Expire(SystemClock.elapsedRealtime(), System.currentTimeMillis()))
                 when {
-                    !hasPreciseLocationPermission() -> stopTracking(getString(R.string.location_service_permission_required))
-                    !isLocationEnabled() -> stopTracking(getString(R.string.location_service_disabled))
-                    !notificationsEnabled() -> stopTracking(getString(R.string.location_service_notifications_required))
+                    !hasPreciseLocationPermission() -> stopTracking(getString(R.string.location_service_permission_required), LocationStayEndReason.PERMISSION_LOST)
+                    !isLocationEnabled() -> stopTracking(getString(R.string.location_service_disabled), LocationStayEndReason.LOCATION_DISABLED)
+                    !notificationsEnabled() -> stopTracking(getString(R.string.location_service_notifications_required), LocationStayEndReason.NOTIFICATIONS_DISABLED)
                     SystemClock.elapsedRealtime() >= sessionDeadline ->
-                        stopTracking(getString(R.string.location_service_timeout))
+                        stopTracking(getString(R.string.location_service_timeout), LocationStayEndReason.SESSION_TIMEOUT)
                 }
             }
         }
@@ -233,7 +237,7 @@ class LocationTrackingService : Service() {
     private fun requestLocationUpdates() {
         if (!started || stopping) return
         if (!hasPreciseLocationPermission()) {
-            stopTracking(getString(R.string.location_service_permission_required))
+            stopTracking(getString(R.string.location_service_permission_required), LocationStayEndReason.PERMISSION_LOST)
             return
         }
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60_000L)
@@ -247,19 +251,19 @@ class LocationTrackingService : Service() {
                     // registration succeeds after cleanup.
                     if (!started || stopping) removeLocationUpdates()
                 }, failed = {
-                    if (started && !stopping) stopTracking(getString(R.string.location_service_provider_error))
+                    if (started && !stopping) stopTracking(getString(R.string.location_service_provider_error), LocationStayEndReason.PROVIDER_ERROR)
                 })
         } catch (_: RuntimeException) {
-            stopTracking(getString(R.string.location_service_provider_error))
+            stopTracking(getString(R.string.location_service_provider_error), LocationStayEndReason.PROVIDER_ERROR)
         }
     }
 
-    private fun stopTracking(message: String? = null) {
+    private fun stopTracking(message: String? = null, reason: LocationStayEndReason = LocationStayEndReason.USER_STOP) {
         if (message != null) mutableStatus.value = message
         if (stopping) return
         stopping = true
         val needsDrain = started
-        if (needsDrain) writes.trySend(Write.Stop)
+        if (needsDrain) writes.trySend(Write.Stop(reason))
         started = false
         removeLocationUpdates()
         mainScope.cancel()
@@ -313,7 +317,7 @@ class LocationTrackingService : Service() {
     }
 
     override fun onDestroy() {
-        if (started) writes.trySend(Write.Stop)
+        if (started) writes.trySend(Write.Stop(LocationStayEndReason.SERVICE_DESTROYED))
         started = false
         stopping = true
         removeLocationUpdates()

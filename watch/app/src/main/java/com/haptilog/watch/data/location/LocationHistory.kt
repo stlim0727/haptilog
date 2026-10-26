@@ -47,7 +47,8 @@ data class LocationHistorySnapshot(
     val events: List<LocationEvent> = emptyList(),
     val dwellMinutes: Int = 10,
     /** Latest accepted observation, not restored across sessions or boots. */
-    val latestSample: LocationSample? = null
+    val latestSample: LocationSample? = null,
+    val stays: List<LocationStay> = emptyList()
 )
 
 internal fun validCoordinates(latitude: Double, longitude: Double) =
