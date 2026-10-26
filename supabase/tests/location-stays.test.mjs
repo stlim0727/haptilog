@@ -113,7 +113,13 @@ assert.equal((await ingest({...stay,id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc'},{
 assert.equal((await rpc('consent',{expected_revision:1,enabled:false})).state.consent_enabled,false);
 assert.equal((await ingest(stay,{sync_epoch:2})).error,'CONSENT_REQUIRED');
 assert.equal((await rpc('consent',{expected_revision:2,enabled:true,backfill:true})).state.consent_revision,3);
-assert.equal((await ingest({...stay,id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc'},{sync_epoch:2,consent_revision:3})).error,'DELETED');
+// Issue #79: re-enabling without backfill must keep the earlier cutoff a prior grant already allowed.
+const widenedCutoff=(await rpc('snapshot')).state.upload_cutoff;
+assert.ok(Date.parse(widenedCutoff)<Date.now()-6*86400000,'backfill widened the window to roughly seven days');
+const reEnabled=await rpc('consent',{expected_revision:3,enabled:true,backfill:false});
+assert.equal(reEnabled.state.consent_revision,4);
+assert.equal(reEnabled.state.upload_cutoff,widenedCutoff,'a later enable never narrows an already-granted window');
+assert.equal((await ingest({...stay,id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc'},{sync_epoch:2,consent_revision:4})).error,'DELETED');
 assert.equal((await rpc('anything_else')).error,'UNSUPPORTED_ACTION');
 // Simulate a delayed cleanup: direct SELECT and snapshot must hide expired rows now.
 await db.exec(`reset role;insert into public.location_stays(owner_user_id,id,source_revision,started_at,expires_at,summary)

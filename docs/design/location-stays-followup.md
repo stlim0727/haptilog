@@ -21,8 +21,8 @@ Baseline: PR #70, merged 2026-10-26. Touch events and Gemini journal classificat
 
 ## Release evidence still required
 
-1. Apply the migration to the intended Supabase environment and verify actual owner/portal session authorization and the cloud-switch consent mirror against that environment. Run database advisors. Local PGlite tests are not deployment evidence.
-2. Configure and observe scheduled `cleanup_location_stays()`; verify physical expiry cleanup and immediate read exclusion separately. Read exclusion alone is not physical deletion.
+1. Applied on 2026-10-26 as `20261026082252_location_stays_foundation` plus the cutoff widen-keep migration, with owner and portal-session authorization exercised over the real wire as `authenticated` (see Deployment status in the [contract](../architecture/location-stays-sync.md)). Database advisors were run against a full local mirror. Still to verify against that environment: the authorization path with the watch driving `consent` from the cloud sync switch instead of a location-specific prompt.
+2. The `location-stays-cleanup` pg_cron job is scheduled at 04:15 UTC daily; observe its first execution and confirm physical expiry cleanup separately from read exclusion. Read exclusion alone is not physical deletion.
 3. Deploy the updated privacy notice and review Play Console data disclosures and location foreground-service description against shipped behavior.
 4. Exercise watch → cloud → browser, pending settings between sessions, cloud-switch withdrawal, deletion/reconnect, and audio-only versus audio-plus-location upload combinations on device. Record ambient operation, adjacent-place/jitter behavior and actual battery drain relative to the existing collection baseline.
 5. Record browser interaction evidence for keyboard/focus, narrow screens, English/Korean, transient errors, conflicts and authorization loss. Regression tests for editing recovery cover only their tested scenarios, not a full accessibility review.
