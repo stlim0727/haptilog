@@ -48,7 +48,9 @@ class LocationConsentTest {
 
     @Before fun setUp() {
         val context = RuntimeEnvironment.getApplication() as Context
-        WorkManager.initialize(context, Configuration.Builder().build())
+        try { WorkManager.getInstance(context) }
+        catch (_: IllegalStateException) { WorkManager.initialize(context, Configuration.Builder().build()) }
+        LocationConsent.preferences(context).edit().clear().commit()
         val directory = java.io.File(context.filesDir, "location_history").apply { mkdirs() }
         val history = JSONObject().put("version", 2).put("dwell_minutes", 10)
             .put("places", JSONArray().put(JSONObject().put("id", "55555555-5555-4555-8555-555555555555")
@@ -70,4 +72,22 @@ class LocationConsentTest {
         assertTrue(LocationConsent.enabled(context))
         assertTrue(LocationConsent.preferences(context).getBoolean("ever_enabled", false))
     }
+    @Test fun syncCanBeEnabledAndDisabledWithoutStoppingCollection() {
+        val context = RuntimeEnvironment.getApplication() as Context
+        val repository = LocationHistoryRepository.get(context)
+        repository.startSession()
+        try {
+            LocationConsent.enable(context, backfill = false, api = FakeCloud())
+            assertTrue(LocationConsent.enabled(context))
+            // Active collection defers downloaded settings instead of requiring a stop.
+            assertFalse(repository.applySyncedPlaces(emptyList(), 20))
+            assertEquals("Home", repository.state.value.places.single().name)
+            LocationConsent.disable(context)
+            assertFalse(LocationConsent.enabled(context))
+            assertTrue(LocationConsent.preferences(context).getBoolean("revoke_pending", false))
+            assertFalse(repository.applySyncedPlaces(emptyList(), 20))
+        } finally { repository.stopSession() }
+        assertTrue(repository.applySyncedPlaces(emptyList(), 20))
+    }
+
 }

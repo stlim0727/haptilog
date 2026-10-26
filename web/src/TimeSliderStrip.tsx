@@ -1,17 +1,21 @@
 import { useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles } from "lucide-react";
-import { latest, localDate, toLocalDateString } from "./domain";
+import { toLocalDateString } from "./domain";
 import type { Recording } from "./domain";
+import { voiceItem, journalDates, journalIntent } from "./journal";
+import type { JournalItem } from "./journal";
 import type { translations } from "./i18n";
 
 export default function TimeSliderStrip({
   recordings,
+  journalItems,
   selectedDateKey,
   onSelectDate,
   t,
   lang,
 }: {
   recordings: Recording[];
+  journalItems?: JournalItem[];
   selectedDateKey: string; // "ALL" or "YYYY-MM-DD"
   onSelectDate: (key: string) => void;
   t: (typeof translations)["en"] | (typeof translations)["ko"];
@@ -20,18 +24,16 @@ export default function TimeSliderStrip({
   const scrollRef = useRef<HTMLDivElement>(null);
   const todayKey = toLocalDateString();
 
-  // Group recordings by local date key
-  const dateMap = new Map<string, Recording[]>();
-  for (const r of recordings) {
-    const key = localDate(r.recorded_at);
-    const list = dateMap.get(key) ?? [];
-    list.push(r);
-    dateMap.set(key, list);
+  const items = journalItems ?? recordings.map(voiceItem);
+  // Group both item types by observed date.
+  const dateMap = new Map<string, JournalItem[]>();
+  for (const r of items) for (const key of journalDates(r)) {
+    const list = dateMap.get(key) ?? []; list.push(r); dateMap.set(key, list);
   }
 
   // Ensure today is at least present in keys if there are recordings
   const dateKeysSet = new Set(dateMap.keys());
-  if (recordings.length > 0) {
+  if (items.length > 0) {
     dateKeysSet.add(todayKey);
   }
 
@@ -117,7 +119,7 @@ export default function TimeSliderStrip({
 
           // Extract distinct categories present on this day
           const categories = new Set(
-            list.map((r) => latest(r)?.intent_type?.toLowerCase() ?? "voice"),
+            list.map((r) => journalIntent(r)?.toLowerCase() ?? "voice"),
           );
 
           return (
@@ -157,6 +159,7 @@ export default function TimeSliderStrip({
                   {categories.has("travel") && <span className="dot dot-travel" />}
                   {categories.has("workout") && <span className="dot dot-workout" />}
                   {categories.has("memo") && <span className="dot dot-memo" />}
+                  {categories.has("stay") && <span className="dot dot-stay" />}
                   {categories.has("voice") && !categories.has("expense") && !categories.has("travel") && (
                     <span className="dot dot-voice" />
                   )}

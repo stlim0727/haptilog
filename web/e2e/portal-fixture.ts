@@ -103,7 +103,12 @@ export async function fixture(
     const req = route.request(),
       path = new URL(req.url()).pathname;
     let body: unknown;
-    if (path.endsWith("/signup")) body = activeSession;
+    if (path.endsWith("/location_stays")) body = {
+      protocol_version: 1,
+      state: { consent_enabled: false, consent_revision: 0, sync_epoch: 0, upload_cutoff: null, places_revision: 0, applied_places_revision: 0, threshold_minutes: 10 },
+      places: [], stays: [], deleted_ids: [],
+    };
+    else if (path.endsWith("/signup")) body = activeSession;
     else if (path.endsWith("/user")) body = activeSession.user;
     else if (path.endsWith("/notion-export")) {
       body = { configured: false, connected: false, target: null, exports: [] };

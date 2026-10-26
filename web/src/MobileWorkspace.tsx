@@ -40,6 +40,9 @@ import {
   processingState,
 } from "./domain";
 import type { Recording } from "./domain";
+import { JournalStayCard } from "./JournalStayCard";
+import { journalDates, journalLocated, voiceItem } from "./journal";
+import type { JournalItem } from "./journal";
 import type { Language, TranslationKeys } from "./i18n";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
@@ -62,6 +65,11 @@ class MobileMapBoundary extends React.Component<
 type Props = {
   records: Recording[];
   filtered: Recording[];
+  items: JournalItem[];
+  filteredItems: JournalItem[];
+  stayEmptyMessage: string;
+  locationLoaded: boolean;
+  renderStay: (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording?: (recording: Recording) => void) => React.ReactNode;
   loaded: boolean;
   truncated: boolean;
   date: string;
@@ -73,6 +81,8 @@ type Props = {
   summary: { grouped: Record<string, number>; incomplete: number };
   count: number;
   seconds: number;
+  stayMinutes: number;
+  now: number;
   lastChecked: Date | null;
   lang: Language;
   t: TranslationKeys;
@@ -94,10 +104,11 @@ type Props = {
 
 export function MobileWorkspace(p: Props) {
   const { t, lang, filtered, records } = p;
+  const entries = p.filteredItems;
   const ko = lang === "ko";
   const [view, setView] = useState<View>("list");
   const [detailId, setDetailId] = useState<string | null>(() =>
-    new URL(location.href).searchParams.get("recording")
+    (new URL(location.href).searchParams.get("recording") ?? new URL(location.href).searchParams.get("stay"))
   );
   const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
   const [mapSelected, setMapSelected] = useState<string | null>(null);
@@ -125,20 +136,22 @@ export function MobileWorkspace(p: Props) {
     : "Discard unsaved changes and go back?";
   const discardMessageRef = useRef(discardMessage);
   discardMessageRef.current = discardMessage;
-  const detail = records.find((r) => r.id === detailId);
+  const detail = p.items.find((r) => r.id === detailId);
   const isTrash = p.category === "Trash";
   const categories = [
     ["All", t.all_cat],
+    ["Voice", ko ? "음성" : "Voice"],
+    ["Stay", ko ? "체류" : "Stays"],
     ["Expense", t.expense_cat],
     ["Travel", t.travel_cat],
     ["Workout", t.workout_cat],
     ["Memo", t.memo_cat],
   ];
-  const located = filtered.filter(hasLocation);
+  const located = entries.filter(journalLocated);
   // Coordinates a short walk apart are the same stop, so the place list shows
   // one counted group per place the way the map shows one pin per group.
   const places = clusterPlaces(located);
-  const groupKey = (group: MapCluster<Recording>) => group.members.reduce(
+  const groupKey = (group: MapCluster<JournalItem>) => group.members.reduce(
     (lowest, member) => (member.id < lowest ? member.id : lowest),
     group.members[0].id,
   );
@@ -182,7 +195,7 @@ export function MobileWorkspace(p: Props) {
       dirty.current = false;
       p.onDraftChange(false);
       historyIndex.current = nextIndex;
-      const id = new URL(location.href).searchParams.get("recording");
+      const id = (new URL(location.href).searchParams.get("recording") ?? new URL(location.href).searchParams.get("stay"));
       setDetailId(id);
     };
     const unload = (event: BeforeUnloadEvent) => {
@@ -228,12 +241,14 @@ export function MobileWorkspace(p: Props) {
     p.onDraftChange(false);
     const url = new URL(location.href);
     url.searchParams.delete("recording");
+    url.searchParams.delete("stay");
     history.replaceState({ ...history.state, mobileDetail: false }, "", url);
     setDetailId(null);
   }
-  function openDetail(r: Recording) {
-    returnPosition.current = { y: window.scrollY, id: r.id };
+  function openDetail(r: JournalItem) {
+    if (!detailId) returnPosition.current = { y: window.scrollY, id: r.id };
     const url = new URL(location.href);
+    url.searchParams.delete("stay");
     url.searchParams.set("recording", r.id);
     historyIndex.current++;
     history.pushState(
@@ -250,13 +265,13 @@ export function MobileWorkspace(p: Props) {
   // A deleted/removed record must never silently switch the detail to another one.
   useEffect(() => {
     if (
-      p.loaded && detailId && (!detail || (!!detail.deleted_at !== isTrash))
+      (p.loaded && p.locationLoaded) && detailId && (!detail || ((detail.kind === "voice" && !!detail.recording.deleted_at) !== isTrash))
     ) {
       dirty.current = false;
       p.onDraftChange(false);
       closeDetail();
     }
-  }, [p.loaded, detailId, detail?.deleted_at, isTrash, !!detail]);
+  }, [p.loaded, p.locationLoaded, detailId, detail?.kind === "voice" ? detail.recording.deleted_at : null, isTrash, !!detail]);
 
   useEffect(() => {
     if (notionOpen) {
@@ -297,7 +312,9 @@ export function MobileWorkspace(p: Props) {
     setView("list");
     window.scrollTo(0, 0);
   }
-  function card(r: Recording) {
+  function card(item: JournalItem) {
+    if (item.kind === "stay") return <JournalStayCard key={`stay:${item.id}`} item={item} lang={lang} now={p.now} mobile onSelect={() => openDetail(item)} />;
+    const r = item.recording;
     const e = latest(r), cost = expense(r), state = processingState(r);
     const category =
       categories.find(([key]) => key.toUpperCase() === e?.intent_type)?.[1] ??
@@ -308,7 +325,8 @@ export function MobileWorkspace(p: Props) {
         className="mobile-record"
         key={r.id}
         data-record-id={r.id}
-        onClick={() => openDetail(r)}
+        data-journal-kind="voice"
+        onClick={() => openDetail(item)}
       >
         <span className="mobile-record-meta">
           <time>
@@ -351,7 +369,7 @@ export function MobileWorkspace(p: Props) {
       </button>
     );
   }
-  const days = [...new Set(filtered.map((r) => localDate(r.recorded_at)))];
+  const days = [...new Set(entries.flatMap(journalDates))].sort().reverse();
   return (
     <div className="mobile-workspace">
       <div hidden={!!detailId}>
@@ -392,10 +410,10 @@ export function MobileWorkspace(p: Props) {
           <div className="mobile-heading">
             <div>
               <span className="eyebrow">
-                {ko ? "나의 목소리로 남긴 순간" : "YOUR VOICE, REMEMBERED."}
+                {ko ? "음성과 머문 장소를 한곳에" : "YOUR VOICE AND PLACES, TOGETHER."}
               </span>
               <h1 ref={title} tabIndex={-1}>
-                {isTrash ? t.trash : (ko ? "내가 남긴 순간들" : "Your moments")}
+                {isTrash ? t.trash : (ko ? "기록" : "Journal")}
               </h1>
             </div>
             <button
@@ -417,7 +435,7 @@ export function MobileWorkspace(p: Props) {
                   onClick={() => p.setCategory("All")}
                 >
                   <ArrowLeft size={16} />
-                  {ko ? "전체 기록" : "All recordings"}
+                  {ko ? "전체 기록" : "Journal"}
                 </button>
                 {filtered.length > 0 && (
                   <button className="text-button" onClick={p.emptyTrash}>
@@ -453,10 +471,10 @@ export function MobileWorkspace(p: Props) {
                 </div>
                 <div className="mobile-summary">
                   <span>
-                    {ko ? `기록 ${p.count}개` : `${p.count} recordings`} ·{" "}
+                    {ko ? `기록 ${p.count}개` : `${p.count} records`} ·{" "}
                     {Math.floor(p.seconds / 60)}
                     {ko ? "분" : "m"} {p.seconds % 60}
-                    {ko ? "초" : "s"}
+                    {ko ? "초 음성" : "s voice"} · {p.stayMinutes}{ko ? "분 확인된 체류" : " min stays observed"}
                   </span>
                   <span>
                     {Object.entries(p.summary.grouped).map((
@@ -499,11 +517,11 @@ export function MobileWorkspace(p: Props) {
             <label className="mobile-search">
               <Search size={18} />
               <span className="sr-only">
-                {ko ? "기록 검색" : "Search transcripts"}
+                {ko ? "기록 검색" : "Search journal"}
               </span>
               <input
                 type="search"
-                placeholder={t.search_placeholder}
+                placeholder={ko ? "음성·장소 검색" : "Search voice and places"}
                 value={p.search}
                 onChange={(e) => p.setSearch(e.target.value)}
               />
@@ -537,7 +555,7 @@ export function MobileWorkspace(p: Props) {
           {p.truncated && <p className="limit-note">{t.showing_limit_note}</p>}
           {!p.loaded ? <p role="status">{t.finding_moments}</p> : (
             <>
-              {view === "list" && (filtered.length
+              {view === "list" && (entries.length
                 ? days.map((day) => (
                   <section key={day}>
                     <h2 className="mobile-day-heading">
@@ -547,27 +565,25 @@ export function MobileWorkspace(p: Props) {
                         weekday: "short",
                       })}
                       <span>
-                        {filtered.filter((r) =>
-                          localDate(r.recorded_at) === day
-                        ).length}
+                        {entries.filter((r) => journalDates(r).includes(day)).length}
                         {ko ? "개" : " records"}
                       </span>
                     </h2>
-                    {filtered.filter((r) => localDate(r.recorded_at) === day)
+                    {entries.filter((r) => journalDates(r).includes(day))
                       .map(card)}
                   </section>
                 ))
                 : (
                   <div className="mobile-empty">
                     <h2>
-                      {isTrash
+                      {p.category === "Stay" ? (ko ? "체류" : "Stays") : isTrash
                         ? t.empty_trash_title
                         : records.length
                         ? t.empty_active_title
                         : t.empty_first_title}
                     </h2>
                     <p>
-                      {isTrash
+                      {p.category === "Stay" ? p.stayEmptyMessage : isTrash
                         ? t.empty_trash_desc
                         : records.length
                         ? t.empty_active_desc
@@ -578,9 +594,10 @@ export function MobileWorkspace(p: Props) {
               {view === "calendar" && (
                 <CalendarView
                   recordings={filtered}
+                  journalItems={entries}
                   selectedId={detailId}
                   onSelect={(id) => {
-                    const r = records.find((r) => r.id === id);
+                    const r = p.items.find((r) => r.id === id);
                     if (r) openDetail(r);
                   }}
                   t={t}
@@ -603,6 +620,7 @@ export function MobileWorkspace(p: Props) {
                       <RecordingMap
                         heading={t.map_heading}
                         recordings={filtered}
+                  journalItems={entries}
                         selectedId={mapSelected}
                         groupIds={selectedPlace
                           ? placeRecords.map((r) => r.id)
@@ -610,7 +628,7 @@ export function MobileWorkspace(p: Props) {
                         showRoute={false}
                         lang={lang}
                         onSelect={(id, reveal) => {
-                          const r = records.find((r) => r.id === id);
+                          const r = p.items.find((r) => r.id === id);
                           if (!r) {
                             return;
                           }
@@ -706,7 +724,7 @@ export function MobileWorkspace(p: Props) {
           <div className="mobile-detail-nav">
             <button onClick={closeDetail}>
               <ArrowLeft size={18} />
-              {ko ? "돌아가기" : "Back to recordings"}
+              {ko ? "돌아가기" : "Back to journal"}
             </button>
           </div>
           <div
@@ -715,7 +733,7 @@ export function MobileWorkspace(p: Props) {
             className="inspector"
             aria-label={ko ? "기록 상세" : "Recording details"}
           >
-            {detail ? p.renderInspector(detail, onDirtyChange) : (
+            {detail ? (detail.kind === "stay" ? p.renderStay(detail, recording => openDetail(voiceItem(recording))) : p.renderInspector(detail.recording, onDirtyChange)) : (
               <p>
                 {ko ? "기록을 찾을 수 없어요." : "Recording unavailable."}
               </p>
@@ -759,7 +777,7 @@ export function MobileWorkspace(p: Props) {
           }}
         >
           <ArrowDownToLine size={18} />
-          {t.export_csv}
+          {ko ? "음성 CSV" : "Voice CSV"}
         </button>
         <button
           onClick={() => {
@@ -769,7 +787,7 @@ export function MobileWorkspace(p: Props) {
           }}
         >
           <FileText size={18} />
-          {ko ? "Notion으로 내보내기" : "Export to Notion"}
+          {ko ? "음성을 Notion으로 내보내기" : "Export voice to Notion"}
         </button>
         <button
           disabled={p.busy}

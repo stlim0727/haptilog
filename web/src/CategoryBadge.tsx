@@ -3,6 +3,7 @@ import {
   FileText,
   Luggage,
   Mic,
+  MapPin,
   Receipt,
 } from "lucide-react";
 
@@ -15,6 +16,8 @@ export function CategoryBadge({
 }) {
   const norm = type?.toUpperCase();
   switch (norm) {
+    case "STAY":
+      return <span className="category category-stay"><MapPin size={size} /> 체류 · STAY</span>;
     case "EXPENSE":
       return (
         <span className="category category-expense">
@@ -57,6 +60,8 @@ export function CategoryIcon({
 }) {
   const norm = type?.toUpperCase();
   switch (norm) {
+    case "STAY":
+      return <MapPin size={size} />;
     case "EXPENSE":
       return <Receipt size={size} />;
     case "TRAVEL":

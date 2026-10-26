@@ -2,14 +2,21 @@
     <string name="location_sync_title">Places and stay sync</string>
     <string name="location_sync_disclosure">Optional and separate from audio sync. Uploads stay times, representative coordinates, accuracy and named places to Supabase. No movement trail or audio is included, and nothing is sent to Gemini. Stays expire after 7 days; saved places remain until deleted. Tracking still requires an explicit start.</string>
     <string name="location_sync_places_disclosure">First enable imports saved watch places. While enabled, manage places and the shared stay threshold in the web portal. Later enables apply cloud settings, replacing local place settings. Changes apply between tracking sessions. Turning off stops future uploads; existing cloud data must be deleted separately in the portal. Privacy: haptilog.keepory.app/privacy.html</string>
-    <string name="location_sync_on">Location sync enabled</string>
-    <string name="location_sync_off">Location sync disabled</string>
+    <string name="location_sync_on">Web sync on</string>
+    <string name="location_sync_off">Web sync off · saved on watch</string>
     <string name="location_sync_withdrawal">Uploads stopped. Server withdrawal is waiting for a connection. Wait for completion before enabling again.</string>
     <string name="location_sync_error">Could not complete sync settings. Check your connection and review cloud places before retrying.</string>
-    <string name="location_sync_stop_first">Stop the location journal before enabling sync.</string>
     <string name="location_sync_backfill_on">Include retained stays from the past 7 days: yes</string>
     <string name="location_sync_backfill_off">Include retained stays from the past 7 days: no</string>
-    <string name="location_sync_agree">Agree and enable location sync</string>
-    <string name="location_sync_disable">Disable location sync</string>
+    <string name="location_sync_agree">Agree and sync to web</string>
+    <string name="location_sync_disable">Turn off web sync</string>
     <string name="location_sync_busy">Connecting…</string>
+    <string name="location_sync_setup">Sync to web</string>
+    <string name="location_sync_summary">Sync places, stay times and representative locations to the web. Movement trails stay on your watch. Stays are kept for 7 days. You can keep recording while enabling sync.</string>
+    <string name="location_sync_details">Sync details</string>
+    <string name="location_sync_details_hide">Hide sync details</string>
+    <string name="location_sync_cancel">Keep on watch only</string>
+    <string name="location_sync_next_session">Web place settings apply to your next recording session. Collection continues now.</string>
+    <string name="location_sync_unavailable">Web sync is unavailable in this build. You can still record stays on this watch.</string>
+    <string name="location_sync_backfill_current">Include previous stays to show a stay that has already started.</string>
 </resources>

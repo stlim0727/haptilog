@@ -7,12 +7,15 @@ import {
   Clock,
 } from "lucide-react";
 import { CategoryBadge } from "./CategoryBadge";
-import { expense, hasLocation, latest, localDate, money, toLocalDateString } from "./domain";
+import { money, toLocalDateString } from "./domain";
 import type { Recording } from "./domain";
+import { voiceItem, journalDates, journalTitle, journalIntent, journalExpense, journalDuration, journalLocated } from "./journal";
+import type { JournalItem } from "./journal";
 import type { TranslationKeys } from "./i18n";
 
 export default function CalendarView({
   recordings,
+  journalItems,
   selectedId,
   onSelect,
   t,
@@ -24,6 +27,7 @@ export default function CalendarView({
   onDateChange?: () => boolean | void;
   onSelectedDateChange?: (dateKey: string) => void;
   recordings: Recording[];
+  journalItems?: JournalItem[];
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
   t: TranslationKeys;
@@ -38,13 +42,11 @@ export default function CalendarView({
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth(); // 0-indexed
 
-  // Map of dateKey -> recordings
-  const dateMap = new Map<string, Recording[]>();
-  for (const r of recordings) {
-    const key = localDate(r.recorded_at);
-    const list = dateMap.get(key) ?? [];
-    list.push(r);
-    dateMap.set(key, list);
+  const items = journalItems ?? recordings.map(voiceItem);
+  // One original stay appears on each observed local date.
+  const dateMap = new Map<string, JournalItem[]>();
+  for (const r of items) for (const key of journalDates(r)) {
+    const list = dateMap.get(key) ?? []; list.push(r); dateMap.set(key, list);
   }
 
   // Days in month calculation
@@ -158,7 +160,7 @@ export default function CalendarView({
 
             // Extract distinct category types on this day
             const categories = new Set(
-              list.map((r) => latest(r)?.intent_type?.toLowerCase() ?? "voice"),
+              list.map((r) => journalIntent(r)?.toLowerCase() ?? "voice"),
             );
 
             return (
@@ -189,6 +191,7 @@ export default function CalendarView({
                   {categories.has("travel") && <span className="cat-dot dot-travel" title="여행" />}
                   {categories.has("workout") && <span className="cat-dot dot-workout" title="운동" />}
                   {categories.has("memo") && <span className="cat-dot dot-memo" title="메모" />}
+                  {categories.has("stay") && <span className="cat-dot dot-stay" title={lang === "ko" ? "체류" : "Stay"} />}
                   {categories.has("voice") && <span className="cat-dot dot-voice" title="음성" />}
                 </div>
               </button>
@@ -208,16 +211,16 @@ export default function CalendarView({
         {selectedDayRecordings.length === 0 ? (
           <div className="calendar-empty-day">
             <p>{t.no_recordings_on_date}</p>
-            {recordings.length > 0 && <button className="text-button" onClick={() => {
-              const key = recordings.map(r => localDate(r.recorded_at)).sort().at(-1)!;
+            {items.length > 0 && <button className="text-button" onClick={() => {
+              const key = items.flatMap(journalDates).sort().at(-1)!;
               selectDate(new Date(`${key}T12:00:00`));
             }}>{lang === "ko" ? "최근 기록 날짜로 이동" : "Go to latest recording date"}</button>}
           </div>
         ) : (
           <div className="calendar-day-list">
             {selectedDayRecordings.map((r) => {
-              const e = latest(r);
-              const cost = expense(r);
+              const intent = journalIntent(r);
+              const cost = journalExpense(r);
               const isSelected = r.id === selectedId;
 
               return (
@@ -225,6 +228,7 @@ export default function CalendarView({
                   type="button"
                   key={r.id}
                   data-record-id={r.id}
+                  data-journal-kind={r.kind}
                   className={`calendar-day-card ${isSelected ? "selected" : ""}`}
                   onClick={() => onSelect(r.id, true)}
                 >
@@ -236,11 +240,11 @@ export default function CalendarView({
                         minute: "2-digit",
                       })}
                     </span>
-                    <CategoryBadge type={e?.intent_type} size={11} />
+                    <CategoryBadge type={intent} size={11} />
                   </div>
 
                   <strong className="calendar-card-title">
-                    {e?.summary || "Voice recording"}
+                    {journalTitle(r, lang)}
                   </strong>
 
                   {cost && cost.amount != null && cost.currency && (
@@ -250,8 +254,8 @@ export default function CalendarView({
                   )}
 
                   <div className="calendar-card-footer">
-                    <span>{r.duration_seconds}s</span>
-                    {hasLocation(r) ? (
+                    <span>{journalDuration(r, lang)}</span>
+                    {journalLocated(r) ? (
                       <span className="gps-pill">
                         <MapPin size={11} /> {t.gps_badge}
                       </span>

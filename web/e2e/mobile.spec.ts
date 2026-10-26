@@ -74,7 +74,7 @@ test("mobile detail restores filters, nonzero scroll, and focus with browser Bac
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await page.getByLabel("Category", { exact: true }).selectOption("Expense");
   await page.getByRole("button", { name: "Apply filter" }).click();
-  await page.getByRole("searchbox", { name: "Search transcripts" }).fill(
+  await page.getByRole("searchbox", { name: "Search journal" }).fill(
     "Coffee",
   );
   const card = page.locator('.mobile-record[data-record-id="mobile-15"]');
@@ -92,7 +92,7 @@ test("mobile detail restores filters, nonzero scroll, and focus with browser Bac
   await expect(page.locator(".mobile-active-filter")).toContainText("Expense");
   await page.goForward();
   await expect(page.locator(".mobile-detail")).toBeVisible();
-  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.getByRole("button", { name: "Back to journal" }).click();
   await expect(card).toBeFocused();
 });
 
@@ -110,7 +110,7 @@ test("mobile calendar has keyboard dates, no unrelated detail, and preserves sel
   await expect(day).toHaveAttribute("aria-pressed", "true");
   await page.locator(".calendar-day-card").click();
   await expect(page.locator(".mobile-detail")).toBeVisible();
-  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.getByRole("button", { name: "Back to journal" }).click();
   await expect(page.locator(".calendar-day-card")).toBeFocused();
   await expect(day).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", {
@@ -298,12 +298,12 @@ test("mobile unsaved transcript warns on Back and cancellation preserves edits",
   );
   page.removeAllListeners("dialog");
   page.once("dialog", (dialog) => dialog.dismiss());
-  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.getByRole("button", { name: "Back to journal" }).click();
   await expect(page.getByRole("textbox", { name: "Transcript", exact: true }))
     .toHaveValue("Unsaved mobile text");
   await expect(page).toHaveURL(/recording=/);
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.getByRole("button", { name: "Back to journal" }).click();
   await expect(page.locator(".mobile-record")).toBeVisible();
   await expect(page.locator(".mobile-detail")).toHaveCount(0);
 });
@@ -321,7 +321,7 @@ test("mobile trash, restore, and disconnect remain available from the menu", asy
   await page.locator(".mobile-record").click();
   await page.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(page.locator(".mobile-detail")).toHaveCount(0);
-  await page.getByRole("button", { name: "All recordings" }).click();
+  await page.getByRole("button", { name: "Journal", exact: true }).click();
   await expect(page.locator(".mobile-record")).toBeVisible();
   await page.getByRole("button", { name: "More options" }).click();
   await page.getByRole("button", { name: "Disconnect browser", exact: true })
@@ -352,7 +352,7 @@ test("mobile drafts survive rotation and saved edits reload in detail", async ({
     path: "test-results/mobile-detail.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await page.getByRole("button", { name: "Back to journal" }).click();
   await expect(page.locator(".mobile-record")).toBeVisible();
 });
 
@@ -495,7 +495,7 @@ test("compact detail keeps provenance folded and downloads from keyboard-accessi
   await page.reload();
   for (const lang of ["en", "ko"]) {
     if (lang === "ko") {
-      await page.getByRole("button", { name: "Back to recordings" }).click();
+      await page.getByRole("button", { name: "Back to journal" }).click();
       await page.getByRole("button", { name: "Toggle language" }).click();
       await page.locator(".mobile-record").click();
     }

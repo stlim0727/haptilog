@@ -29,7 +29,7 @@ test("pairs through code only and restores browser connection after reload", asy
   await page.getByLabel("Access code").fill("123456");
   await page.getByRole("button", { name: "Connect my watch" }).click();
   await expect(
-    page.getByRole("heading", { name: "A day, in your own words." }),
+    page.getByRole("heading", { name: "Journal", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
   await page.reload();
@@ -45,7 +45,7 @@ test("correction persists through refresh and changes totals and CSV", async ({ 
   await page.reload();
   await expect(page.getByLabel("Amount", { exact: true })).toHaveValue("4500");
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export CSV" }).click();
+  await page.getByRole("button", { name: "Voice CSV" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^haptilog-.*\.csv$/);
 });

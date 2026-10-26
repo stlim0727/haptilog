@@ -2,14 +2,21 @@
     <string name="location_sync_title">장소·체류 동기화</string>
     <string name="location_sync_disclosure">음성 동기화와 별도인 선택 기능입니다. 체류 시각·대표 좌표·정확도·저장한 장소를 Supabase에 전송합니다. 이동 경로·음성은 포함하지 않으며 Gemini에도 보내지 않습니다. 체류는 7일 후 만료되고 저장한 장소는 삭제할 때까지 유지됩니다. 위치 수집은 직접 시작해야 합니다.</string>
     <string name="location_sync_places_disclosure">처음 켜면 워치의 저장한 장소를 가져옵니다. 켜져 있는 동안 장소와 공통 체류 시간은 웹에서 관리합니다. 다시 켜면 클라우드 설정으로 로컬 장소 설정을 교체합니다. 변경은 추적 세션 사이에 적용합니다. 끄면 이후 업로드를 중단하며 기존 클라우드 기록은 웹에서 별도로 삭제해야 합니다. 개인정보 안내: haptilog.keepory.app/privacy.html</string>
-    <string name="location_sync_on">위치 동기화 켜짐</string>
-    <string name="location_sync_off">위치 동기화 꺼짐</string>
+    <string name="location_sync_on">웹 동기화 켜짐</string>
+    <string name="location_sync_off">웹 동기화 꺼짐 · 워치에 보관</string>
     <string name="location_sync_withdrawal">업로드를 중단했습니다. 연결되면 서버 동의를 철회합니다. 완료 후 다시 켤 수 있습니다.</string>
     <string name="location_sync_error">설정을 완료하지 못했습니다. 연결과 웹의 저장한 장소를 확인한 뒤 다시 시도하세요.</string>
-    <string name="location_sync_stop_first">동기화를 켜기 전에 위치 기록을 중지하세요.</string>
     <string name="location_sync_backfill_on">지난 7일의 남아 있는 체류 포함: 예</string>
     <string name="location_sync_backfill_off">지난 7일의 남아 있는 체류 포함: 아니요</string>
-    <string name="location_sync_agree">동의하고 위치 동기화 켜기</string>
-    <string name="location_sync_disable">위치 동기화 끄기</string>
+    <string name="location_sync_agree">동의하고 웹에 동기화</string>
+    <string name="location_sync_disable">웹 동기화 끄기</string>
     <string name="location_sync_busy">연결 중…</string>
+    <string name="location_sync_setup">웹에 동기화</string>
+    <string name="location_sync_summary">장소·체류 시각·대표 위치를 웹에 동기화합니다. 이동 경로는 워치에만 남고 체류는 7일 보관됩니다. 수집 중에도 동기화를 켤 수 있습니다.</string>
+    <string name="location_sync_details">동기화 자세히 보기</string>
+    <string name="location_sync_details_hide">자세한 안내 접기</string>
+    <string name="location_sync_cancel">워치에만 보관</string>
+    <string name="location_sync_next_session">웹의 장소 설정은 다음 위치 기록부터 적용됩니다. 현재 수집은 계속됩니다.</string>
+    <string name="location_sync_unavailable">이 버전에서는 웹 동기화를 사용할 수 없습니다. 워치에서 체류 기록은 가능합니다.</string>
+    <string name="location_sync_backfill_current">이미 시작한 체류를 웹에 표시하려면 이전 체류 포함을 켜세요.</string>
 </resources>

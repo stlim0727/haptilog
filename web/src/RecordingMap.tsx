@@ -1,27 +1,32 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { hasLocation, latest } from "./domain";
+import { journalLocated, journalTitle, voiceItem } from "./journal";
+import type { JournalItem } from "./journal";
 import { CLUSTER_MAX_ZOOM, clusterLocations } from "./mapClustering";
 import type { Recording } from "./domain";
 
 export default function RecordingMap({
   recordings,
+  journalItems,
   selectedId,
   groupIds,
   onSelect,
   className,
   showRoute = true,
+  showSelectionSummary = true,
   lang = "en",
   heading,
 }: {
   recordings: Recording[];
+  journalItems?: JournalItem[];
   selectedId: string | null;
   /** Recordings of the place the user chose; every other pin is dimmed. */
   groupIds?: string[];
   onSelect: (id: string, revealDetails?: boolean) => void;
   className?: string;
   showRoute?: boolean;
+  showSelectionSummary?: boolean;
   lang?: "ko" | "en";
   heading?: string;
 }) {
@@ -56,7 +61,9 @@ export default function RecordingMap({
   const shortDate = (value: string) => new Date(value).toLocaleString(locale, {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
-  const located = recordings.filter(hasLocation);
+  const items = journalItems ?? recordings.map(voiceItem);
+  const hasStays = items.some(item => item.kind === "stay");
+  const located = items.filter(journalLocated);
 
   // Refreshing identical data must not reset a user's pan/zoom every 15 seconds.
   const locations = JSON.stringify(
@@ -64,7 +71,7 @@ export default function RecordingMap({
   );
   const markerData = JSON.stringify(
     located.map(
-      (r) => [r.id, r.latitude, r.longitude, r.recorded_at, latest(r)?.summary],
+      (r) => [r.id, r.latitude, r.longitude, r.recorded_at, journalTitle(r, lang)],
     ),
   );
   const groupSignature = groupIds?.join(",") ?? "";
@@ -142,7 +149,7 @@ export default function RecordingMap({
     const zoom = instance.getZoom();
 
     // Connect sequential GPS records with a coral route line
-    if (showRoute && located.length > 1) {
+    if (showRoute && located.length > 1 && located.every(item => item.kind === "voice")) {
       const sorted = [...located].sort(
         (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime(),
       );
@@ -197,7 +204,7 @@ export default function RecordingMap({
         const time = document.createElement("small");
         time.textContent = shortDate(r.recorded_at);
         const summary = document.createElement("span");
-        summary.textContent = latest(r)?.summary || (lang === "ko" ? "음성 기록" : "Voice recording");
+        summary.textContent = journalTitle(r, lang) || (lang === "ko" ? "음성 기록" : "Voice recording");
         button.append(time, summary);
         button.addEventListener("click", () => selection.current(r.id, true));
         popup.appendChild(button);
@@ -291,7 +298,7 @@ export default function RecordingMap({
   return (
     <>
       <div className="map-view-toolbar">
-        <h2>{heading ?? (lang === "ko" ? "기록이 남은 장소" : "Your voices, by place.")}</h2>
+        <h2>{hasStays ? (lang === "ko" ? "기록 지도" : "Journal map") : heading ?? (lang === "ko" ? "기록이 남은 장소" : "Your voices, by place.")}</h2>
         <button type="button" className="map-show-all" disabled={!located.length} onClick={showAll}>
           {lang === "ko" ? "전체 보기" : "Show all locations"}
         </button>
@@ -301,14 +308,14 @@ export default function RecordingMap({
           ref={container}
           className={`recording-map ${className ?? ""}`}
           role="region"
-          aria-label="Map of recording locations"
+          aria-label={hasStays ? (lang === "ko" ? "음성과 체류의 위치 지도" : "Map of voice and stay locations") : "Map of recording locations"}
         />
       ) : (
         <p className="map-empty">
           {lang === "ko" ? "선택한 기록에 저장된 위치가 없어요. 위치 없는 기록도 목록에서 볼 수 있어요." : "No saved locations in this selection. Recordings without GPS are still available in the list."}
         </p>
       )}
-      {mobile && active && dismissedId !== active.id && (
+      {showSelectionSummary && mobile && active && dismissedId !== active.id && (
         <div className="map-selection-card" onKeyDown={(event) => {
           if (event.key === "Escape") {
             setDismissedId(active.id);
@@ -316,15 +323,15 @@ export default function RecordingMap({
           }
         }} aria-label={lang === "ko" ? "선택한 기록" : "Selected recording"}>
           <button className="map-selection-detail" onClick={() => onSelect(active.id, true)}>
-            <small>{shortDate(active.recorded_at)}{placeCount > 1 ? ` · ${lang === "ko" ? `이 장소 기록 ${placeCount}개` : `${placeCount} recordings here`}` : ""}</small>
-            <strong>{latest(active)?.summary || (lang === "ko" ? "음성 기록" : "Voice recording")}</strong>
+            <small>{shortDate(active.recorded_at)}{placeCount > 1 ? ` · ${lang === "ko" ? `이 장소 기록 ${placeCount}개` : `${placeCount} ${hasStays ? "records" : "recordings"} here`}` : ""}</small>
+            <strong>{journalTitle(active, lang) || (lang === "ko" ? "음성 기록" : "Voice recording")}</strong>
             <span>{lang === "ko" ? "상세 보기 →" : "View details →"}</span>
           </button>
           <button className="map-selection-close" aria-label={lang === "ko" ? "요약 닫기" : "Dismiss summary"} onClick={() => setDismissedId(active.id)}>×</button>
         </div>
       )}
       <p className="map-caption">
-        {lang === "ko" ? `${recordings.length}개 중 ${located.length}개 기록에 위치가 저장되어 있어요. 지도는 OpenStreetMap에서 불러오며 음성과 텍스트는 지도 제공자에게 보내지 않아요.` : `${located.length} of ${recordings.length} recordings have a saved location. Others remain in the list. Map tiles load from OpenStreetMap. No recording audio or text is sent to the map provider.`}
+        {lang === "ko" ? `${items.length}개 중 ${located.length}개 기록에 위치가 저장되어 있어요. 지도는 OpenStreetMap에서 불러오며 음성과 텍스트는 지도 제공자에게 보내지 않아요.` : `${located.length} of ${items.length} ${hasStays ? "records" : "recordings"} have a saved location. Others remain in the list. Map tiles load from OpenStreetMap. No recording audio or text is sent to the map provider.`}
       </p>
       {tileError && (
         <p role="status" className="map-caption">
