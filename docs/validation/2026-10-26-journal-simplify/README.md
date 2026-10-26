@@ -47,6 +47,6 @@ The three inline review findings were repaired after the original emulator pass:
 - The worker obtains one complete post-import snapshot before applying/acknowledging settings, keeping its revision and place contents coherent.
 - Pending withdrawals stored as `revoke_pending` are translated before the new off-and-idle guards; failed withdrawals retain the pending work.
 
-Three regression tests cover partial-import retry, coherent first-import application/acknowledgement, and old-marker withdrawal through a network failure. After isolating the in-process repository between tests, all 150 unit tests, `lintDebug` and `assembleDebug` passed locally.
+Four regression tests cover partial-import retry, retrying a failed threshold write after places already reached the cloud, coherent first-import application/acknowledgement, and old-marker withdrawal through a network failure. After isolating the in-process repository between tests, all 151 unit tests, `lintDebug` and `assembleDebug` passed locally.
 
 This validates the correctness fixes, not selection of this PR's shared audio/location consent policy. The independent-consent consolidated alternative is #84; this branch remains a draft pending the cross-PR decision. No production merge or live data upload was performed for this follow-up.

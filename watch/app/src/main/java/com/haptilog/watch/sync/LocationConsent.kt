@@ -57,6 +57,14 @@ object LocationConsent {
     private fun importPlaces(context: Context, client: LocationSyncClient, state: JSONObject,
                              remotePlaces: JSONArray): JSONObject {
         val history = LocationHistoryRepository.get(context).state.value
+        val prefs = preferences(context)
+        // Persist the bootstrap decision before any remote write: after a failed import the
+        // cloud may no longer be empty, but its original local threshold still needs sending.
+        if (!prefs.contains("import_threshold_minutes")) {
+            check(prefs.edit().putInt("import_threshold_minutes",
+                if (remotePlaces.length() == 0) history.dwellMinutes else -1).commit())
+        }
+        val threshold = prefs.getInt("import_threshold_minutes", -1)
         val remoteIds = (0 until remotePlaces.length()).map { remotePlaces.getJSONObject(it).getString("id") }.toSet()
         var next = state
         for (place in history.places.filterNot { it.id in remoteIds }) {
@@ -65,11 +73,11 @@ object LocationConsent {
                 .put("longitude", place.longitude).put("radius_meters", place.radiusMeters)).getJSONObject("state")
         }
         // A brand-new cloud collection inherits the threshold the watch already worked to.
-        if (remotePlaces.length() == 0 && next.getInt("threshold_minutes") != history.dwellMinutes) {
+        if (threshold > 0 && next.getInt("threshold_minutes") != threshold) {
             next = client.call("set_threshold", JSONObject().put("expected_revision", next.getLong("places_revision"))
-                .put("threshold_minutes", history.dwellMinutes)).getJSONObject("state")
+                .put("threshold_minutes", threshold)).getJSONObject("state")
         }
-        check(preferences(context).edit().putBoolean("places_imported", true).commit())
+        check(prefs.edit().putBoolean("places_imported", true).remove("import_threshold_minutes").commit())
         return next
     }
 }

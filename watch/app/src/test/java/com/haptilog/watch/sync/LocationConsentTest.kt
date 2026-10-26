@@ -25,6 +25,7 @@ class LocationConsentTest {
         var failPutNumber: Int? = null
         var puts = 0
         var failNextConsent = false
+        var failNextThreshold = false
         fun client() = LocationSyncClient(object : CloudApi {
             override fun authenticate() = "token" to "owner-uuid"
             override fun request(path: String, method: String, body: ByteArray?, token: String?,
@@ -45,7 +46,11 @@ class LocationConsentTest {
                         places.put(payload)
                         placesRevision++
                     }
-                    "set_threshold" -> thresholdMinutes = payload.getInt("threshold_minutes")
+                    "set_threshold" -> {
+                        if (failNextThreshold) { failNextThreshold = false; error("Interrupted threshold import") }
+                        thresholdMinutes = payload.getInt("threshold_minutes")
+                        placesRevision++
+                    }
                 }
                 return JSONObject().put("protocol_version", 1)
                     .put("state", state())
@@ -164,12 +169,28 @@ class LocationConsentTest {
         val before = cloud.snapshot()
         val after = LocationConsent.reconciledSnapshot(context, cloud.client(), before)
         assertEquals(0, before.getJSONArray("places").length())
-        assertEquals(1L, after.getJSONObject("state").getLong("places_revision"))
+        assertEquals(2L, after.getJSONObject("state").getLong("places_revision"))
         assertEquals("Home", after.getJSONArray("places").getJSONObject(0).getString("name"))
         val repository = LocationHistoryRepository.get(context)
         LocationSyncWorker.syncPlaces(context, repository, cloud.client(), after)
         assertEquals("Home", repository.state.value.places.single().name)
-        assertEquals(1L, LocationConsent.preferences(context).getLong("applied_places_revision", -1))
+        assertEquals(2L, LocationConsent.preferences(context).getLong("applied_places_revision", -1))
+    }
+
+    @Test fun thresholdImportRetriesAfterPlacesAlreadyReachedCloud() {
+        cloudSync(true)
+        val cloud = FakeCloud(consentEnabled = false).apply { failNextThreshold = true }
+        assertThrows(IllegalStateException::class.java) {
+            LocationConsent.reconciledSnapshot(context, cloud.client(), cloud.snapshot())
+        }
+        assertEquals(1, cloud.places.length())
+        assertEquals(10, cloud.thresholdMinutes)
+        assertFalse(LocationConsent.preferences(context).getBoolean("places_imported", false))
+        val recovered = LocationConsent.reconciledSnapshot(context, cloud.client(), cloud.snapshot())
+        assertEquals(20, recovered.getJSONObject("state").getInt("threshold_minutes"))
+        assertEquals(1, cloud.actions.count { it.first == "put_place" })
+        assertEquals(2, cloud.actions.count { it.first == "set_threshold" })
+        assertFalse(LocationConsent.preferences(context).contains("import_threshold_minutes"))
     }
 
     @Test fun oldOfflineWithdrawalSurvivesMigrationAndNetworkFailure() {
