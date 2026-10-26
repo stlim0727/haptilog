@@ -177,7 +177,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("all");
   const [category, setCategory] = useState("All");
-  const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording"));
+  const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording") ?? new URL(window.location.href).searchParams.get("stay"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
   const [showTimeSlider, setShowTimeSlider] = useState(false);
@@ -616,7 +616,7 @@ function App() {
   const activeItem = filteredItems.find(item => item.id === selected) ?? (selected ? undefined : filteredItems[0]);
   const active = activeItem?.kind === "voice" ? activeItem.recording : undefined;
   const displayItems = viewMode === "list" && showTimeSlider && stripDateKey !== "ALL" ? filteredItems.filter(item => journalDates(item).includes(stripDateKey)) : filteredItems;
-  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
+  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = (recording: Recording) => setSelected(recording.id)) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} records={records} onOpenRecording={onOpenRecording} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
   const displayRecordings =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
       ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)

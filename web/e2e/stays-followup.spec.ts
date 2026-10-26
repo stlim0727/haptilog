@@ -105,3 +105,28 @@ test("authorization failure during a save clears the sensitive editor", async ({
   await expect(dialog.getByRole("alert")).toContainText("Location access expired");
   await expect(dialog.getByLabel("Name", { exact: true })).toHaveCount(0);
 });
+
+test("expired hidden areas are pruned and recommendations return while settings remain mounted", async ({ page }) => {
+  const { state } = await staysFixture(page);
+  const template = state.data.stays[0];
+  state.data.places = [];
+  state.data.stays = ["2026-10-25T05:00:00Z", "2026-10-25T09:00:00Z", "2026-10-26T04:00:00Z"].map((started_at, index) => ({
+    ...template, id: `suggestion-visit-${index}`, started_at,
+    qualified_at: new Date(Date.parse(started_at) + 10 * 60_000).toISOString(),
+    last_observed_at: new Date(Date.parse(started_at) + 40 * 60_000).toISOString(),
+    end_confirmed_at: new Date(Date.parse(started_at) + 40 * 60_000).toISOString(),
+    observed_duration_millis: 40 * 60_000, status: "closed", end_reason: "moved",
+  }));
+  await page.addInitScript(({ key, owner }) => localStorage.setItem(key, JSON.stringify([
+    { owner, latitude: 37.5, longitude: 127, radius_meters: 200, expires_at: Date.parse("2026-10-26T06:00:20Z") },
+  ])), { key: hiddenKey, owner: stayOwner });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Place settings", exact: true }).click();
+  const suggestions = page.getByRole("region", { name: "Frequent stay suggestions" });
+  await expect(suggestions.getByRole("button", { name: "Save as a place", exact: true })).toHaveCount(0);
+  await page.getByRole("dialog", { name: "Place settings", exact: true }).getByRole("button", { name: "Close", exact: true }).click();
+  await page.clock.runFor(30_001);
+  await expect.poll(() => page.evaluate(key => localStorage.getItem(key), hiddenKey)).toBe(null);
+  await page.getByRole("button", { name: "Place settings", exact: true }).click();
+  await expect(suggestions.getByRole("button", { name: "Save as a place", exact: true })).toBeVisible();
+});

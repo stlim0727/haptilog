@@ -21,3 +21,7 @@ The two-round UX and product-marketing review is recorded in
 `watch/` contains paired screenshots and accessibility hierarchies from the existing 454×454 x86_64 Wear OS emulator. Verified start/stop and independent sync status with networking disabled, notification-denial recovery text, English/Korean strings, and scrolling/wrapping at 200% font size. The emulator already had a consented test account; live consent changes were not exercised. The unit test `syncCanBeEnabledAndDisabledWithoutStoppingCollection` covers enabling/disabling during an active local session and deferred place settings. Emulator network, font size, application locale and original notification denial were restored after checking.
 
 No production deployment, database migration, physical-watch GPS accuracy, long-running battery usage or live end-to-end location upload is claimed by this evidence.
+
+## PR review consolidation follow-up
+
+The #82–#85 disposition and compatibility decisions are recorded in [the review resolution](../docs/design/2026-10-26-pr82-85-resolution.md). After importing #83's evidence and adapting its locale scenarios, fixing dismissal expiry, and porting #85's voice association/navigation behavior, the consolidated branch passed 51 web unit tests, all 86 browser scenarios, 2 production-bundle scenarios and the production build. The earlier screenshots remain representative layout evidence; the added association section and query alias are covered by current tests.

@@ -112,7 +112,7 @@ test("a late location response cannot restore data after disconnect", async ({ p
   await expect(page.getByText("Original cafe", { exact: true })).toHaveCount(0);
 });
 
-test("mobile stay deep links wait for the initial location response", async ({ page }) => {
+for (const parameter of ["recording", "stay"]) test(`mobile ${parameter} deep links wait for the initial location response`, async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const { state } = await staysFixture(page);
   let release!: () => void;
@@ -121,7 +121,7 @@ test("mobile stay deep links wait for the initial location response", async ({ p
     await gate;
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(state.data) });
   });
-  const url = `/?recording=${state.data.stays[0].id}`;
+  const url = `/?${parameter}=${state.data.stays[0].id}`;
   await page.goto(url, { waitUntil: "domcontentloaded" });
   await expect(page.locator(".mobile-detail")).toBeVisible();
   await expect(page).toHaveURL(url);
@@ -181,3 +181,36 @@ for (const width of [1280, 390]) {
     await expect(save).toBeFocused();
   });
 }
+
+for (const width of [1280, 390]) {
+  test(`related voice opens through the correct detail controller at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const { portal } = await staysFixture(page);
+    portal.recording.recorded_at = "2026-10-26T05:30:00Z";
+    portal.recording.latitude = 37.5; portal.recording.longitude = 127;
+    await page.goto("/");
+    const card = page.locator(width < 700 ? `.mobile-record${stayCard}` : `.record-list ${stayCard}`);
+    await card.click();
+    await page.getByRole("region", { name: "Voice candidates during this stay" }).getByRole("button", { name: "Coffee on the corner", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Load original audio", exact: true })).toBeVisible();
+    if (width < 700) {
+      await expect(page).toHaveURL(new RegExp(`recording=${portal.recording.id}`));
+      await page.goBack();
+      await expect(page.locator(".mobile-detail")).toContainText("59 min observed");
+      await page.goBack();
+      await expect(card).toBeFocused();
+    }
+  });
+}
+
+test("overlapping stays do not both claim the same voice recording", async ({ page }) => {
+  const { state, portal } = await staysFixture(page);
+  portal.recording.recorded_at = "2026-10-26T05:30:00Z";
+  portal.recording.latitude = 37.5; portal.recording.longitude = 127;
+  state.data.stays.push({ ...state.data.stays[0], id: "66666666-6666-4666-8666-666666666666" });
+  await page.goto("/");
+  await page.locator(`.record-list ${stayCard}`).first().click();
+  const links = page.getByRole("region", { name: "Voice candidates during this stay" });
+  await expect(links).toContainText("No unambiguous voice candidates.");
+  await expect(links.getByRole("button")).toHaveCount(0);
+});

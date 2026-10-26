@@ -38,3 +38,17 @@ test('cross-midnight stay is discoverable on both dates under one original ident
   assert.equal(item.id, stay.id);
   assert.equal(matchesJournal(item, {date:'today', today:'2026-10-26'}), true);
 });
+
+test('related voice candidates compete against all stays and exclude deleted sources', async () => {
+  const { relatedRecordings } = await import('./journal.ts');
+  const first = mockStay();
+  const other = mockStay({ id: 'other-stay' });
+  assert.deepEqual(relatedRecordings([voice], [first, other], first.id, MOCK_NOW), []);
+  const remote = mockStay({ id: 'remote-stay', representative_latitude: 38 });
+  const located = { ...voice, latitude: 37.5, longitude: 127, accuracy: 15 };
+  assert.deepEqual(relatedRecordings([located], [first, remote], first.id, MOCK_NOW).map(r => r.id), [voice.id]);
+  assert.deepEqual(relatedRecordings([located], [first, remote], remote.id, MOCK_NOW), []);
+  for (const extra of [{ deleted_at: '2026-10-26T05:40:00Z' }, { purging_at: '2026-10-26T05:40:00Z' }]) {
+    assert.deepEqual(relatedRecordings([{ ...located, ...extra }], [first], first.id, MOCK_NOW), []);
+  }
+});

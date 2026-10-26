@@ -1,6 +1,6 @@
 import { expense, latest, localDate, transcript } from './domain.ts';
 import type { Recording } from './domain.ts';
-import { distanceMeters, splitStayByDate, visibleStay } from './location-stays/domain.ts';
+import { distanceMeters, recordingAssociation, splitStayByDate, visibleStay } from './location-stays/domain.ts';
 import type { SavedPlace, Stay } from './location-stays/types.ts';
 
 type Display = { id: string; recorded_at: string; latitude: number | null; longitude: number | null };
@@ -41,3 +41,11 @@ export function matchesJournal(item: JournalItem, { category = 'All', date = 'al
   return !search || text.toLowerCase().includes(search.trim().toLowerCase());
 }
 export const journalLocated = (item: JournalItem): item is JournalItem & { latitude: number; longitude: number } => typeof item.latitude === 'number' && Number.isFinite(item.latitude) && Math.abs(item.latitude) <= 90 && typeof item.longitude === 'number' && Number.isFinite(item.longitude) && Math.abs(item.longitude) <= 180;
+
+/** Every visible stay competes, so ambiguous observations never become a unique link. */
+export function relatedRecordings(records: Recording[], stays: Stay[], stayId: string, now: number) {
+  return records.filter(recording => {
+    const match = recordingAssociation(recording, stays, now);
+    return match.kind === 'candidate' && match.stayIds[0] === stayId;
+  });
+}

@@ -7,6 +7,9 @@ import { presence } from './domain.ts';
 import { clearDismissals } from './dismissals.ts';
 import { LocationError } from './repository.ts';
 import type { LocationJournal } from './useLocationJournal.ts';
+import { latest } from '../domain.ts';
+import type { Recording } from '../domain.ts';
+import { relatedRecordings } from '../journal.ts';
 const RecordingMap = lazy(() => import('../RecordingMap'));
 class StayMapBoundary extends Component<{ children: ReactNode; ko: boolean }, { failed: boolean }> {
   state = { failed: false };
@@ -17,10 +20,11 @@ class StayMapBoundary extends Component<{ children: ReactNode; ko: boolean }, { 
       : this.props.children;
   }
 }
-export function StayInspector({ item, journal, lang, onSavePlace }: { item: Extract<JournalItem, { kind: 'stay' }>; journal: LocationJournal; lang: 'ko' | 'en'; onSavePlace: () => void }) {
+export function StayInspector({ item, journal, lang, onSavePlace, records, onOpenRecording }: { item: Extract<JournalItem, { kind: 'stay' }>; journal: LocationJournal; lang: 'ko' | 'en'; onSavePlace: () => void; records: Recording[]; onOpenRecording: (recording: Recording) => void }) {
   const ko = lang === 'ko', stay = item.stay;
   const [confirm, setConfirm] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const status = presence(stay, journal.now);
+  const linked = relatedRecordings(records, journal.snapshot?.stays ?? [], stay.id, journal.now);
   const time = (value: string) => new Date(value).toLocaleString(ko ? 'ko-KR' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   async function remove() {
     if (!journal.repository || !journal.snapshot) return;
@@ -45,6 +49,11 @@ export function StayInspector({ item, journal, lang, onSavePlace }: { item: Extr
     <dl className="stay-observations"><div><dt>{ko ? '관측 시작' : 'First observed'}</dt><dd>{time(stay.started_at)}</dd></div><div><dt>{ko ? '마지막 확인' : 'Last confirmed'}</dt><dd>{time(stay.last_observed_at)}</dd></div><div><dt>{ko ? '위치 정확도' : 'Location accuracy'}</dt><dd>±{Math.round(stay.accuracy_meters)} m</dd></div></dl>
     <p className="location-secondary">{ko ? '위치가 확인된 시간만 표시합니다. 관측이 끊긴 시간은 포함하지 않습니다. 체류는 시작 후 7일간 보관됩니다.' : 'Only observed time is counted. Gaps are not added. Stays are kept for seven days from their start.'}</p>
     <StayMapBoundary ko={ko}><Suspense fallback={<p>{ko ? '지도 불러오는 중…' : 'Loading map…'}</p>}><RecordingMap recordings={[]} journalItems={[item]} selectedId={item.id} onSelect={() => {}} showRoute={false} showSelectionSummary={false} lang={lang} /></Suspense></StayMapBoundary>
+    <section aria-label={ko ? '체류 중 음성 후보' : 'Voice candidates during this stay'}>
+      <h3>{ko ? '함께 남긴 음성' : 'Related voice recordings'}</h3>
+      <p className="location-secondary">{ko ? '관측 시간과 확인 가능한 위치에 따른 후보입니다. 장소를 확정하지 않습니다.' : 'Candidates based on observed times and available locations. Place association is not confirmed.'}</p>
+      {linked.length ? <ul>{linked.map(recording => <li key={recording.id}><button className="text-button" onClick={() => onOpenRecording(recording)}>{latest(recording)?.summary || (ko ? '음성 기록 열기' : 'Open voice recording')}</button></li>)}</ul> : <p>{ko ? '연결할 음성 후보가 없습니다.' : 'No unambiguous voice candidates.'}</p>}
+    </section>
     <div className="stay-actions"><button className="secondary-button" disabled={busy || !journal.snapshot?.state.consent_enabled} onClick={onSavePlace}><MapPin size={16} />{ko ? '장소로 저장' : 'Save as a place'}</button><button className="secondary-button" disabled={busy} onClick={() => setConfirm(true)}><Trash2 size={16} />{ko ? '이 체류 삭제' : 'Delete this stay'}</button></div>
     {error && <p role="alert">{error}</p>}
     {confirm && <section className="stay-delete-confirm" aria-label={ko ? '체류 삭제 확인' : 'Confirm stay deletion'}><p>{ko ? '이 체류를 영구 삭제할까요? 다시 동기화해도 복원되지 않습니다. 음성과 내 장소는 유지됩니다.' : 'Permanently delete this stay? Synchronization will not restore it. Voice recordings and saved places are retained.'}</p><button className="secondary-button" disabled={busy} onClick={() => void remove()}>{ko ? '체류 영구 삭제' : 'Permanently delete stay'}</button><button className="secondary-button" disabled={busy} onClick={() => setConfirm(false)}>{ko ? '취소' : 'Cancel'}</button></section>}

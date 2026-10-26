@@ -41,7 +41,7 @@ import {
 } from "./domain";
 import type { Recording } from "./domain";
 import { JournalStayCard } from "./JournalStayCard";
-import { journalDates, journalLocated } from "./journal";
+import { journalDates, journalLocated, voiceItem } from "./journal";
 import type { JournalItem } from "./journal";
 import type { Language, TranslationKeys } from "./i18n";
 
@@ -69,7 +69,7 @@ type Props = {
   filteredItems: JournalItem[];
   stayEmptyMessage: string;
   locationLoaded: boolean;
-  renderStay: (item: Extract<JournalItem, { kind: "stay" }>) => React.ReactNode;
+  renderStay: (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording?: (recording: Recording) => void) => React.ReactNode;
   loaded: boolean;
   truncated: boolean;
   date: string;
@@ -108,7 +108,7 @@ export function MobileWorkspace(p: Props) {
   const ko = lang === "ko";
   const [view, setView] = useState<View>("list");
   const [detailId, setDetailId] = useState<string | null>(() =>
-    new URL(location.href).searchParams.get("recording")
+    (new URL(location.href).searchParams.get("recording") ?? new URL(location.href).searchParams.get("stay"))
   );
   const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
   const [mapSelected, setMapSelected] = useState<string | null>(null);
@@ -195,7 +195,7 @@ export function MobileWorkspace(p: Props) {
       dirty.current = false;
       p.onDraftChange(false);
       historyIndex.current = nextIndex;
-      const id = new URL(location.href).searchParams.get("recording");
+      const id = (new URL(location.href).searchParams.get("recording") ?? new URL(location.href).searchParams.get("stay"));
       setDetailId(id);
     };
     const unload = (event: BeforeUnloadEvent) => {
@@ -241,12 +241,14 @@ export function MobileWorkspace(p: Props) {
     p.onDraftChange(false);
     const url = new URL(location.href);
     url.searchParams.delete("recording");
+    url.searchParams.delete("stay");
     history.replaceState({ ...history.state, mobileDetail: false }, "", url);
     setDetailId(null);
   }
   function openDetail(r: JournalItem) {
-    returnPosition.current = { y: window.scrollY, id: r.id };
+    if (!detailId) returnPosition.current = { y: window.scrollY, id: r.id };
     const url = new URL(location.href);
+    url.searchParams.delete("stay");
     url.searchParams.set("recording", r.id);
     historyIndex.current++;
     history.pushState(
@@ -731,7 +733,7 @@ export function MobileWorkspace(p: Props) {
             className="inspector"
             aria-label={ko ? "기록 상세" : "Recording details"}
           >
-            {detail ? (detail.kind === "stay" ? p.renderStay(detail) : p.renderInspector(detail.recording, onDirtyChange)) : (
+            {detail ? (detail.kind === "stay" ? p.renderStay(detail, recording => openDetail(voiceItem(recording))) : p.renderInspector(detail.recording, onDirtyChange)) : (
               <p>
                 {ko ? "기록을 찾을 수 없어요." : "Recording unavailable."}
               </p>

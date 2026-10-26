@@ -50,6 +50,9 @@ export function LocationWorkspace({ owner, repository, journal, initialStay, lan
   }, [load, owner]);
   useEffect(() => { setError(journal.error); if (journal.error === "FORBIDDEN") { setEditor(null); setDeleteConfirm(null); } }, [journal.error]);
   useEffect(() => {
+    setDismissals(loadDismissals(localStorage, owner, now));
+  }, [owner, now]);
+  useEffect(() => {
     if (initialStay && snapshot?.state.consent_enabled) setEditor({ initial: { name: "", latitude: initialStay.representative_latitude, longitude: initialStay.representative_longitude, radius_meters: 200 }, revision: snapshot.state.places_revision });
   }, [initialStay?.id]);
   useEffect(() => {
