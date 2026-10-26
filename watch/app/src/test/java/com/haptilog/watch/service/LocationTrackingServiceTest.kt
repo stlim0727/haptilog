@@ -45,6 +45,8 @@ class LocationTrackingServiceTest {
         // with local defaults, not a prior scenario's downloaded 20-minute threshold.
         application.getSharedPreferences("location_sync", android.content.Context.MODE_PRIVATE)
             .edit().clear().commit()
+        application.getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE)
+            .edit().clear().commit()
         LocationHistoryRepository.get(application).apply {
             stopSession()
             clearHistory()
@@ -87,13 +89,16 @@ class LocationTrackingServiceTest {
         controller.destroy()
     }
 
-    @Test fun hiddenNotificationsPreventTracking() {
+    @Test fun hiddenNotificationsDoNotPreventTracking() {
         shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
         shadowOf(application.getSystemService(NotificationManager::class.java)).setNotificationsEnabled(false)
         val controller = controller()
         controller.get().onStartCommand(startIntent(), 0, 1)
-        assertFalse(LocationTrackingService.isTracking.value)
-        assertEquals(application.getString(R.string.location_service_notifications_required), LocationTrackingService.status.value)
+        await { updates.requests == 1 }
+        assertTrue(LocationTrackingService.isTracking.value)
+        controller.get().onStartCommand(Intent(application, LocationTrackingService::class.java)
+            .setAction(LocationTrackingService.ACTION_STOP), 0, 2)
+        await { !LocationTrackingService.isTracking.value }
         controller.destroy()
     }
 
@@ -190,9 +195,11 @@ class LocationTrackingServiceTest {
 
     @Test fun downloadedSettingsApplyBeforeNextSessionAndRecordAppliedRevision() {
         shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        application.getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE)
+            .edit().putBoolean("enabled", true)
+            .putString("consent_version", com.haptilog.watch.sync.CloudConsent.VERSION).commit()
         val prefs = application.getSharedPreferences("location_sync", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("enabled", true)
-            .putString("policy_version", com.haptilog.watch.sync.LocationConsent.POLICY_VERSION)
+        prefs.edit()
             .putString("pending_places", org.json.JSONObject().put("revision", 11).put("owner_user_id", "owner")
                 .put("threshold_minutes", 20).put("places", org.json.JSONArray().put(org.json.JSONObject()
                     .put("id", "33333333-3333-4333-8333-333333333333").put("name", "Office")
@@ -212,11 +219,10 @@ class LocationTrackingServiceTest {
         controller.destroy()
     }
 
-    @Test fun revokedConsentDoesNotApplyDownloadedSettingsAtNextStart() {
+    @Test fun cloudSwitchOffDoesNotApplyDownloadedSettingsAtNextStart() {
         shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
         val prefs = application.getSharedPreferences("location_sync", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("enabled", false)
-            .putString("pending_places", "not valid JSON").commit()
+        prefs.edit().putString("pending_places", "not valid JSON").commit()
         val controller = controller()
         controller.get().onStartCommand(startIntent(), 0, 1)
         await { updates.requests == 1 }

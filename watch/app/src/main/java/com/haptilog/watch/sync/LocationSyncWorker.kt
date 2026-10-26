@@ -14,7 +14,7 @@ import org.json.JSONObject
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
-/** Separate scheduling: a watch with no audio consent or recordings still syncs places. */
+/** Journal sync rides on the cloud sync switch; a watch with no recordings still syncs places. */
 class LocationSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     companion object {
         private val mutex = Mutex()
@@ -22,7 +22,7 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
         fun cancelActive() { active?.cancelRequests() }
         fun schedule(context: Context) {
             val prefs = LocationConsent.preferences(context)
-            if ((!LocationConsent.enabled(context) && !prefs.getBoolean("revoke_pending", false)) || !CloudClient.configured) return
+            if ((!LocationConsent.enabled(context) && !prefs.getBoolean("reconcile_pending", false)) || !CloudClient.configured) return
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED)
                 .setRequiresBatteryNotLow(true).build()
             val manager = WorkManager.getInstance(context)
@@ -102,28 +102,28 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
     override suspend fun doWork(): Result = mutex.withLock { withContext(Dispatchers.IO) {
         val context = applicationContext
         val prefs = LocationConsent.preferences(context)
-        if (!CloudClient.configured || (!LocationConsent.enabled(context) && !prefs.getBoolean("revoke_pending", false)))
+        val withdrawing = !LocationConsent.enabled(context)
+        // Off and already agreed: no reason to wake the radio. A moved switch always leaves a
+        // pending marker, so withdrawal is never skipped.
+        if (!CloudClient.configured || (withdrawing && !prefs.getBoolean("reconcile_pending", false)))
             return@withContext Result.success()
         // Do not compete with the sacred audio capture path.
         if (com.haptilog.watch.service.VoiceRecordingService.isRecording.value) return@withContext Result.retry()
-        val api = CloudClient(context) { !isStopped && (LocationConsent.enabled(context) || prefs.getBoolean("revoke_pending", false)) }
+        val api = CloudClient(context) { !isStopped && (LocationConsent.enabled(context) || prefs.getBoolean("reconcile_pending", false)) }
         active = api
         try {
             val client = LocationSyncClient(api)
             val snapshot = client.call("snapshot")
-            val state = snapshot.getJSONObject("state")
+            val state = LocationConsent.reconcile(context, client, snapshot)
+            if (state !== snapshot.getJSONObject("state")) snapshot.put("state", state)
+            if (withdrawing) {
+                // Withdrawal is confirmed; nothing left to send until the switch moves again.
+                val manager = WorkManager.getInstance(context)
+                manager.cancelUniqueWork("location-sync")
+                manager.cancelUniqueWork("location-sync-safety")
+                return@withContext Result.success()
+            }
             check(snapshot.getInt("protocol_version") == 1)
-            if (prefs.getBoolean("revoke_pending", false)) {
-                client.call("consent", JSONObject().put("enabled", false).put("backfill", false)
-                    .put("expected_revision", state.getLong("consent_revision")))
-                check(prefs.edit().putBoolean("revoke_pending", false).remove("pending_places").commit())
-                return@withContext Result.success()
-            }
-            if (!LocationConsent.enabled(context)) return@withContext Result.success()
-            if (!state.getBoolean("consent_enabled")) {
-                check(prefs.edit().putBoolean("enabled", false).remove("checkpoint").remove("pending_places").commit())
-                return@withContext Result.success()
-            }
             val epoch = state.getLong("sync_epoch")
             val previous = JSONObject(prefs.getString("checkpoint", "{}")!!)
             val acknowledgements = if (previous.optLong("epoch", -1) == epoch)
@@ -161,8 +161,8 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
                     check(result.getString("outcome") in setOf("accepted", "idempotent", "stale"))
                 } catch (error: LocationSyncException) {
                     if (error.error == "CONSENT_CONFLICT") {
-                        // Web-side re-enable re-bumped the token only: adopt it and retry once.
-                        // A revocation surfaces as CONSENT_REQUIRED here and stops sends.
+                        // The token moved mid-pass, from a web edit or from our own reconcile:
+                        // adopt the live flag and retry this stay once.
                         client.ensureConsentCurrent()
                         val result = client.call("ingest", JSONObject().put("consent_revision", client.consentRevision)
                             .put("sync_epoch", epoch).put("stay", LocationStayWire.encode(stay)))
@@ -180,7 +180,9 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
         catch (error: AuthSessionException) { Result.failure() }
         catch (error: LocationSyncException) {
             if (error.error == "CONSENT_REQUIRED") {
-                check(prefs.edit().putBoolean("enabled", false).remove("pending_places").commit())
+                // The flag was revoked after our reconcile. Discard half-applied state so the next
+                // pass rebuilds it from a fresh snapshot instead of acknowledging stale work.
+                check(prefs.edit().remove("checkpoint").remove("pending_places").commit())
                 Result.success()
             } else if (error.error in setOf("INVALID_PAYLOAD", "FORBIDDEN")) Result.failure() else Result.retry()
         } catch (_: Exception) { Result.retry() }

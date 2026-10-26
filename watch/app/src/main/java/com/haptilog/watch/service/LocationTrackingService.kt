@@ -18,7 +18,6 @@ import android.location.LocationManager
 import android.os.IBinder
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -195,10 +194,6 @@ class LocationTrackingService : Service() {
             stopTracking(getString(R.string.location_service_disabled), LocationStayEndReason.LOCATION_DISABLED)
             return
         }
-        if (!notificationsEnabled()) {
-            stopTracking(getString(R.string.location_service_notifications_required), LocationStayEndReason.NOTIFICATIONS_DISABLED)
-            return
-        }
         try {
             startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
         } catch (_: RuntimeException) {
@@ -219,7 +214,6 @@ class LocationTrackingService : Service() {
                 when {
                     !hasPreciseLocationPermission() -> stopTracking(getString(R.string.location_service_permission_required), LocationStayEndReason.PERMISSION_LOST)
                     !isLocationEnabled() -> stopTracking(getString(R.string.location_service_disabled), LocationStayEndReason.LOCATION_DISABLED)
-                    !notificationsEnabled() -> stopTracking(getString(R.string.location_service_notifications_required), LocationStayEndReason.NOTIFICATIONS_DISABLED)
                     SystemClock.elapsedRealtime() >= sessionDeadline ->
                         stopTracking(getString(R.string.location_service_timeout), LocationStayEndReason.SESSION_TIMEOUT)
                 }
@@ -293,11 +287,6 @@ class LocationTrackingService : Service() {
 
     private fun isLocationEnabled(): Boolean =
         getSystemService(LocationManager::class.java).isLocationEnabled
-
-    private fun notificationsEnabled(): Boolean =
-        NotificationManagerCompat.from(this).areNotificationsEnabled() &&
-            getSystemService(NotificationManager::class.java).getNotificationChannel(CHANNEL_ID)
-                ?.importance != NotificationManager.IMPORTANCE_NONE
 
     private fun notification(): Notification {
         val open = PendingIntent.getActivity(

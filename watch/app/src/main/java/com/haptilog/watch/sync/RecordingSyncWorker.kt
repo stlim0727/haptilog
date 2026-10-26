@@ -34,10 +34,12 @@ class RecordingSyncWorker(context: Context, params: WorkerParameters) : Coroutin
             RecordingNotifications.clearAllSync(context)
             WorkManager.getInstance(context).cancelUniqueWork("recording-sync")
             WorkManager.getInstance(context).cancelUniqueWork("recording-sync-safety")
+            LocationConsent.onCloudSwitchChanged(context)
         }
         fun enable(context: Context) {
             context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).edit().putBoolean("enabled", true).apply()
             schedule(context)
+            LocationConsent.onCloudSwitchChanged(context)
         }
         fun schedule(context: Context) {
             if (!enabled(context) || !CloudClient.configured) return

@@ -1,58 +1,59 @@
 package com.haptilog.watch.sync
 
 import android.content.Context
+import com.haptilog.watch.data.location.LocationHistoryRepository
+import org.json.JSONArray
 import org.json.JSONObject
 
-/** Location consent is deliberately independent of CloudConsent and audio sync. */
+/**
+ * There is no location-specific consent: sharing follows the cloud sync switch, and collecting the
+ * journal is authorized by the OS location permission alone. The server consent flag is a mirror of
+ * that switch, reconciled by [LocationSyncWorker] instead of a user press.
+ */
 object LocationConsent {
-    const val POLICY_VERSION = "2026-10-26"
     internal fun preferences(context: Context) = context.getSharedPreferences("location_sync", Context.MODE_PRIVATE)
-    fun enabled(context: Context): Boolean = preferences(context).getBoolean("enabled", false) &&
-        preferences(context).getString("policy_version", null) == POLICY_VERSION
+    fun enabled(context: Context): Boolean = RecordingSyncWorker.enabled(context)
 
-    @Synchronized fun enable(context: Context, backfill: Boolean, api: CloudApi = CloudClient(context)) {
-        val prefs = preferences(context)
-        check(!prefs.getBoolean("revoke_pending", false)) { "Finish pending withdrawal before enabling" }
-        val client = LocationSyncClient(api)
-        val state = client.call("snapshot").getJSONObject("state")
-        var nextState = client.call("consent", JSONObject().put("enabled", true).put("backfill", backfill)
-            .put("expected_revision", state.getLong("consent_revision")))
-            .getJSONObject("state")
-        // First explicit opt-in imports existing saved places before downloading cloud settings.
-        // Subsequent activations use the cloud collection, including its deletions.
-        if (!prefs.getBoolean("ever_enabled", false)) {
-            val snapshot = client.call("snapshot")
-            val remote = snapshot.getJSONArray("places")
-            val remoteIds = (0 until remote.length()).associateBy { remote.getJSONObject(it).getString("id") }
-            for (place in com.haptilog.watch.data.location.LocationHistoryRepository.get(context).state.value.places) {
-                if (place.id in remoteIds) {
-                    val existing = remote.getJSONObject(remoteIds.getValue(place.id))
-                    check(existing.getString("name") == place.name && existing.getDouble("latitude") == place.latitude &&
-                        existing.getDouble("longitude") == place.longitude && existing.getDouble("radius_meters") == place.radiusMeters) {
-                        "Saved place differs from cloud; review it in the portal"
-                    }
-                    continue
-                }
-                nextState = client.call("put_place", JSONObject().put("expected_revision", nextState.getLong("places_revision"))
-                    .put("id", place.id).put("name", place.name).put("latitude", place.latitude)
-                    .put("longitude", place.longitude).put("radius_meters", place.radiusMeters)).getJSONObject("state")
-            }
-            val threshold = com.haptilog.watch.data.location.LocationHistoryRepository.get(context).state.value.dwellMinutes
-            if (state.getLong("places_revision") == 0L && nextState.getInt("threshold_minutes") != threshold) {
-                client.call("set_threshold", JSONObject().put("expected_revision", nextState.getLong("places_revision"))
-                    .put("threshold_minutes", threshold))
-            }
-        }
-        check(prefs.edit().putBoolean("enabled", true).putString("policy_version", POLICY_VERSION)
-            .putBoolean("ever_enabled", true).remove("checkpoint").commit())
+    /** The switch moved: stop in-flight sends, then push the new position before work can idle. */
+    fun onCloudSwitchChanged(context: Context) {
+        LocationSyncWorker.cancelActive()
+        check(preferences(context).edit().putBoolean("reconcile_pending", true).commit())
         LocationSyncWorker.schedule(context)
     }
 
-    /** Stops pending and in-flight sends before attempting an offline-capable withdrawal. */
-    @Synchronized fun disable(context: Context) {
-        check(preferences(context).edit().putBoolean("enabled", false)
-            .putBoolean("revoke_pending", true).remove("checkpoint").commit())
-        LocationSyncWorker.cancelActive()
-        LocationSyncWorker.schedule(context)
+    /** Returns the state to work against, after the server flag agrees with the switch. */
+    fun reconcile(context: Context, client: LocationSyncClient, snapshot: JSONObject): JSONObject {
+        val state = snapshot.getJSONObject("state")
+        val desired = enabled(context)
+        val prefs = preferences(context)
+        if (state.optBoolean("consent_enabled") == desired) {
+            prefs.edit().remove("reconcile_pending").commit()
+            return state
+        }
+        val next = client.call("consent", JSONObject().put("enabled", desired).put("backfill", desired)
+            .put("expected_revision", state.getLong("consent_revision"))).getJSONObject("state")
+        prefs.edit().remove("reconcile_pending").commit()
+        // Places named while offline become the starting cloud collection; afterwards the cloud wins.
+        if (!desired || prefs.getBoolean("places_imported", false)) return next
+        return importPlaces(context, client, next, snapshot.getJSONArray("places"))
+    }
+
+    private fun importPlaces(context: Context, client: LocationSyncClient, state: JSONObject,
+                             remotePlaces: JSONArray): JSONObject {
+        val history = LocationHistoryRepository.get(context).state.value
+        val remoteIds = (0 until remotePlaces.length()).map { remotePlaces.getJSONObject(it).getString("id") }.toSet()
+        var next = state
+        for (place in history.places.filterNot { it.id in remoteIds }) {
+            next = client.call("put_place", JSONObject().put("expected_revision", next.getLong("places_revision"))
+                .put("id", place.id).put("name", place.name).put("latitude", place.latitude)
+                .put("longitude", place.longitude).put("radius_meters", place.radiusMeters)).getJSONObject("state")
+        }
+        // A brand-new cloud collection inherits the threshold the watch already worked to.
+        if (remotePlaces.length() == 0 && next.getInt("threshold_minutes") != history.dwellMinutes) {
+            next = client.call("set_threshold", JSONObject().put("expected_revision", next.getLong("places_revision"))
+                .put("threshold_minutes", history.dwellMinutes)).getJSONObject("state")
+        }
+        check(preferences(context).edit().putBoolean("places_imported", true).commit())
+        return next
     }
 }

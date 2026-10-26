@@ -7,7 +7,6 @@
     <string name="location_service_stop">위치 기록 중지</string>
     <string name="location_service_permission_required">위치 기록을 중지했습니다. 정확한 위치 권한을 허용한 뒤 다시 시작하세요.</string>
     <string name="location_service_disabled">위치 기록을 중지했습니다. 기기의 위치 기능을 켠 뒤 다시 시작하세요.</string>
-    <string name="location_service_notifications_required">위치 기록을 중지했습니다. 기록 상태와 중지 버튼이 보이도록 HaptiLog 알림과 위치 기록 알림 채널을 허용하세요.</string>
     <string name="location_service_start_error">위치 기록을 시작하지 못했습니다. 위치 기록 화면에서 다시 시도하세요.</string>
     <string name="location_service_provider_error">위치를 받을 수 없어 기록을 중지했습니다. 다시 시도하세요.</string>
     <string name="location_service_storage_error">워치에 저장할 수 없어 위치 기록을 중지했습니다.</string>

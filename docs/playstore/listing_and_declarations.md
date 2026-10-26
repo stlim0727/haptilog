@@ -102,7 +102,7 @@ HaptiLog is an eyes-free, haptic-first voice logger designed exclusively for Wea
      - 수집: 선택적 클라우드 동기화 시 전송, 익명 사용자 ID에 연결, 비임시 저장, 앱 기능 목적
   2. **정확한 위치 / 대략적인 위치(Location - Precise & Approximate)**:
      - 목적: 앱 기능(녹음 시점의 GPS 좌표, 고도, 속도를 메모 맥락으로 태깅)
-     - 수집: 녹음에 저장된 위치는 위치 권한 및 선택적 동기화에 따라 전송, 비임시 저장, 앱 기능 목적. 별도의 위치 일지는 사용자가 워치에서 직접 시작한 세션 동안 주기적으로 위치를 취득하며, 필터링된 위치·지정 장소·진입/이탈/체류 기록을 워치에만 저장합니다. 위치 일지 데이터는 클라우드 동기화를 켜도 전송하지 않습니다.
+     - 수집: 녹음에 저장된 위치는 위치 권한 및 선택적 동기화에 따라 전송, 비임시 저장, 앱 기능 목적. 별도의 위치 일지는 사용자가 워치에서 직접 시작한 세션 동안 주기적으로 위치를 취득하며, 수집 동의는 운영체제의 정확한 위치 권한 요청이 맡습니다(별도 동의 화면 없음). 클라우드 동기를 켜면 저장한 장소와 체류 요약(대표 좌표·시각·정확도)이 녹음과 함께 전송되고, 필터링된 이동 위치 표본과 진입/이탈 기록은 워치에만 남습니다. 체류 요약은 서버에서 시작 후 7일간 보관하며 장소 정의는 삭제할 때까지 유지됩니다.
   3. **앱 정보 및 성능 (진단 / 비정상 종료 로그)**:
      - 목적: 분석 및 오류 수정. 크래시 동의와 사용자 제보는 녹음 동기화 스위치와 별개입니다.
      - 수집: 예외 클래스명·앱 코드 위치·앱 버전·기기 모델·Android API. 보고서는 익명 사용자 ID와 연결됩니다. 오디오·GPS·예외 메시지는 자동 첨부하지 않습니다.
@@ -144,12 +144,12 @@ HaptiLog 매니페스트에 등록된 포그라운드 서비스 타입:
   ```
   HaptiLog captures location during user-started voice recording to geotag memos. Users may separately start a local location journal from watch settings to record filtered movement, arrival/departure at saved GPS places, and sustained stays.
 
-  Voice-memo location acquisition ends when recording stops. A journal session uses its own location foreground service with an ongoing notification and stop action so sampling can continue while the watch display is off. The user can stop it from the journal or notification. Journal data is local by default and does not join voice-recording cloud sync. Separate optional place/stay consent allows an independent worker to upload saved places and stay summaries to Supabase; raw movement points remain local and journal data is not sent to Gemini. The journal does not require microphone access or hold a wake lock.
+  Voice-memo location acquisition ends when recording stops. A journal session uses its own location foreground service with an ongoing notification and stop action so sampling can continue while the watch display is off. The user can stop it from the journal or notification. Journal sampling starts only from an explicit press in the journal and is authorized by the system location permission. When the user turns on cloud sync, saved places and derived stay summaries upload beside the recordings through a separate worker; filtered raw movement points remain local and journal data is not sent to Gemini. The journal does not require microphone access or hold a wake lock.
   ```
 - **사용자 시작 조건 (User-initiated trigger)**:
   `Triggered by a voice recording, or by the user explicitly pressing Start in the separate watch location journal.`
 - **위치 일지 출시 확인**: 공개 개인정보처리방침 변경본 배포, 위치 FGS 선언 설명/데모 갱신, 워치에서 시작·화면 꺼짐·알림 정지 동작 검증 후 심사 제출. 이 문서 변경 자체가 콘솔 저장이나 배포를 뜻하지 않습니다.
-- **장소·체류 동기화 출시 확인**: 독립 동의·소급 선택 문구, 위치 데이터 수집 및 7일 클라우드 보존 안내, 서버 migration·만료 정리 일정·advisors, 삭제 후 재접속 검증, 실제 착용 배터리 증거를 확인합니다. 아래 [후속 작업 목록](../design/location-stays-followup.md)은 코드 병합과 서비스 출시를 구분합니다.
+- **장소·체류 동기화 출시 확인**: 별도 동의 화면 없이 클라우드 동기화 스위치가 위치 전송을 결정하므로, 그 문구와 위치 데이터 수집 및 7일 클라우드 보존 안내를 개인정보처리방침에 반영했는지 확인합니다. 서버 migration·만료 정리 일정·advisors, 삭제 후 재접속 검증, 실제 착용 배터리 증거를 확인합니다. 아래 [후속 작업 목록](../design/location-stays-followup.md)은 코드 병합과 서비스 출시를 구분합니다.
 
 ---
 

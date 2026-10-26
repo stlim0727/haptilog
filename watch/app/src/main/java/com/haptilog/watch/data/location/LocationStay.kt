@@ -5,6 +5,8 @@ import java.util.UUID
 enum class LocationStayStatus { ACTIVE, CLOSED }
 enum class LocationStayEndReason {
     MOVED, OBSERVATION_GAP, USER_STOP, SESSION_TIMEOUT, PERMISSION_LOST,
+    // Only read back from history written by builds that still required notifications; a blocked
+    // notification shade no longer interrupts a session.
     LOCATION_DISABLED, NOTIFICATIONS_DISABLED, PROVIDER_ERROR, STORAGE_ERROR,
     SERVICE_DESTROYED, INTERRUPTED
 }

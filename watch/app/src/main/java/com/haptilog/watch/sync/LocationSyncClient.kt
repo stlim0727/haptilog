@@ -43,9 +43,9 @@ class LocationSyncClient(private val api: CloudApi) {
 
     /**
      * Consent identity is the live server flag plus its upload cutoff window, not the CAS
-     * token. A web re-enable only re-bumps that token; adopting it never revives data the
-     * cutoff already excludes. A revocation is never bridged here; callers must re-enable
-     * through an explicit watch-side consent.
+     * token. A web edit or the watch's own reconcile can re-bump that token; adopting it never
+     * revives data the cutoff already excludes. A flag this watch did not ask for is reported as
+     * CONSENT_REQUIRED and [LocationConsent.reconcile] resolves it against the cloud switch.
      */
     fun ensureConsentCurrent() {
         val state = call("snapshot").getJSONObject("state")

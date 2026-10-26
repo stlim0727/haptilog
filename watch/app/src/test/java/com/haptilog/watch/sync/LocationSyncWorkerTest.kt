@@ -36,8 +36,10 @@ class LocationSyncWorkerTest {
 
     @Before fun setUp() {
         context = RuntimeEnvironment.getApplication()
-        LocationConsent.preferences(context).edit().clear()
-            .putBoolean("enabled", true).putString("policy_version", LocationConsent.POLICY_VERSION).commit()
+        // Sync is authorized by the cloud switch alone.
+        context.getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).edit().clear()
+            .putBoolean("enabled", true).putString("consent_version", CloudConsent.VERSION).commit()
+        LocationConsent.preferences(context).edit().clear().commit()
         repository = LocationHistoryRepository(Files.createTempDirectory("location-sync-worker").toFile())
     }
 
@@ -125,7 +127,8 @@ class LocationSyncWorkerTest {
         repository.startSession()
         LocationSyncWorker.syncPlaces(context, repository, client, snapshot(consent = 3, epoch = 8))
         assertEquals(listOf(4L), cloud.acknowledgements)
-        LocationConsent.preferences(context).edit().putBoolean("enabled", false).commit()
+        context.getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", false).commit()
         cloud.acknowledgements.clear()
         LocationSyncWorker.syncPlaces(context, repository, client, snapshot())
         assertTrue(cloud.acknowledgements.isEmpty())
