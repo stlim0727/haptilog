@@ -52,8 +52,8 @@ export async function staysFixture(page: Page) {
 }
 export async function openStays(page: Page) {
   await page.goto("/");
-  await page.getByRole("button", { name: "Stays and my places", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Stays and my places" });
+  await page.getByRole("button", { name: "Places", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Places" });
   await expect(dialog.getByText("Original cafe", { exact: false }).first()).toBeVisible();
   return dialog;
 }

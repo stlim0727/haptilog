@@ -1,7 +1,7 @@
 import { useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles } from "lucide-react";
-import { latest, localDate, toLocalDateString } from "./domain";
-import type { Recording } from "./domain";
+import { intentType, localDate, toLocalDateString } from "./domain";
+import type { TimelineItem } from "./domain";
 import type { translations } from "./i18n";
 
 export default function TimeSliderStrip({
@@ -11,7 +11,7 @@ export default function TimeSliderStrip({
   t,
   lang,
 }: {
-  recordings: Recording[];
+  recordings: TimelineItem[];
   selectedDateKey: string; // "ALL" or "YYYY-MM-DD"
   onSelectDate: (key: string) => void;
   t: (typeof translations)["en"] | (typeof translations)["ko"];
@@ -21,7 +21,7 @@ export default function TimeSliderStrip({
   const todayKey = toLocalDateString();
 
   // Group recordings by local date key
-  const dateMap = new Map<string, Recording[]>();
+  const dateMap = new Map<string, TimelineItem[]>();
   for (const r of recordings) {
     const key = localDate(r.recorded_at);
     const list = dateMap.get(key) ?? [];
@@ -117,7 +117,7 @@ export default function TimeSliderStrip({
 
           // Extract distinct categories present on this day
           const categories = new Set(
-            list.map((r) => latest(r)?.intent_type?.toLowerCase() ?? "voice"),
+            list.map((r) => intentType(r)?.toLowerCase() ?? "voice"),
           );
 
           return (
@@ -157,6 +157,7 @@ export default function TimeSliderStrip({
                   {categories.has("travel") && <span className="dot dot-travel" />}
                   {categories.has("workout") && <span className="dot dot-workout" />}
                   {categories.has("memo") && <span className="dot dot-memo" />}
+                  {categories.has("stay") && <span className="dot dot-stay" />}
                   {categories.has("voice") && !categories.has("expense") && !categories.has("travel") && (
                     <span className="dot dot-voice" />
                   )}

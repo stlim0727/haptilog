@@ -36,6 +36,10 @@
   --cat-memo-border: #a855f7;
   --cat-memo-ink: #e9d5ff;
 
+  --cat-stay-bg: #16323a;
+  --cat-stay-border: #14b8a6;
+  --cat-stay-ink: #99f6e4;
+
   /* Core compatibility mapping */
   --bg-canvas: var(--ph-bg-canvas);
   --bg-surface: var(--ph-bg-card);
@@ -97,6 +101,10 @@ body.light-mode {
   --cat-memo-bg: #f3e8ff;
   --cat-memo-border: #a855f7;
   --cat-memo-ink: #581c87;
+
+  --cat-stay-bg: #ccfbf1;
+  --cat-stay-border: #14b8a6;
+  --cat-stay-ink: #115e59;
 
   --bg-canvas: var(--ph-bg-canvas);
   --bg-surface: var(--ph-bg-card);
@@ -914,6 +922,11 @@ footer a:hover {
   background: var(--cat-memo-bg);
   color: var(--cat-memo-ink);
   border-color: var(--cat-memo-border);
+}
+.category-stay {
+  background: var(--cat-stay-bg);
+  color: var(--cat-stay-ink);
+  border-color: var(--cat-stay-border);
 }
 .category-voice {
   background: var(--bg-surface-elevated);
@@ -2136,6 +2149,10 @@ audio {
   background: #d8b4fe;
   box-shadow: 0 0 3px #7e22ce;
 }
+.dot-stay {
+  background: #5eead4;
+  box-shadow: 0 0 3px #0f766e;
+}
 .dot-voice {
   background: #a1a1aa;
 }
@@ -2480,6 +2497,7 @@ audio {
 .time-strip-dots .dot-travel  { background: #7dd3fc; }
 .time-strip-dots .dot-workout { background: #6ee7b7; }
 .time-strip-dots .dot-memo    { background: #d8b4fe; }
+.time-strip-dots .dot-stay    { background: #5eead4; }
 .time-strip-dots .dot-voice   { background: #a1a1aa; }
 
 /* PR Preview / Demo Mode */
@@ -3263,6 +3281,25 @@ audio {
 .recording-details .context dl { flex-wrap: wrap; }
 .recording-details .muted { font-size: 12px; margin-bottom: 16px; }
 .transcript-history details > p, .transcript-history article { margin-top: 12px; }
+.stay-linked { padding-block: 18px; border-top: 1px solid var(--border); }
+.stay-linked .section-label { display: inline-flex; align-items: center; gap: 8px; }
+.related-record {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--text-primary);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.related-record:hover { background: var(--bg-surface-hover); }
+.related-record span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.related-record time { color: var(--text-secondary); white-space: nowrap; }
 .recording-actions { position: relative; }
 .recording-actions > summary {
   display: flex;

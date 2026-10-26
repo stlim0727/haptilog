@@ -1,5 +1,3 @@
-.stay-timeline details { margin-block: .75rem; padding: 1rem; border: 1px solid currentColor; border-radius: .75rem; }
-.stay-timeline summary { cursor: pointer; }
 .place-editor fieldset { display: grid; gap: .75rem; min-width: 0; }
 .place-editor label { display: grid; gap: .25rem; }
 .place-editor input { min-width: 0; max-width: 100%; }

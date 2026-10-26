@@ -2,6 +2,7 @@ import {
   Activity,
   FileText,
   Luggage,
+  MapPinned,
   Mic,
   Receipt,
 } from "lucide-react";
@@ -39,6 +40,12 @@ export function CategoryBadge({
           <FileText size={size} /> 메모 · MEMO
         </span>
       );
+    case "STAY":
+      return (
+        <span className="category category-stay">
+          <MapPinned size={size} /> 체류 · STAY
+        </span>
+      );
     default:
       return (
         <span className="category category-voice">
@@ -65,6 +72,8 @@ export function CategoryIcon({
       return <Activity size={size} />;
     case "MEMO":
       return <FileText size={size} />;
+    case "STAY":
+      return <MapPinned size={size} />;
     default:
       return <Mic size={size} />;
   }

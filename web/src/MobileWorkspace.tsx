@@ -34,12 +34,16 @@ import type { MapCluster } from "./mapClustering";
 import {
   expense,
   hasLocation,
-  latest,
+  intentType,
+  isRecordingItem,
+  isStayItem,
+  itemSummary,
   localDate,
   money,
   processingState,
 } from "./domain";
-import type { Recording } from "./domain";
+import type { TimelineItem } from "./domain";
+import { stayState, stayStateText, stayTitle } from "./location-stays/journal";
 import type { Language, TranslationKeys } from "./i18n";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
@@ -60,8 +64,8 @@ class MobileMapBoundary extends React.Component<
 }
 
 type Props = {
-  records: Recording[];
-  filtered: Recording[];
+  records: TimelineItem[];
+  filtered: TimelineItem[];
   loaded: boolean;
   truncated: boolean;
   date: string;
@@ -85,9 +89,11 @@ type Props = {
   emptyTrash: () => Promise<void>;
   isDemo?: boolean;
   onResetDemo?: () => void;
+  /** Shared clock so an open stay can say whether observation is still fresh. */
+  now?: number;
   locationControl?: React.ReactNode;
   renderInspector: (
-    recording: Recording,
+    item: TimelineItem,
     onDirtyChange: (dirty: boolean) => void,
   ) => React.ReactNode;
 };
@@ -97,6 +103,7 @@ export function MobileWorkspace(p: Props) {
   const ko = lang === "ko";
   const [view, setView] = useState<View>("list");
   const [detailId, setDetailId] = useState<string | null>(() =>
+    new URL(location.href).searchParams.get("stay") ??
     new URL(location.href).searchParams.get("recording")
   );
   const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
@@ -126,6 +133,7 @@ export function MobileWorkspace(p: Props) {
   const discardMessageRef = useRef(discardMessage);
   discardMessageRef.current = discardMessage;
   const detail = records.find((r) => r.id === detailId);
+  const detailTrashed = detail && isRecordingItem(detail) ? !!detail.deleted_at : false;
   const isTrash = p.category === "Trash";
   const categories = [
     ["All", t.all_cat],
@@ -133,12 +141,15 @@ export function MobileWorkspace(p: Props) {
     ["Travel", t.travel_cat],
     ["Workout", t.workout_cat],
     ["Memo", t.memo_cat],
+    ["Stay", t.stay_cat],
   ];
   const located = filtered.filter(hasLocation);
+  /** Stays are journal items too, but only voice records can be exported. */
+  const exportable = filtered.filter(isRecordingItem);
   // Coordinates a short walk apart are the same stop, so the place list shows
   // one counted group per place the way the map shows one pin per group.
   const places = clusterPlaces(located);
-  const groupKey = (group: MapCluster<Recording>) => group.members.reduce(
+  const groupKey = (group: MapCluster<TimelineItem>) => group.members.reduce(
     (lowest, member) => (member.id < lowest ? member.id : lowest),
     group.members[0].id,
   );
@@ -182,8 +193,8 @@ export function MobileWorkspace(p: Props) {
       dirty.current = false;
       p.onDraftChange(false);
       historyIndex.current = nextIndex;
-      const id = new URL(location.href).searchParams.get("recording");
-      setDetailId(id);
+      const params = new URL(location.href).searchParams;
+      setDetailId(params.get("stay") ?? params.get("recording"));
     };
     const unload = (event: BeforeUnloadEvent) => {
       if (!dirty.current) return;
@@ -228,13 +239,15 @@ export function MobileWorkspace(p: Props) {
     p.onDraftChange(false);
     const url = new URL(location.href);
     url.searchParams.delete("recording");
+    url.searchParams.delete("stay");
     history.replaceState({ ...history.state, mobileDetail: false }, "", url);
     setDetailId(null);
   }
-  function openDetail(r: Recording) {
-    returnPosition.current = { y: window.scrollY, id: r.id };
+  function openDetail(item: TimelineItem) {
+    returnPosition.current = { y: window.scrollY, id: item.id };
     const url = new URL(location.href);
-    url.searchParams.set("recording", r.id);
+    url.searchParams.delete(isStayItem(item) ? "recording" : "stay");
+    url.searchParams.set(isStayItem(item) ? "stay" : "recording", item.id);
     historyIndex.current++;
     history.pushState(
       {
@@ -245,18 +258,18 @@ export function MobileWorkspace(p: Props) {
       "",
       url,
     );
-    setDetailId(r.id);
+    setDetailId(item.id);
   }
   // A deleted/removed record must never silently switch the detail to another one.
   useEffect(() => {
     if (
-      p.loaded && detailId && (!detail || (!!detail.deleted_at !== isTrash))
+      p.loaded && detailId && (!detail || (detailTrashed !== isTrash))
     ) {
       dirty.current = false;
       p.onDraftChange(false);
       closeDetail();
     }
-  }, [p.loaded, detailId, detail?.deleted_at, isTrash, !!detail]);
+  }, [p.loaded, detailId, detail?.id, detailTrashed, isTrash, !!detail]);
 
   useEffect(() => {
     if (notionOpen) {
@@ -297,44 +310,55 @@ export function MobileWorkspace(p: Props) {
     setView("list");
     window.scrollTo(0, 0);
   }
-  function card(r: Recording) {
-    const e = latest(r), cost = expense(r), state = processingState(r);
+  function card(item: TimelineItem) {
+    const stay = isStayItem(item) ? item : null;
+    const cost = isStayItem(item) ? null : expense(item);
+    const state = isStayItem(item) ? "Ready" : processingState(item);
     const category =
-      categories.find(([key]) => key.toUpperCase() === e?.intent_type)?.[1] ??
+      categories.find(([key]) => key.toUpperCase() === intentType(item))?.[1] ??
         (ko ? "음성" : "Voice");
     return (
       <button
         type="button"
         className="mobile-record"
-        key={r.id}
-        data-record-id={r.id}
-        onClick={() => openDetail(r)}
+        key={item.id}
+        data-record-id={item.id}
+        onClick={() => openDetail(item)}
       >
         <span className="mobile-record-meta">
           <time>
-            {new Date(r.recorded_at).toLocaleTimeString(lang, {
+            {new Date(item.recorded_at).toLocaleTimeString(lang, {
               hour: "2-digit",
               minute: "2-digit",
             })}
           </time>
           <span
             className={`category category-${
-              e?.intent_type?.toLowerCase() ?? "voice"
+              intentType(item)?.toLowerCase() ?? "voice"
             }`}
           >
-            <CategoryIcon type={e?.intent_type} size={12} />
+            <CategoryIcon type={intentType(item)} size={12} />
             {category}
           </span>
         </span>
         <strong>
-          {e?.summary ||
-            (ko ? "기다리는 음성 기록" : "A moment, waiting to be heard")}
+          {itemSummary(item) ||
+            (stay
+              ? stayTitle(stay, ko)
+              : (ko ? "기다리는 음성 기록" : "A moment, waiting to be heard"))}
         </strong>
         <span className="mobile-record-foot">
           <Clock size={13} />
-          <span>{r.duration_seconds ?? "—"}{ko ? "초" : " sec"}</span>
-          {hasLocation(r) && <MapPin size={13} aria-label={t.gps_badge} />}
-          {state !== "Ready" && (
+          <span>
+            {stay
+              ? `${Math.round((stay.duration_seconds ?? 0) / 60)}${ko ? "분 체류" : " min stay"}`
+              : `${item.duration_seconds ?? "—"}${ko ? "초" : " sec"}`}
+          </span>
+          {hasLocation(item) && <MapPin size={13} aria-label={t.gps_badge} />}
+          {stay && stayState(stay, p.now ?? Date.now()) !== "closed" && (
+            <span>{stayStateText(stay, p.now ?? Date.now(), ko)}</span>
+          )}
+          {!stay && state !== "Ready" && (
             <span>
               {state === "Processing"
                 ? (ko ? "분석 중" : "Processing")
@@ -603,6 +627,7 @@ export function MobileWorkspace(p: Props) {
                       <RecordingMap
                         heading={t.map_heading}
                         recordings={filtered}
+                        now={p.now}
                         selectedId={mapSelected}
                         groupIds={selectedPlace
                           ? placeRecords.map((r) => r.id)
@@ -694,7 +719,7 @@ export function MobileWorkspace(p: Props) {
           </p>
           <div hidden={!notionOpen || isTrash}>
             <NotionExport
-              records={filtered}
+              records={exportable}
               ko={ko}
               onAuthorizationReturn={p.loaded ? revealNotion : undefined}
             />
@@ -749,10 +774,10 @@ export function MobileWorkspace(p: Props) {
         </div>
         <button onClick={enterTrash}>
           <Trash2 size={18} />
-          {t.trash} ({records.filter((r) => r.deleted_at).length})
+          {t.trash} ({records.filter((r) => isRecordingItem(r) && r.deleted_at).length})
         </button>
         <button
-          disabled={!filtered.length}
+          disabled={!exportable.length}
           onClick={() => {
             closeMenu();
             p.exportCsv();

@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "./fixtures";
+import { emptyLocationSnapshot } from "./portal-fixture";
 const browserId = "22222222-2222-4222-8222-222222222222";
 const sessionId = "11111111-1111-4111-8111-111111111111";
 const owner = "33333333-3333-4333-8333-333333333333";
@@ -120,6 +121,7 @@ async function setup(page: Page, { configured = true, connected = true } = {}) {
         body = { saved: true };
       } else throw new Error(`Unexpected action: ${input.action}`);
     } else if (path.endsWith("/recording_correction_history")) body = [];
+    else if (path.endsWith("/rpc/location_stays")) body = emptyLocationSnapshot;
     else throw new Error(`Unexpected request: ${path}`);
     await route.fulfill({
       status,

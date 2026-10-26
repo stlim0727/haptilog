@@ -7,8 +7,9 @@ import {
   Clock,
 } from "lucide-react";
 import { CategoryBadge } from "./CategoryBadge";
-import { expense, hasLocation, latest, localDate, money, toLocalDateString } from "./domain";
-import type { Recording } from "./domain";
+import { expense, hasLocation, intentType, isStayItem, itemSummary, localDate, money, toLocalDateString } from "./domain";
+import type { TimelineItem } from "./domain";
+import { stayTitle } from "./location-stays/journal";
 import type { TranslationKeys } from "./i18n";
 
 export default function CalendarView({
@@ -23,11 +24,12 @@ export default function CalendarView({
   lang?: "en" | "ko";
   onDateChange?: () => boolean | void;
   onSelectedDateChange?: (dateKey: string) => void;
-  recordings: Recording[];
+  recordings: TimelineItem[];
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
   t: TranslationKeys;
 }) {
+  const ko = lang === "ko";
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedDateKey, setSelectedDateKey] = useState<string>(() => toLocalDateString());
 
@@ -39,7 +41,7 @@ export default function CalendarView({
   const month = currentDate.getMonth(); // 0-indexed
 
   // Map of dateKey -> recordings
-  const dateMap = new Map<string, Recording[]>();
+  const dateMap = new Map<string, TimelineItem[]>();
   for (const r of recordings) {
     const key = localDate(r.recorded_at);
     const list = dateMap.get(key) ?? [];
@@ -158,7 +160,7 @@ export default function CalendarView({
 
             // Extract distinct category types on this day
             const categories = new Set(
-              list.map((r) => latest(r)?.intent_type?.toLowerCase() ?? "voice"),
+              list.map((r) => intentType(r)?.toLowerCase() ?? "voice"),
             );
 
             return (
@@ -189,6 +191,7 @@ export default function CalendarView({
                   {categories.has("travel") && <span className="cat-dot dot-travel" title="여행" />}
                   {categories.has("workout") && <span className="cat-dot dot-workout" title="운동" />}
                   {categories.has("memo") && <span className="cat-dot dot-memo" title="메모" />}
+                  {categories.has("stay") && <span className="cat-dot dot-stay" title="체류" />}
                   {categories.has("voice") && <span className="cat-dot dot-voice" title="음성" />}
                 </div>
               </button>
@@ -216,9 +219,12 @@ export default function CalendarView({
         ) : (
           <div className="calendar-day-list">
             {selectedDayRecordings.map((r) => {
-              const e = latest(r);
-              const cost = expense(r);
+              const stay = isStayItem(r);
+              const cost = stay ? null : expense(r);
               const isSelected = r.id === selectedId;
+              const duration = stay
+                ? `${Math.round((r.duration_seconds ?? 0) / 60)}${ko ? "분" : " min"}`
+                : `${r.duration_seconds}s`;
 
               return (
                 <button
@@ -236,11 +242,13 @@ export default function CalendarView({
                         minute: "2-digit",
                       })}
                     </span>
-                    <CategoryBadge type={e?.intent_type} size={11} />
+                    <CategoryBadge type={intentType(r)} size={11} />
                   </div>
 
                   <strong className="calendar-card-title">
-                    {e?.summary || "Voice recording"}
+                    {itemSummary(r) || (stay
+                      ? stayTitle(r, ko)
+                      : "Voice recording")}
                   </strong>
 
                   {cost && cost.amount != null && cost.currency && (
@@ -250,7 +258,7 @@ export default function CalendarView({
                   )}
 
                   <div className="calendar-card-footer">
-                    <span>{r.duration_seconds}s</span>
+                    <span>{duration}</span>
                     {hasLocation(r) ? (
                       <span className="gps-pill">
                         <MapPin size={11} /> {t.gps_badge}

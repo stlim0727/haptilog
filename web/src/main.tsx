@@ -1,5 +1,5 @@
 import { signInGoogle, watchAccount, type AccountWatch } from "./account";
-import React, { Fragment, lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import React, { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
@@ -20,6 +20,7 @@ import {
   LogOut,
   Luggage,
   MapPin,
+  MapPinned,
   MoreHorizontal,
   Mic,
   Receipt,
@@ -59,6 +60,10 @@ import {
   analysisFailure,
   expense,
   hasLocation,
+  intentType,
+  isRecordingItem,
+  isStayItem,
+  itemSummary,
   latest,
   localDate,
   money,
@@ -68,14 +73,18 @@ import {
   totals,
   toLocalDateString,
 } from "./domain";
-import type { Correction, Recording } from "./domain";
+import type { Correction, Recording, TimelineItem } from "./domain";
+import { createLocationRepository } from "./location-stays/repository";
+import { recordingAssociation } from "./location-stays/domain";
+import { stayEndReason, stayState, stayStateText, stayTitle, stayToTimelineItem } from "./location-stays/journal";
+import { useLocationStays } from "./location-stays/useLocationStays";
 import { translations, getInitialLanguage } from "./i18n";
 import type { Language, TranslationKeys } from "./i18n";
 import "./style.css";
 import "./mobile.css";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
-const LocationLauncher = lazy(() => import("./location-stays/LocationLauncher"));
+const PlacesPanel = lazy(() => import("./location-stays/PlacesPanel"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
@@ -166,7 +175,10 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("all");
   const [category, setCategory] = useState("All");
-  const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording"));
+  const [selected, setSelected] = useState<string | null>(() => {
+    const params = new URL(window.location.href).searchParams;
+    return params.get("stay") ?? params.get("recording");
+  });
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
   const [showTimeSlider, setShowTimeSlider] = useState(false);
@@ -182,6 +194,27 @@ function App() {
   const [isDemo, setIsDemo] = useState(isDemoSessionActive);
   const showTestLogin = isPreviewEnvironment();
   const t = translations[lang];
+  // Stays arrive from the same owner grant as recordings, on their own refresh cycle.
+  const locationRepository = useMemo(
+    () => supabase && connection && !isDemo
+      ? createLocationRepository(connection.owner_user_id, (name, args) => supabase!.rpc(name, args))
+      : null,
+    [connection?.owner_user_id, connection?.session_id, isDemo],
+  );
+  const location = useLocationStays({
+    owner: connection?.owner_user_id ?? "",
+    repository: locationRepository,
+    lang,
+  });
+  const stayItems = useMemo(
+    () => location.stays.map(stay => stayToTimelineItem(stay, location.places)),
+    [location.stays, location.places],
+  );
+  const items = useMemo<TimelineItem[]>(
+    () => [...records, ...stayItems]
+      .sort((a, b) => Date.parse(b.recorded_at) - Date.parse(a.recorded_at)),
+    [records, stayItems],
+  );
   useEffect(() => { document.documentElement.lang = lang; }, [lang]);
 
   useEffect(() => {
@@ -594,10 +627,9 @@ function App() {
   const trashedCount = records.filter((r) => Boolean(r.deleted_at)).length;
   const activeRecords = records.filter((r) => !r.deleted_at);
 
-  const filtered = records.filter((r) => {
-    const isTrashed = Boolean(r.deleted_at);
+  const filtered = items.filter((r) => {
+    const isTrashed = isStayItem(r) ? false : Boolean(r.deleted_at);
     if (isTrashView !== isTrashed) return false;
-    const e = latest(r);
     const day = localDate(r.recorded_at),
       today = toLocalDateString();
     return (
@@ -605,15 +637,16 @@ function App() {
         (date === "today"
           ? day === today
           : day.slice(0, 7) === today.slice(0, 7))) &&
-      (isTrashView || category === "All" || e?.intent_type === category.toUpperCase()) &&
+      (isTrashView || category === "All" || intentType(r) === category.toUpperCase()) &&
       (!search ||
-        `${e?.summary ?? ""} ${transcript(r)}`
+        `${itemSummary(r) ?? ""} ${isStayItem(r) ? "" : transcript(r)}`
           .toLowerCase()
           .includes(search.toLowerCase()))
     );
   });
   const active = filtered.find((r) => r.id === selected) ?? filtered[0];
-  const displayRecordings =
+  const exportable = filtered.filter(isRecordingItem);
+  const visibleItems =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
       ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)
       : filtered;
@@ -637,13 +670,53 @@ function App() {
   ).length;
   function exportCsv() {
     const url = URL.createObjectURL(
-      new Blob([csv(filtered)], { type: "text/csv;charset=utf-8" }),
+      new Blob([csv(exportable)], { type: "text/csv;charset=utf-8" }),
     );
     const link = document.createElement("a");
     link.href = url;
     link.download = `haptilog-${toLocalDateString()}.csv`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function deleteStay(id: string) {
+    const repository = location.repository, snapshot = location.snapshot;
+    if (!repository || !snapshot) return;
+    if (!window.confirm(lang === "ko"
+      ? "이 체류를 서버에서 삭제할까요? 워치가 다시 동기화해도 복원되지 않습니다. 음성과 장소 정의는 유지됩니다."
+      : "Delete this stay from the server? Synchronizing again will not restore it. Audio and saved places are retained.")) return;
+    const epoch = snapshot.state.sync_epoch;
+    const deleted = await location.perform(
+      () => repository.deleteStays([id], epoch),
+      lang === "ko" ? "체류를 삭제했습니다." : "Stay deleted.",
+    );
+    if (deleted && selected === id) setSelected(null);
+  }
+  /** One detail view for both kinds of journal item; a stay simply has no audio half. */
+  function inspectorFor(item: TimelineItem, onDirtyChange?: (dirty: boolean) => void) {
+    const related = isStayItem(item)
+      ? records.filter((r) => {
+        if (r.deleted_at) return false;
+        const match = recordingAssociation(r, [item.stay], location.now);
+        return match.kind === "candidate" && match.stayIds[0] === item.id;
+      })
+      : [];
+    return <Inspector
+      key={`${item.id}:${connection?.session_id ?? ""}`}
+      item={item}
+      onChange={load}
+      onDirtyChange={onDirtyChange}
+      onError={setError}
+      onMoveToTrash={moveToTrash}
+      onRestore={restoreRecording}
+      onDeletePermanently={deletePermanently}
+      onDeleteStay={deleteStay}
+      onSelectItem={setSelected}
+      lang={lang}
+      t={t}
+      isDemo={isDemo}
+      related={related}
+      now={location.now}
+    />;
   }
   return (
     <>
@@ -1024,15 +1097,13 @@ function App() {
           </section>
         </main>
       ) : mobile ? (
-        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} loaded={loaded} truncated={truncated}
+        <MobileWorkspace key={connection.session_id} records={items} filtered={filtered} loaded={loaded} truncated={truncated}
           date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
           summary={summary} count={dateFilteredActiveRecords.length} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
-          isDemo={isDemo} onResetDemo={resetSampleData}
-          locationControl={<Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} sessionId={connection.session_id} records={records} lang={lang} isDemo={isDemo} /></Suspense>}
-          renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
-            onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
-            lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
+          isDemo={isDemo} onResetDemo={resetSampleData} now={location.now}
+          locationControl={<Suspense fallback={null}><PlacesPanel data={location} lang={lang} isDemo={isDemo} /></Suspense>}
+          renderInspector={(item, onDirtyChange) => inspectorFor(item, onDirtyChange)} />
       ) : (
         <main className="workspace">
           {!accountEmail && supabase && (
@@ -1093,7 +1164,7 @@ function App() {
               <p>{t.workspace_subtitle}</p>
             </div>
             <div className="heading-actions">
-              <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} sessionId={connection.session_id} records={records} lang={lang} isDemo={isDemo} /></Suspense>
+              <Suspense fallback={null}><PlacesPanel data={location} lang={lang} isDemo={isDemo} /></Suspense>
               <label className="date-picker">
                 <CalendarDays size={16} />
                 <span className="sr-only">Date range</span>
@@ -1106,7 +1177,7 @@ function App() {
               <button
                 className="secondary-button"
                 onClick={exportCsv}
-                disabled={!filtered.length}
+                disabled={!exportable.length}
               >
                 <ArrowDownToLine size={16} />
                 {t.export_csv}
@@ -1122,7 +1193,7 @@ function App() {
               </button>}
             </div>
           </div>
-          {!isTrashView && <NotionExport key={connection.session_id} records={filtered} ko={lang === "ko"}
+          {!isTrashView && <NotionExport key={connection.session_id} records={exportable} ko={lang === "ko"}
             expanded={notionOpen} onExpandedChange={setNotionOpen} />}
           <div className="metrics">
             <section>
@@ -1250,6 +1321,7 @@ function App() {
                   ["Travel", t.travel_cat, Luggage],
                   ["Workout", t.workout_cat, Activity],
                   ["Memo", t.memo_cat, FileText],
+                  ["Stay", t.stay_cat, MapPinned],
                 ] as const
               ).map(([c, label, Icon]) => (
                 <button
@@ -1312,6 +1384,7 @@ function App() {
                       <RecordingMap
                         heading={t.map_heading}
                         lang={lang}
+                        now={location.now}
                         recordings={filtered.filter((r) => localDate(r.recorded_at) === calendarDateKey)}
                         selectedId={active?.id ?? null}
                         onSelect={(id, revealDetails) => {
@@ -1390,7 +1463,8 @@ function App() {
                         <RecordingMap
                           heading={t.map_heading}
                           lang={lang}
-                          recordings={displayRecordings}
+                          now={location.now}
+                          recordings={visibleItems}
                           selectedId={active?.id ?? null}
                           onSelect={(id, revealDetails) => {
                             setSelected(id);
@@ -1420,7 +1494,7 @@ function App() {
                           {t.empty_trash}
                         </button>
                       )}
-                      <span>{displayRecordings.length}</span>
+                      <span>{visibleItems.length}</span>
                     </div>
                   </div>
                   {!loaded ? (
@@ -1428,7 +1502,7 @@ function App() {
                       <LoaderCircle className="spin" />
                       <h3>{t.finding_moments}</h3>
                     </div>
-                  ) : !displayRecordings.length ? (
+                  ) : !visibleItems.length ? (
                     <div className="empty">
                       {isTrashView ? (
                         <>
@@ -1442,12 +1516,12 @@ function App() {
                         <>
                           <Mic size={30} />
                           <h3>
-                            {records.length
+                            {items.length
                               ? t.empty_active_title
                               : t.empty_first_title}
                           </h3>
                           <p>
-                            {records.length
+                            {items.length
                               ? t.empty_active_desc
                               : t.empty_first_desc}
                           </p>
@@ -1459,10 +1533,14 @@ function App() {
                     </div>
                   ) : (
                     <div className="record-list">
-                      {displayRecordings.map((r) => {
-                    const e = latest(r),
-                      state = processingState(r),
-                      x = expense(r);
+                      {visibleItems.map((r) => {
+                    const stay = isStayItem(r);
+                    const e = stay ? undefined : latest(r);
+                    const x = stay ? null : expense(r);
+                    const here = stay && stayState(r, location.now) === "active";
+                    const status = stay
+                      ? stayStateText(r, location.now, lang === "ko")
+                      : processingState(r);
                     return (
                       <button
                         key={r.id}
@@ -1478,26 +1556,31 @@ function App() {
                               minute: "2-digit",
                             })}
                           </time>
-                          <CategoryBadge type={e?.intent_type} size={11} />
+                          <CategoryBadge type={intentType(r)} size={11} />
                         </span>
                         <strong>
-                          {e?.summary || (lang === "ko" ? "기다리는 음성 기록" : "A moment, waiting to be heard")}
+                          {itemSummary(r) || (stay
+                            ? stayTitle(r, lang === "ko")
+                            : (lang === "ko" ? "기다리는 음성 기록" : "A moment, waiting to be heard"))}
                         </strong>
                         <span className="record-bottom">
                           <span
                             className={
-                              state === "Ready" ? "ready-text" : "pending-text"
+                              stay ? (here ? "ready-text" : "pending-text")
+                                : status === "Ready" ? "ready-text" : "pending-text"
                             }
                           >
                             <span className="status-dot" />
-                            {state}
+                            {status}
                           </span>
                           {x?.amount != null && x.currency ? (
                             <span className="record-amount">
                               {money(x.amount, x.currency)}
                             </span>
                           ) : (
-                            <span>{r.duration_seconds ?? "—"} {lang === "ko" ? "초" : "sec"}</span>
+                            <span>{stay
+                              ? `${Math.round((r.duration_seconds ?? 0) / 60)} ${lang === "ko" ? "분" : "min"}`
+                              : `${r.duration_seconds ?? "—"} ${lang === "ko" ? "초" : "sec"}`}</span>
                           )}
                           <ChevronRight size={14} />
                         </span>
@@ -1509,19 +1592,7 @@ function App() {
             </section>
             <section className="inspector" aria-label="Recording details">
               {active ? (
-                <Inspector
-                  key={`${active.id}:${connection.session_id}`}
-                  recording={active}
-                  onChange={load}
-                  onDirtyChange={setDraftInProgress}
-                  onError={setError}
-                  onMoveToTrash={moveToTrash}
-                  onRestore={restoreRecording}
-                  onDeletePermanently={deletePermanently}
-                  lang={lang}
-                  t={t}
-                  isDemo={isDemo}
-                />
+                inspectorFor(active, setDraftInProgress)
               ) : (
                 <div className="inspector-empty">
                   <span className="empty-orbit">
@@ -1545,19 +1616,7 @@ function App() {
 
           {viewMode === "calendar" && active && selected === active.id && (
             <section className="inspector" style={{ marginTop: "24px" }} aria-label="Selected recording details">
-              <Inspector
-                key={active.id}
-                recording={active}
-                onChange={load}
-                onDirtyChange={setDraftInProgress}
-                onError={setError}
-                onMoveToTrash={moveToTrash}
-                onRestore={restoreRecording}
-                onDeletePermanently={deletePermanently}
-                lang={lang}
-                t={t}
-                isDemo={isDemo}
-              />
+              {inspectorFor(active, setDraftInProgress)}
             </section>
           )}
           <p className="timezone-note">
@@ -1578,31 +1637,47 @@ function App() {
   );
 }
 function Inspector({
-  recording: r,
+  item: r,
   onChange,
   onError,
   onMoveToTrash,
   onRestore,
   onDeletePermanently,
+  onDeleteStay,
+  onSelectItem,
   lang,
   t,
   onDirtyChange,
   isDemo,
+  related = [],
+  now = Date.now(),
 }: {
-  recording: Recording;
+  item: TimelineItem;
   onChange: () => Promise<void>;
   onError: (message: string) => void;
   onMoveToTrash: (id: string) => Promise<void>;
   onRestore: (id: string) => Promise<void>;
   onDeletePermanently: (id: string) => Promise<void>;
+  onDeleteStay: (id: string) => Promise<void>;
+  /** Move the journal selection to another item, used by the stay's linked recordings. */
+  onSelectItem?: (id: string) => void;
   lang: Language;
   t: TranslationKeys;
   onDirtyChange?: (dirty: boolean) => void;
   isDemo?: boolean;
+  /** Voice recordings captured while the user was at this stay. */
+  related?: Recording[];
+  now?: number;
 }) {
-  const e = latest(r),
-    x = expense(r),
-    state = processingState(r);
+  const ko = lang === "ko";
+  const e = isStayItem(r) ? undefined : latest(r);
+  const x = isStayItem(r) ? null : expense(r);
+  const state = isStayItem(r) ? "Ready" : processingState(r);
+  const audioPath = isStayItem(r) ? null : r.audio_path;
+  const errorCode = isStayItem(r) ? null : r.enrichment_status?.error_code;
+  const trashed = isRecordingItem(r) ? r.deleted_at ?? null : null;
+  const correctionsAt = isRecordingItem(r) ? r.recording_corrections?.updated_at : undefined;
+  const stay = isStayItem(r) ? r : null;
   const [audioUrl, setAudioUrl] = useState("");
   const [audioBusy, setAudioBusy] = useState(false);
   const [retryBusy, setRetryBusy] = useState(false);
@@ -1638,20 +1713,20 @@ function Inspector({
       setMerchant(x?.merchant ?? "");
       setCategory(x?.category ?? "");
     }
-  }, [r.recording_corrections?.updated_at, e?.created_at, dirty]);
+  }, [correctionsAt, e?.created_at, dirty]);
   async function prepareAudio() {
     if (audioUrl) return audioUrl;
-    if (isDemo || r.audio_path?.startsWith("demo/")) {
+    if (isDemo || audioPath?.startsWith("demo/")) {
       const blob = createDemoAudioBlob();
       objectUrl.current = URL.createObjectURL(blob);
       setAudioUrl(objectUrl.current);
       return objectUrl.current;
     }
-    if (!supabase || !r.audio_path) return;
+    if (!supabase || !audioPath) return;
     setAudioBusy(true);
     const { data, error } = await supabase.storage
       .from("recordings")
-      .download(r.audio_path);
+      .download(audioPath);
     if (!mounted.current) return;
     if (error || !data)
       onError(t.audio_load_error);
@@ -1775,17 +1850,17 @@ function Inspector({
     )
       setDirty(false);
   }
-  const tasks = taskItems(r),
-    completed = r.recording_corrections?.completed_tasks ?? [];
+  const tasks = isRecordingItem(r) ? taskItems(r) : [];
+  const completed = isRecordingItem(r) ? r.recording_corrections?.completed_tasks ?? [] : [];
   return (
     <>
-      {r.deleted_at && (
+      {trashed && (
         <div className="trashed-banner" role="alert">
           <div>
             <strong>{t.in_trash}</strong>
             <p>
               {t.moved_to_trash_on}{" "}
-              {new Date(r.deleted_at).toLocaleString([], {
+              {new Date(trashed).toLocaleString([], {
                 month: "short",
                 day: "numeric",
                 hour: "2-digit",
@@ -1810,9 +1885,11 @@ function Inspector({
         </div>
       )}
       <div className="inspector-top">
-        <h2>{e?.summary || (lang === "ko" ? "보존된 음성 기록." : "Your voice, preserved.")}</h2>
+        <h2>{itemSummary(r) || (stay
+          ? stayTitle(stay, ko)
+          : (ko ? "보존된 음성 기록." : "Your voice, preserved."))}</h2>
         <div className="inspector-top-actions">
-          {state !== "Ready" && <span className="state-pill">{state}</span>}
+          {!stay && state !== "Ready" && <span className="state-pill">{state}</span>}
           <details className="recording-actions" onKeyDown={event => {
             if (event.key === "Escape") {
               event.currentTarget.open = false;
@@ -1821,22 +1898,27 @@ function Inspector({
           }} onBlur={event => {
             if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
           }}>
-            <summary aria-label={lang === "ko" ? "녹음 옵션" : "Recording options"}><MoreHorizontal size={20} /></summary>
+            <summary aria-label={ko ? "녹음 옵션" : "Recording options"}><MoreHorizontal size={20} /></summary>
             <div className="recording-actions-popover">
-              <button onClick={() => { if (!audioBusy) void downloadAudio(); }} disabled={!r.audio_path} aria-disabled={audioBusy}>
+              {!stay && <button onClick={() => { if (!audioBusy) void downloadAudio(); }} disabled={!audioPath} aria-disabled={audioBusy}>
                 <ArrowDownToLine size={14} /> {audioBusy ? t.loading_audio : t.download_audio}
-              </button>
-              {!r.deleted_at && <button className="trash-trigger" onClick={() => onMoveToTrash(r.id)} aria-label={lang === "en" ? "Move recording to trash" : t.move_to_trash}>
+              </button>}
+              {!stay && !trashed && <button className="trash-trigger" onClick={() => onMoveToTrash(r.id)} aria-label={lang === "en" ? "Move recording to trash" : t.move_to_trash}>
                 <Trash2 size={14} /> {t.move_to_trash}
+              </button>}
+              {stay && <button className="trash-trigger" onClick={() => void onDeleteStay(r.id)} aria-label={ko ? "체류 삭제" : "Delete this stay"}>
+                <Trash2 size={14} /> {ko ? "체류 삭제" : "Delete stay"}
               </button>}
             </div>
           </details>
         </div>
       </div>
       <p className="detail-time">
-        {new Date(r.recorded_at).toLocaleString()} ·{" "}
-        {r.duration_seconds ?? (lang === "ko" ? "알 수 없음" : "Unknown")} {lang === "ko" ? "초" : "seconds"}
+        {stay
+          ? `${new Date(stay.stay.started_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}–${new Date(stay.stay.last_observed_at).toLocaleString([], { hour: "2-digit", minute: "2-digit" })} · ${Math.round((stay.duration_seconds ?? 0) / 60)}${ko ? "분 관측" : " min observed"}`
+          : `${new Date(r.recorded_at).toLocaleString()} · ${r.duration_seconds ?? (ko ? "알 수 없음" : "Unknown")} ${ko ? "초" : "seconds"}`}
       </p>
+      {!isStayItem(r) && <>
       <section className="audio-section">
         {audioUrl ? (
           <>
@@ -1874,13 +1956,13 @@ function Inspector({
           <button
             className="audio-load"
             onClick={prepareAudio}
-            disabled={audioBusy || !r.audio_path}
+            disabled={audioBusy || !audioPath}
           >
             <AudioLines size={30} />
             <span>
               {audioBusy
                 ? t.loading_audio
-                : r.audio_path
+                : audioPath
                   ? t.load_audio
                   : t.audio_unavailable}
             </span>
@@ -1899,13 +1981,13 @@ function Inspector({
             <p>
               {state === "Processing" || retryBusy
                 ? t.analysis_in_progress
-                : analysisFailure(r.enrichment_status?.error_code)}
+                : analysisFailure(errorCode)}
             </p>
           </div>
           <button
             className="secondary-button"
             onClick={retry}
-            disabled={retryBusy || state === "Processing" || !r.audio_path}
+            disabled={retryBusy || state === "Processing" || !audioPath}
           >
             <RefreshCw size={14} />
             {retryBusy ? t.analysing : t.retry_analysis}
@@ -2002,13 +2084,48 @@ function Inspector({
           )}
         </>
       )}
+      </>}
+      {stay && (
+        <section className="stay-linked">
+          <div className="section-label">
+            <Link2 size={14} aria-hidden="true" /> {ko ? "이 체류에서 기록한 음성" : "Voice recorded during this stay"}
+          </div>
+          {!related.length && (
+            <p className="muted">{ko ? "이 시간에 저장된 음성 기록이 없습니다." : "No voice recordings at this time."}</p>
+          )}
+          {related.map((record) => (
+            <button key={record.id} type="button" className="related-record" onClick={() => onSelectItem?.(record.id)}>
+              <Mic size={14} aria-hidden="true" />
+              <span>{latest(record)?.summary || (ko ? "음성 기록" : "Voice recording")}</span>
+              <time>{new Date(record.recorded_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+            </button>
+          ))}
+        </section>
+      )}
       <section className="recording-location">
-        <span><MapPin size={16} aria-hidden="true" /> {lang === "ko" ? "녹음 위치" : "Recording location"}</span>
+        <span><MapPin size={16} aria-hidden="true" /> {stay ? (ko ? "체류 위치" : "Stay location") : (ko ? "녹음 위치" : "Recording location")}</span>
         {hasLocation(r) ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.latitude},${r.longitude}`)}`} target="_blank" rel="noopener noreferrer">{t.open_in_maps}</a>
           : <p className="muted">{t.no_location}</p>}
       </section>
       <details className="recording-details">
         <summary>{lang === "ko" ? "기록 상세" : "Recording details"}</summary>
+        {isStayItem(r) ? <>
+          <p className="muted">{ko ? "위치 관측만으로 추정한 체류입니다. 원음이나 전사문은 여기에 저장되지 않습니다." : "This stay is inferred from location observations only; no audio or transcript is stored here."}</p>
+          <section className="context">
+            <h3>{t.captured_context}</h3>
+            <dl>
+              <div><dt>{ko ? "정확도" : "Accuracy"}</dt><dd>{`±${Math.round(r.stay.accuracy_meters)} m`}</dd></div>
+              <div><dt>{ko ? "관측 반경" : "Observation radius"}</dt><dd>{`±${Math.round(r.stay.observation_radius_meters)} m`}</dd></div>
+              <div><dt>{ko ? "체류 임계값" : "Dwell threshold"}</dt><dd>{`${r.stay.threshold_minutes} ${ko ? "분" : "min"}`}</dd></div>
+              <div><dt>{ko ? "마지막 관측" : "Last observed"}</dt><dd>{new Date(r.stay.last_observed_at).toLocaleString()}</dd></div>
+              {stayEndReason(r, ko) && <div><dt>{ko ? "종료 사유" : "Ended"}</dt><dd>{stayEndReason(r, ko)}</dd></div>}
+            </dl>
+          </section>
+          <details className="structured">
+            <summary>{t.all_details}</summary>
+            <pre>{JSON.stringify(r.stay, null, 2)}</pre>
+          </details>
+        </> : <>
         <p className="muted">{t.audio_truth}</p>
         {e && <TranscriptHistory recording={r} lang={lang} />}
         {hasLocation(r) && <section className="context">
@@ -2027,6 +2144,7 @@ function Inspector({
             <small>{t.analysis_version}: {e.pipeline_version ?? "legacy"}</small>
           </details>
         )}
+        </>}
       </details>
     </>
   );

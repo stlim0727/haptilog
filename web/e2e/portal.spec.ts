@@ -140,7 +140,7 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
   await page.getByRole("button", { name: "Show map" }).click();
   await expect(page.getByRole("region", { name: "Map of recording locations" }))
     .toBeVisible();
-  await expect(page.getByText(/2 of 3 recordings have a saved location/))
+  await expect(page.getByText(/2 of 3 records have a saved location/))
     .toBeVisible();
   if (process.env.HAPTILOG_LIVE_MAP_TILES) {
     await expect.poll(() => page.locator(".leaflet-tile-loaded").count())
@@ -403,12 +403,12 @@ test("Calendar map follows the selected day, hides pins for empty days, and open
   await page.getByRole("button", { name: "Show map" }).click();
 
   // Today (2026-10-25) has no recordings — the map should show zero pins, not the two elsewhere.
-  await expect(page.getByText("0 of 0 recordings have a saved location")).toBeVisible();
+  await expect(page.getByText("0 of 0 records have a saved location")).toBeVisible();
   await expect(page.locator(".voice-marker")).toHaveCount(0);
 
   // Select 2026-10-16 (base recording, single pin).
   await page.getByRole("button", { name: "1 recording on 2026-10-16", exact: true }).click();
-  await expect(page.getByText("1 of 1 recordings have a saved location")).toBeVisible();
+  await expect(page.getByText("1 of 1 records have a saved location")).toBeVisible();
   await expect(page.locator(".voice-marker")).toHaveCount(1);
 
   // Tapping the pin and choosing its recording opens the inspector.
@@ -418,7 +418,7 @@ test("Calendar map follows the selected day, hides pins for empty days, and open
 
   // Switching to a different day re-scopes the map to that day's recording.
   await page.getByRole("button", { name: "1 recording on 2026-10-14", exact: true }).click();
-  await expect(page.getByText("1 of 1 recordings have a saved location")).toBeVisible();
+  await expect(page.getByText("1 of 1 records have a saved location")).toBeVisible();
   await expect(page.locator(".voice-marker")).toHaveCount(1);
   await page.locator(".voice-marker").first().click();
   await page.locator(".map-recordings button").filter({ hasText: "Earlier coffee" }).click();

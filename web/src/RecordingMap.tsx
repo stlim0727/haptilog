@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { hasLocation, latest } from "./domain";
-import { CLUSTER_MAX_ZOOM, clusterLocations } from "./mapClustering";
-import type { Recording } from "./domain";
+import { hasLocation, intentType, isStayItem, itemSummary } from "./domain";
+import type { TimelineItem } from "./domain";
+import { stayStateText, stayTitle } from "./location-stays/journal";
+import { clusterLocations, CLUSTER_MAX_ZOOM } from "./mapClustering";
 
 export default function RecordingMap({
   recordings,
@@ -14,8 +15,9 @@ export default function RecordingMap({
   showRoute = true,
   lang = "en",
   heading,
+  now = Date.now(),
 }: {
-  recordings: Recording[];
+  recordings: TimelineItem[];
   selectedId: string | null;
   /** Recordings of the place the user chose; every other pin is dimmed. */
   groupIds?: string[];
@@ -24,6 +26,7 @@ export default function RecordingMap({
   showRoute?: boolean;
   lang?: "ko" | "en";
   heading?: string;
+  now?: number;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
@@ -53,9 +56,14 @@ export default function RecordingMap({
     return () => query.removeEventListener("change", update);
   }, []);
   const locale = lang === "ko" ? "ko-KR" : "en-US";
+  const ko = lang === "ko";
   const shortDate = (value: string) => new Date(value).toLocaleString(locale, {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
+  /** Stays have no transcript, so their name and observed state carry the map label. */
+  const itemLabel = (item: TimelineItem) => itemSummary(item) ??
+    (isStayItem(item) ? `${stayTitle(item, ko)} · ${stayStateText(item, now, ko)}`
+      : (ko ? "음성 기록" : "Voice recording"));
   const located = recordings.filter(hasLocation);
 
   // Refreshing identical data must not reset a user's pan/zoom every 15 seconds.
@@ -63,9 +71,7 @@ export default function RecordingMap({
     located.map((r) => [r.id, r.latitude, r.longitude]),
   );
   const markerData = JSON.stringify(
-    located.map(
-      (r) => [r.id, r.latitude, r.longitude, r.recorded_at, latest(r)?.summary],
-    ),
+    located.map((r) => [r.id, r.latitude, r.longitude, r.recorded_at, itemLabel(r)]),
   );
   const groupSignature = groupIds?.join(",") ?? "";
   const initialBounds = useRef("");
@@ -143,16 +149,19 @@ export default function RecordingMap({
 
     // Connect sequential GPS records with a coral route line
     if (showRoute && located.length > 1) {
-      const sorted = [...located].sort(
+      // A stay is a place, not a step along a trail, so it never joins the route.
+      const sorted = located.filter(r => !isStayItem(r)).sort(
         (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime(),
       );
-      const points: L.LatLngExpression[] = sorted.map((r) => [r.latitude, r.longitude]);
-      routeLayer.current = L.polyline(points, {
-        color: "#f43f5e",
-        weight: 3,
-        opacity: 0.7,
-        dashArray: "6, 8",
-      }).addTo(instance);
+      if (sorted.length > 1) {
+        const points: L.LatLngExpression[] = sorted.map((r) => [r.latitude, r.longitude]);
+        routeLayer.current = L.polyline(points, {
+          color: "#f43f5e",
+          weight: 3,
+          opacity: 0.7,
+          dashArray: "6, 8",
+        }).addTo(instance);
+      }
     }
 
     for (const cluster of clusterLocations(located, zoom)) {
@@ -161,7 +170,7 @@ export default function RecordingMap({
         new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
       )[0];
       const label = entries.length < 2
-        ? `Recording ${new Date(first.recorded_at).toLocaleString()}`
+        ? `${itemLabel(first)} · ${new Date(first.recorded_at).toLocaleString()}`
         : lang === "ko"
           ? (cluster.coLocated
               ? `이 장소의 기록 ${entries.length}개`
@@ -197,7 +206,7 @@ export default function RecordingMap({
         const time = document.createElement("small");
         time.textContent = shortDate(r.recorded_at);
         const summary = document.createElement("span");
-        summary.textContent = latest(r)?.summary || (lang === "ko" ? "음성 기록" : "Voice recording");
+        summary.textContent = itemLabel(r);
         button.append(time, summary);
         button.addEventListener("click", () => selection.current(r.id, true));
         popup.appendChild(button);
@@ -317,14 +326,14 @@ export default function RecordingMap({
         }} aria-label={lang === "ko" ? "선택한 기록" : "Selected recording"}>
           <button className="map-selection-detail" onClick={() => onSelect(active.id, true)}>
             <small>{shortDate(active.recorded_at)}{placeCount > 1 ? ` · ${lang === "ko" ? `이 장소 기록 ${placeCount}개` : `${placeCount} recordings here`}` : ""}</small>
-            <strong>{latest(active)?.summary || (lang === "ko" ? "음성 기록" : "Voice recording")}</strong>
+            <strong>{itemLabel(active)}</strong>
             <span>{lang === "ko" ? "상세 보기 →" : "View details →"}</span>
           </button>
           <button className="map-selection-close" aria-label={lang === "ko" ? "요약 닫기" : "Dismiss summary"} onClick={() => setDismissedId(active.id)}>×</button>
         </div>
       )}
       <p className="map-caption">
-        {lang === "ko" ? `${recordings.length}개 중 ${located.length}개 기록에 위치가 저장되어 있어요. 지도는 OpenStreetMap에서 불러오며 음성과 텍스트는 지도 제공자에게 보내지 않아요.` : `${located.length} of ${recordings.length} recordings have a saved location. Others remain in the list. Map tiles load from OpenStreetMap. No recording audio or text is sent to the map provider.`}
+        {lang === "ko" ? `${recordings.length}개 중 ${located.length}개 기록에 위치가 저장되어 있어요. 지도는 OpenStreetMap에서 불러오며 음성과 텍스트는 지도 제공자에게 보내지 않아요.` : `${located.length} of ${recordings.length} records have a saved location. Others remain in the list. Map tiles load from OpenStreetMap. No recording audio or text is sent to the map provider.`}
       </p>
       {tileError && (
         <p role="status" className="map-caption">

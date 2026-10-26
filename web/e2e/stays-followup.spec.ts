@@ -3,6 +3,88 @@ import { test } from "./fixtures";
 import { staysFixture, openStays, hiddenKey, stayOwner } from "./stays-fixture";
 test.use({ timezoneId: "UTC" });
 
+const stayId = "44444444-4444-4444-8444-444444444444";
+const tile = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf6kAAAAASUVORK5CYII=";
+
+test("a stay joins the journal feed and opens the shared detail without the audio half", async ({ page }) => {
+  await staysFixture(page);
+  await page.goto("/");
+  const cards = page.locator(".record-card");
+  await expect(cards).toHaveCount(2);
+  // Newest first: the 2026-10-26 stay sits above the 2026-10-16 voice record.
+  await expect(cards.nth(0)).toContainText("Original cafe");
+  await expect(cards.nth(0)).toContainText("Observed moments ago");
+  await expect(cards.nth(1)).toContainText("Coffee on the corner");
+  await cards.filter({ hasText: "Original cafe" }).click();
+  const inspector = page.locator(".inspector");
+  await expect(inspector.locator("h2")).toHaveText("Original cafe");
+  await expect(inspector.getByText("min observed")).toBeVisible();
+  await expect(inspector.locator("audio")).toHaveCount(0);
+  await expect(inspector.locator(".audio-load")).toHaveCount(0);
+  await expect(inspector.getByRole("button", { name: "Move recording to trash" })).toHaveCount(0);
+  await inspector.getByLabel("Recording options", { exact: true }).click();
+  await expect(inspector.getByRole("button", { name: "Download .m4a" })).toHaveCount(0);
+  await expect(inspector.getByRole("button", { name: "Delete this stay" })).toBeVisible();
+  await page.screenshot({ path: "test-results/stay-as-record.png" });
+  // The voice record beside it keeps its audio half.
+  await cards.filter({ hasText: "Coffee on the corner" }).click();
+  await expect(inspector.locator(".audio-load")).toBeVisible();
+  await inspector.getByLabel("Recording options", { exact: true }).click();
+  await expect(inspector.getByRole("button", { name: "Move recording to trash" })).toBeVisible();
+  await expect(inspector.getByRole("button", { name: "Delete this stay" })).toHaveCount(0);
+});
+
+test("?stay= restores the stay in the detail after a reload", async ({ page }) => {
+  await staysFixture(page);
+  await page.goto(`/?stay=${stayId}`);
+  await expect(page.locator(".record-card.selected")).toContainText("Original cafe");
+  await expect(page.locator(".inspector h2")).toHaveText("Original cafe");
+});
+
+test("the phone layout lists the stay and opens it without audio", async ({ page }) => {
+  await staysFixture(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?stay=${stayId}`);
+  const cards = page.locator(".mobile-record");
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first()).toContainText("Original cafe");
+  await expect(cards.first()).toContainText("59 min stay");
+  await expect(page.locator(".mobile-detail .inspector h2")).toHaveText("Original cafe");
+  await expect(page.locator(".mobile-detail audio")).toHaveCount(0);
+  await page.screenshot({ path: "test-results/stay-as-record-mobile.png" });
+  await page.getByRole("button", { name: "Back to recordings" }).click();
+  await expect(cards).toHaveCount(2);
+});
+
+test("deleting a stay from the detail leaves the voice record and the place", async ({ page }) => {
+  const { state } = await staysFixture(page);
+  await page.goto("/");
+  await page.locator(".record-card").filter({ hasText: "Original cafe" }).click();
+  await page.getByLabel("Recording options", { exact: true }).click();
+  await page.getByRole("button", { name: "Delete this stay" }).click();
+  await expect.poll(() => state.data.stays.length).toBe(0);
+  await expect(page.locator(".record-card")).toHaveCount(1);
+  expect(state.puts.length).toBe(0);
+  const dialog = await openStays(page);
+  await expect(dialog.getByText("Original cafe", { exact: false }).first()).toBeVisible();
+});
+
+test("the stay appears in the calendar and on the map beside voice records", async ({ page }) => {
+  await staysFixture(page);
+  await page.route("https://tile.openstreetmap.org/**", (route) =>
+    route.fulfill({ contentType: "image/png", body: Buffer.from(tile, "base64") }));
+  await page.goto("/");
+  await page.getByRole("tab", { name: "Calendar" }).click();
+  await page.getByRole("button", { name: "1 recording on 2026-10-26" }).click();
+  await expect(page.locator(".calendar-day-card")).toContainText("Original cafe");
+  await page.getByRole("tab", { name: "List" }).click();
+  await page.getByRole("button", { name: "Show map" }).click();
+  await expect(page.locator(".voice-marker")).toHaveCount(2);
+  await page.locator(".voice-marker").first().click();
+  await expect(page.locator(".map-recordings button").filter({ hasText: "Original cafe" })).toBeVisible();
+  await page.screenshot({ path: "test-results/stay-in-calendar-and-map.png" });
+});
+
 test("background refresh network failure preserves the place draft and loaded data", async ({ page }) => {
   const { state } = await staysFixture(page);
   const dialog = await openStays(page);
@@ -77,17 +159,29 @@ test("forbidden refresh clears sensitive loaded information and the draft", asyn
   await expect(dialog.getByText("Original cafe", { exact: false })).toHaveCount(0);
 });
 
-for (const action of ["delete", "revoke", "logout"] as const) {
+test("turning cloud sync off on the watch drops the stay and locks the place editor", async ({ page }) => {
+  const { state } = await staysFixture(page);
+  await page.goto("/");
+  await expect(page.locator(".record-card").filter({ hasText: "Original cafe" })).toBeVisible();
+  state.data.state.consent_enabled = false;
+  state.data.stays = [];
+  const dialog = await openStays(page);
+  await expect(dialog.getByText("Turn on cloud sync on the watch to edit places.")).toBeVisible();
+  await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.locator(".record-card").filter({ hasText: "Original cafe" })).toHaveCount(0);
+});
+
+for (const action of ["delete", "consent", "logout"] as const) {
   test(`${action} clears hidden location coordinates from this browser`, async ({ page }) => {
-    await staysFixture(page);
+    const { state } = await staysFixture(page);
     const dialog = await openStays(page);
     await page.evaluate(({ key, owner }) => localStorage.setItem(key, JSON.stringify([{ owner, latitude: 37.5, longitude: 127, radius_meters: 200, expires_at: Date.now() + 60_000 }])), { key: hiddenKey, owner: stayOwner });
     if (action === "delete") {
-      await dialog.locator("summary").click();
-      await dialog.getByRole("button", { name: "Delete this stay", exact: true }).click();
+      await dialog.getByRole("button", { name: "Delete all server stays", exact: true }).click();
       await dialog.getByRole("button", { name: "Permanently delete stays", exact: true }).click();
-    } else if (action === "revoke") {
-      await dialog.getByRole("button", { name: "Revoke synchronization consent", exact: true }).click();
+    } else if (action === "consent") {
+      state.data.state.consent_enabled = false;
+      await dialog.getByRole("button", { name: "Refresh", exact: true }).click();
     } else {
       await dialog.getByRole("button", { name: "Close", exact: true }).click();
       await page.getByRole("button", { name: "Disconnect browser", exact: true }).click();

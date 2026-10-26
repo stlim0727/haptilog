@@ -1,3 +1,5 @@
+import type { SavedPlace, Stay } from "./location-stays/types.ts";
+
 export type Enrichment = {
   pipeline_version: string | null;
   created_at: string;
@@ -38,6 +40,35 @@ export type Recording = {
   deleted_at?: string | null;
   purging_at?: string | null;
 };
+export type StayItem = {
+  kind: "stay";
+  id: string;
+  /** Stay start, named like a recording so every surface sorts and groups both. */
+  recorded_at: string;
+  duration_seconds: number | null;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  /** Set only when exactly one saved area contains the stay. */
+  place: string | null;
+  place_matches: number;
+  stay: Stay;
+};
+/** Everything the journal shows: a voice recording, or a stay without audio. */
+export type TimelineItem = Recording | StayItem;
+export function isStayItem(item: TimelineItem): item is StayItem {
+  return "kind" in item;
+}
+export function isRecordingItem(item: TimelineItem): item is Recording {
+  return !isStayItem(item);
+}
+export function intentType(item: TimelineItem) {
+  return isStayItem(item) ? "STAY" : latest(item)?.intent_type;
+}
+/** The one line that names an item in the feed, calendar, map and detail. */
+export function itemSummary(item: TimelineItem) {
+  return isStayItem(item) ? item.place : latest(item)?.summary;
+}
 export function latest(recording: Recording) {
   return [...recording.voice_enrichments].sort(
     (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),

@@ -62,6 +62,13 @@ export const baseRecording = {
   enrichment_status: null,
   recording_corrections: null,
 };
+/** Stays load beside recordings; specs without stay fixtures answer with an empty journal. */
+export const emptyLocationSnapshot = {
+  protocol_version: 1,
+  state: { consent_enabled: false, consent_revision: 0, sync_epoch: 0, upload_cutoff: null,
+    places_revision: 0, applied_places_revision: 0, threshold_minutes: 10 },
+  places: [], stays: [], deleted_ids: [],
+};
 export async function fixture(
   page: Page,
   { connected = true, failed = false, google = false, saved = false } = {},
@@ -109,6 +116,8 @@ export async function fixture(
       body = { configured: false, connected: false, target: null, exports: [] };
     } else if (path.endsWith("/set_cloud_consent")) {
       return route.fulfill({ status: 204 });
+    } else if (path.endsWith("/rpc/location_stays")) {
+      body = emptyLocationSnapshot;
     } else if (path.endsWith("/logout")) return route.fulfill({ status: 204 });
     else if (path.endsWith("/watch-access")) {
       const input = req.postDataJSON();
