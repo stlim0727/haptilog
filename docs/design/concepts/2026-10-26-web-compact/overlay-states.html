@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>HaptiLog — overlay states</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --canvas:#141416; --card:#1c1d24; --card-subtle:#24252f;
+  --ink:#f4f4f6; --ink-2:#a1a1aa; --ink-3:#71717a;
+  --border:#383844; --border-subtle:#272730; --border-strong:#4a4a5a;
+  --accent:#f7a501; --accent-hover:#f54e00;
+  --cat-expense-bg:#3f2214; --cat-expense-br:#f59e0b; --cat-expense-ink:#fde68a;
+  --cat-travel-bg:#14352b; --cat-travel-br:#10b981; --cat-travel-ink:#a7f3d0;
+  --cat-workout-bg:#132f4c; --cat-workout-br:#0ea5e9; --cat-workout-ink:#bae6fd;
+  --cat-memo-bg:#2d1a45; --cat-memo-br:#a855f7; --cat-memo-ink:#e9d5ff;
+}
+* { box-sizing: border-box; }
+html,body { margin:0; padding:0; }
+body {
+  background:var(--canvas); color:var(--ink);
+  font-family:"DM Sans", system-ui, sans-serif; font-size:14px; line-height:1.55;
+  min-height:100vh; width:1440px; margin:0 auto;
+}
+button { font:inherit; color:inherit; background:none; border:none; cursor:default; }
+
+.topbar { padding:14px 32px; border-bottom:1px solid var(--border-subtle);
+  display:flex; align-items:center; justify-content:space-between; }
+.brand { font-weight:700; font-size:17px; letter-spacing:-0.2px; }
+.brand .dot { color:var(--accent); }
+.top-right { display:flex; align-items:center; gap:12px; }
+.pill { padding:6px 12px; border:1px solid var(--border); border-radius:999px; font-size:12.5px; color:var(--ink-2);
+  display:inline-flex; align-items:center; gap:6px; }
+.pill .avatar { width:18px; height:18px; border-radius:50%; background:var(--accent); color:#111; display:inline-flex;
+  align-items:center; justify-content:center; font-weight:700; font-size:11px; }
+.pill.watch { border-color:var(--border-strong); color:var(--ink); }
+.icon-btn { width:32px; height:32px; border-radius:8px; border:1px solid var(--border); display:inline-flex;
+  align-items:center; justify-content:center; color:var(--ink-2); font-size:14px; }
+
+main { padding:22px 32px 40px; }
+
+/* Hybrid header (locked in as the reference for these previews) */
+.head .eyebrow { color:var(--accent); font-size:11px; letter-spacing:1.4px; font-weight:600; }
+.head h1 { font-size:24px; margin:4px 0 2px; font-weight:600; letter-spacing:-0.3px; }
+.head .sub { color:var(--ink-2); margin:0; font-size:13px; }
+.head .heading { margin-bottom:12px; }
+.head .heading-actions { display:flex; gap:8px; align-items:center; justify-content:flex-end; margin-bottom:12px; }
+.head .status-inline { display:flex; align-items:center; gap:14px;
+  padding:10px 14px; background:var(--card); border:1px solid var(--border-subtle); border-radius:10px;
+  box-shadow:2.5px 2.5px 0 #000; margin-bottom:16px; font-size:13px; }
+.head .status-inline .chip { color:var(--ink); }
+.head .status-inline .chip .lbl { color:var(--ink-3); font-size:11.5px; margin-right:4px; }
+.head .status-inline .cloud { color:var(--ink-2); margin-left:auto; }
+.btn-ghost { padding:7px 12px; border:1px solid var(--border); border-radius:8px; color:var(--ink-2); font-size:12.5px; }
+
+/* View row */
+.view-row { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+.view-row .spacer { flex:1; }
+.view-row .state-label { color:var(--ink-3); font-size:12px; }
+.toggle { padding:6px 12px; border-radius:999px; border:1px solid var(--border-subtle); color:var(--ink-2); font-size:12.5px;
+  display:inline-flex; align-items:center; gap:6px; }
+.toggle.active { background:var(--accent); color:#111; border-color:var(--accent); font-weight:600; }
+
+/* Filter row */
+.filter-row { display:flex; align-items:center; gap:8px; margin-bottom:16px; padding:10px 12px;
+  background:var(--card); border:1px solid var(--border-subtle); border-radius:10px; }
+.chip { padding:4px 10px; border-radius:999px; font-size:12px; color:var(--ink-2); border:1px solid transparent; }
+.chip.active { background:var(--card-subtle); color:var(--ink); border-color:var(--border-strong); }
+.chip.trash { color:var(--ink-3); }
+.search { flex:1; max-width:280px; margin-left:auto; padding:6px 10px; border-radius:8px;
+  background:var(--card-subtle); border:1px solid var(--border-subtle); color:var(--ink-3); font-size:12.5px; }
+
+/* Map section (full-width, above the workspace grid) */
+.map-section { position:relative; margin-bottom:16px;
+  background:#0e1418; border:1px solid var(--border-subtle); border-radius:12px; overflow:hidden;
+  height:280px; box-shadow:2.5px 2.5px 0 #000; }
+.map-section svg { display:block; width:100%; height:100%; }
+.map-heading { position:absolute; top:12px; left:14px; padding:6px 12px;
+  background:rgba(20,20,22,0.85); backdrop-filter: blur(6px);
+  border:1px solid var(--border); border-radius:8px; font-size:12px; color:var(--ink); }
+.map-heading small { display:block; color:var(--ink-3); font-size:11px; }
+.map-close { position:absolute; top:12px; right:14px; padding:4px 10px;
+  background:rgba(20,20,22,0.85); border:1px solid var(--border); border-radius:8px;
+  color:var(--ink-2); font-size:12px; }
+.map-legend { position:absolute; bottom:12px; left:14px; display:flex; gap:10px; padding:6px 10px;
+  background:rgba(20,20,22,0.85); border:1px solid var(--border); border-radius:8px; font-size:11px; color:var(--ink-2); }
+.map-legend .lg { display:inline-flex; align-items:center; gap:5px; }
+.map-legend .swatch { width:8px; height:8px; border-radius:50%; }
+
+/* Workspace grid: [rail?] [list] [inspector] */
+.workspace { display:grid; grid-template-columns: 1fr 480px; gap:20px; }
+body[data-cal="1"] .workspace { grid-template-columns: 240px 1fr 480px; }
+
+/* Calendar rail */
+.cal-rail { background:var(--card); border:1px solid var(--border-subtle); border-radius:12px;
+  padding:14px 14px 16px; box-shadow:2.5px 2.5px 0 #000; height:fit-content; }
+.cal-rail .cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.cal-rail .cal-title { font-weight:600; font-size:14px; }
+.cal-rail .cal-nav { color:var(--ink-2); font-size:14px; }
+.cal-rail .cal-nav button { padding:2px 6px; border-radius:4px; }
+.cal-rail .cal-week { display:grid; grid-template-columns:repeat(7,1fr); gap:2px;
+  color:var(--ink-3); font-size:9.5px; text-align:center; text-transform:uppercase; margin-bottom:4px; }
+.cal-rail .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.cal-rail .cal-day { aspect-ratio:1/1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  border-radius:6px; font-size:11px; color:var(--ink-2); position:relative; }
+.cal-rail .cal-day.empty { color:var(--ink-3); opacity:0.35; }
+.cal-rail .cal-day.today { background:var(--card-subtle); color:var(--ink); }
+.cal-rail .cal-day.selected { background:var(--accent); color:#111; font-weight:700; }
+.cal-rail .cal-day .dots { display:flex; gap:1.5px; margin-top:2px; height:4px; }
+.cal-rail .cal-day .d { width:3px; height:3px; border-radius:50%; }
+.cal-rail .cal-day .d.expense { background:var(--cat-expense-br); }
+.cal-rail .cal-day .d.travel { background:var(--cat-travel-br); }
+.cal-rail .cal-day .d.workout { background:var(--cat-workout-br); }
+.cal-rail .cal-day .d.memo { background:var(--cat-memo-br); }
+.cal-rail .cal-foot { margin-top:12px; padding-top:10px; border-top:1px solid var(--border-subtle);
+  color:var(--ink-3); font-size:11px; text-align:center; }
+
+/* Feed */
+.record-card { background:var(--card); border:1px solid var(--border-subtle); border-radius:10px; padding:12px 14px;
+  margin-bottom:8px; box-shadow:2.5px 2.5px 0 #000; }
+.record-card.selected { border-color:var(--accent); }
+.record-card .meta { display:flex; align-items:center; gap:8px; color:var(--ink-3); font-size:11.5px; }
+.badge { padding:1px 7px; border-radius:4px; font-size:10px; font-weight:600; }
+.badge.memo { background:var(--cat-memo-bg); color:var(--cat-memo-ink); border:1px solid var(--cat-memo-br); }
+.badge.expense { background:var(--cat-expense-bg); color:var(--cat-expense-ink); border:1px solid var(--cat-expense-br); }
+.badge.travel { background:var(--cat-travel-bg); color:var(--cat-travel-ink); border:1px solid var(--cat-travel-br); }
+.badge.workout { background:var(--cat-workout-bg); color:var(--cat-workout-ink); border:1px solid var(--cat-workout-br); }
+.record-card strong { display:block; margin:6px 0 4px; font-size:14.5px; font-weight:500; }
+.record-card .bot { display:flex; align-items:center; gap:8px; color:var(--ink-2); font-size:11.5px; }
+.record-card .status-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); }
+.record-card .chev { margin-left:auto; color:var(--ink-3); }
+
+/* Inspector */
+.inspector { background:var(--card); border:1px solid var(--border-subtle); border-radius:12px; padding:18px 20px;
+  box-shadow:2.5px 2.5px 0 #000; height:fit-content; }
+.inspector h2 { font-size:17px; margin:0 0 6px; font-weight:600; }
+.inspector .time { color:var(--ink-3); font-size:12px; margin:0 0 14px; }
+.audio-player { background:var(--card-subtle); border:1px solid var(--border-subtle); border-radius:8px;
+  padding:12px; display:flex; align-items:center; gap:10px; color:var(--ink-2); font-size:12px; margin-bottom:14px; }
+.audio-player .play { width:32px; height:32px; border-radius:50%; background:var(--accent); color:#111;
+  display:inline-flex; align-items:center; justify-content:center; font-weight:700; }
+.audio-player .wave { flex:1; height:24px; background:linear-gradient(90deg, transparent, var(--border-strong), transparent); border-radius:4px; }
+.section-label { color:var(--ink-3); font-size:11px; text-transform:uppercase; letter-spacing:0.8px; margin:14px 0 6px; }
+.transcript { color:var(--ink-2); font-size:13px; line-height:1.6; padding:10px 12px; background:var(--card-subtle);
+  border:1px solid var(--border-subtle); border-radius:8px; }
+.field-row { display:grid; grid-template-columns:1fr 100px; gap:8px; }
+.field { background:var(--card-subtle); border:1px solid var(--border-subtle); border-radius:8px; padding:8px 10px;
+  color:var(--ink); font-size:13px; margin-top:8px; }
+.save-btn { background:var(--accent); color:#111; padding:8px 14px; border-radius:8px; font-weight:600; font-size:13px;
+  margin-top:12px; border:1px solid var(--accent); box-shadow:2px 2px 0 #000; }
+.location-line { margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle);
+  color:var(--ink-2); font-size:12px; display:flex; align-items:center; gap:8px; }
+.location-line .link { color:var(--accent); margin-left:auto; }
+
+/* Show/hide based on state */
+body:not([data-map="1"]) .map-section { display:none; }
+body:not([data-cal="1"]) .cal-rail { display:none; }
+</style>
+</head>
+<body data-map="0" data-cal="0">
+
+<header class="topbar">
+  <div class="brand">haptilog<span class="dot">.</span></div>
+  <div class="top-right">
+    <span class="icon-btn">☀</span>
+    <span class="pill">EN</span>
+    <span class="pill"><span class="avatar">S</span>Account</span>
+    <span class="pill watch">⌚ watch-A17</span>
+  </div>
+</header>
+
+<main>
+
+<div class="head">
+  <div class="heading">
+    <span class="eyebrow">EVENING REVIEW</span>
+    <h1>Your day, on the wrist</h1>
+    <p class="sub">Review what your watch captured, without scrolling forever.</p>
+  </div>
+  <div class="heading-actions">
+    <button class="btn-ghost">This month ▾</button>
+    <button class="btn-ghost">⬇ CSV</button>
+    <button class="btn-ghost">⬡ Notion</button>
+  </div>
+  <div class="status-inline">
+    <span class="chip"><span class="lbl">Spending</span> <span style="color:var(--cat-expense-ink); font-weight:600">₩42,300</span></span>
+    <span style="color:var(--ink-3)">·</span>
+    <span class="chip"><span class="lbl">Moments</span> <span style="font-weight:600">18 recs</span></span>
+    <span style="color:var(--ink-3)">·</span>
+    <span class="chip"><span class="lbl">Ready</span> <span style="font-weight:600">16/18</span></span>
+    <span style="color:var(--ink-3)">·</span>
+    <span class="cloud">⚡ 14:32 <button class="icon-btn" style="width:22px;height:22px;font-size:12px;">↻</button></span>
+  </div>
+</div>
+
+<div class="view-row">
+  <span class="state-label" id="stateLabel">Base — no overlays</span>
+  <span class="spacer"></span>
+  <button class="toggle" id="toggleMap">🗺 Map</button>
+  <button class="toggle" id="toggleCal">📅 Calendar</button>
+</div>
+
+<div class="filter-row">
+  <button class="chip active">All</button>
+  <button class="chip">🧾 Expense</button>
+  <button class="chip">🧳 Travel</button>
+  <button class="chip">🏃 Workout</button>
+  <button class="chip">📝 Memo</button>
+  <button class="chip trash">🗑 Trash (3)</button>
+  <div class="search">🔍 Search transcripts…</div>
+</div>
+
+<!-- MAP (full-width, above workspace) -->
+<section class="map-section" aria-label="Recording map">
+  <svg viewBox="0 0 1376 280" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1a2228" stroke-width="1"/>
+      </pattern>
+    </defs>
+    <rect width="1376" height="280" fill="#0e1418"/>
+    <rect width="1376" height="280" fill="url(#grid)"/>
+    <!-- river -->
+    <path d="M 0 200 Q 200 160 400 190 T 800 170 T 1376 210" fill="none" stroke="#132f4c" stroke-width="26" opacity="0.9"/>
+    <path d="M 0 200 Q 200 160 400 190 T 800 170 T 1376 210" fill="none" stroke="#0ea5e9" stroke-width="1" opacity="0.35"/>
+    <!-- roads -->
+    <path d="M 100 0 L 100 280 M 340 0 L 340 280 M 620 0 L 620 280 M 900 0 L 900 280 M 1180 0 L 1180 280" stroke="#242528" stroke-width="3"/>
+    <path d="M 0 60 L 1376 60 M 0 130 L 1376 130 M 0 240 L 1376 240" stroke="#242528" stroke-width="2"/>
+    <!-- route polyline connecting pins -->
+    <path d="M 210 100 L 480 145 L 720 90 L 980 175 L 1180 130" fill="none" stroke="#f7a501" stroke-width="2" stroke-dasharray="6 4" opacity="0.75"/>
+    <!-- pins -->
+    <g>
+      <circle cx="210" cy="100" r="9" fill="#f59e0b" stroke="#111" stroke-width="2"/>
+      <text x="210" y="104" text-anchor="middle" font-size="9" fill="#111" font-weight="700">₩</text>
+    </g>
+    <g>
+      <circle cx="480" cy="145" r="9" fill="#a855f7" stroke="#111" stroke-width="2"/>
+      <text x="480" y="149" text-anchor="middle" font-size="9" fill="#111" font-weight="700">M</text>
+    </g>
+    <g>
+      <circle cx="720" cy="90" r="11" fill="#f7a501" stroke="#111" stroke-width="2.5"/>
+      <text x="720" y="94" text-anchor="middle" font-size="9" fill="#111" font-weight="700">▶</text>
+    </g>
+    <g>
+      <circle cx="980" cy="175" r="9" fill="#10b981" stroke="#111" stroke-width="2"/>
+      <text x="980" y="179" text-anchor="middle" font-size="9" fill="#111" font-weight="700">L</text>
+    </g>
+    <g>
+      <circle cx="1180" cy="130" r="9" fill="#0ea5e9" stroke="#111" stroke-width="2"/>
+      <text x="1180" y="134" text-anchor="middle" font-size="9" fill="#111" font-weight="700">R</text>
+    </g>
+    <!-- tooltip on selected pin -->
+    <g transform="translate(720, 90)">
+      <rect x="-90" y="-58" width="180" height="42" rx="6" fill="#1c1d24" stroke="#f7a501" stroke-width="1.5"/>
+      <text x="-80" y="-42" font-size="10.5" fill="#f4f4f6" font-weight="600">Lunch with Minji</text>
+      <text x="-80" y="-27" font-size="9.5" fill="#a1a1aa">Oct 24 · 14:32 · 42s · ₩12,000</text>
+    </g>
+  </svg>
+  <div class="map-heading"><strong>Route for Oct 24</strong><small>5 recordings with location · 1 selected</small></div>
+  <button class="map-close">✕ Close</button>
+  <div class="map-legend">
+    <span class="lg"><span class="swatch" style="background:#f59e0b"></span>Expense</span>
+    <span class="lg"><span class="swatch" style="background:#a855f7"></span>Memo</span>
+    <span class="lg"><span class="swatch" style="background:#10b981"></span>Travel</span>
+    <span class="lg"><span class="swatch" style="background:#0ea5e9"></span>Workout</span>
+  </div>
+</section>
+
+<!-- WORKSPACE: [rail?] [list] [inspector] -->
+<div class="workspace">
+
+  <!-- CALENDAR RAIL -->
+  <aside class="cal-rail" aria-label="Calendar">
+    <div class="cal-head">
+      <span class="cal-title">October 2026</span>
+      <span class="cal-nav"><button>‹</button><button>›</button></span>
+    </div>
+    <div class="cal-week"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+    <div class="cal-grid">
+      <span class="cal-day empty">29</span>
+      <span class="cal-day empty">30</span>
+      <span class="cal-day">1</span>
+      <span class="cal-day">2</span>
+      <span class="cal-day">3</span>
+      <span class="cal-day">4</span>
+      <span class="cal-day">5</span>
+      <span class="cal-day">6</span>
+      <span class="cal-day">7</span>
+      <span class="cal-day">8</span>
+      <span class="cal-day">9</span>
+      <span class="cal-day">10</span>
+      <span class="cal-day">11</span>
+      <span class="cal-day">12</span>
+      <span class="cal-day">13</span>
+      <span class="cal-day">14</span>
+      <span class="cal-day">15</span>
+      <span class="cal-day">16</span>
+      <span class="cal-day">17</span>
+      <span class="cal-day">18</span>
+      <span class="cal-day">19</span>
+      <span class="cal-day">20<span class="dots"><i class="d expense"></i><i class="d memo"></i></span></span>
+      <span class="cal-day">21<span class="dots"><i class="d expense"></i><i class="d memo"></i></span></span>
+      <span class="cal-day">22<span class="dots"><i class="d travel"></i><i class="d memo"></i></span></span>
+      <span class="cal-day">23<span class="dots"><i class="d workout"></i></span></span>
+      <span class="cal-day selected">24<span class="dots"><i class="d expense"></i><i class="d memo"></i></span></span>
+      <span class="cal-day today">25<span class="dots"><i class="d memo"></i></span></span>
+      <span class="cal-day">26</span>
+      <span class="cal-day">27</span>
+      <span class="cal-day">28</span>
+      <span class="cal-day">29</span>
+      <span class="cal-day">30</span>
+      <span class="cal-day">31</span>
+      <span class="cal-day empty">1</span>
+      <span class="cal-day empty">2</span>
+      <span class="cal-day empty">3</span>
+      <span class="cal-day empty">4</span>
+      <span class="cal-day empty">5</span>
+      <span class="cal-day empty">6</span>
+      <span class="cal-day empty">7</span>
+      <span class="cal-day empty">8</span>
+    </div>
+    <div class="cal-foot">Tap a day to filter · 18 this month</div>
+  </aside>
+
+  <!-- FEED -->
+  <div class="feed">
+    <div class="record-card selected">
+      <div class="meta"><span>Oct 24 · 14:32</span> <span class="badge memo">MEMO</span></div>
+      <strong>Lunch with Minji — split check, she owes ₩8,500</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 42 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 24 · 12:05</span> <span class="badge expense">EXPENSE</span></div>
+      <strong>Seoul Cafe — Americano ₩4,500</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 8 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 23 · 07:14</span> <span class="badge workout">WORKOUT</span></div>
+      <strong>Morning run — 5.2 km along Han River</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 22 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 22 · 19:48</span> <span class="badge travel">TRAVEL</span></div>
+      <strong>Bus 271 schedule change — check Monday</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 15 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 22 · 11:20</span> <span class="badge memo">MEMO</span></div>
+      <strong>Idea: batch voice memos into a daily digest email</strong>
+      <div class="bot"><span style="color:var(--ink-3)"><span class="status-dot" style="background:var(--ink-3)"></span>Waiting</span><span>· 31 sec</span><span class="chev">›</span></div>
+    </div>
+    <div class="record-card">
+      <div class="meta"><span>Oct 21 · 22:03</span> <span class="badge expense">EXPENSE</span></div>
+      <strong>Groceries at Emart — ₩38,200</strong>
+      <div class="bot"><span><span class="status-dot"></span>Ready</span><span>· 19 sec</span><span class="chev">›</span></div>
+    </div>
+  </div>
+
+  <!-- INSPECTOR -->
+  <aside class="inspector">
+    <h2>Lunch with Minji — split check</h2>
+    <p class="time">Oct 24, 2026 14:32 · 42 seconds</p>
+    <div class="audio-player">
+      <span class="play">▶</span>
+      <div class="wave"></div>
+      <span>0:00 / 0:42</span>
+      <span>1×</span>
+    </div>
+    <div class="section-label">Transcript</div>
+    <div class="transcript">"Lunch with Minji at the Sindorim place. Total was 27,000 won, split the check. She still owes me 8,500."</div>
+    <div class="section-label">Expense</div>
+    <div class="field-row">
+      <div class="field">₩ 12,000</div>
+      <div class="field">KRW</div>
+    </div>
+    <div class="field">Minji</div>
+    <div class="field">Lunch split</div>
+    <button class="save-btn">✓ Save corrections</button>
+    <div class="location-line">📍녹음 위치 <span class="link">Open in Maps ↗</span></div>
+  </aside>
+</div>
+
+<p style="color:var(--ink-3); font-size:11px; margin-top:24px; text-align:center;">
+  Static mockup · Hybrid header · Query params: <code>?map=1</code> <code>?cal=1</code>
+</p>
+
+</main>
+
+<script>
+  const q = new URLSearchParams(location.search);
+  const map = q.get('map') === '1';
+  const cal = q.get('cal') === '1';
+  document.body.dataset.map = map ? '1' : '0';
+  document.body.dataset.cal = cal ? '1' : '0';
+  document.getElementById('toggleMap').classList.toggle('active', map);
+  document.getElementById('toggleCal').classList.toggle('active', cal);
+  const label = (map && cal) ? 'Both overlays — Map + Calendar' :
+                map ? 'Map overlay only' :
+                cal ? 'Calendar rail only' :
+                'Base — no overlays';
+  document.getElementById('stateLabel').textContent = label;
+</script>
+</body>
+</html>

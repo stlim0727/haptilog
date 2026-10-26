@@ -17,6 +17,9 @@ class LocationHistoryRepository internal constructor(private val directory: File
     val state: StateFlow<LocationHistorySnapshot> = mutableState.asStateFlow()
     private var detector: LocationEventDetector? = null
     private var stayDetector: LocationStayDetector? = null
+    // A failed disk commit must not strand a live detector or lose its terminal revision.
+    // Any later successful write retries these closures; process recovery closes durable ACTIVE rows.
+    private val pendingClosures = linkedMapOf<String, LocationStay>()
 
     init {
         val recovered = state.value.copy(stays = state.value.stays.map {
@@ -29,8 +32,8 @@ class LocationHistoryRepository internal constructor(private val directory: File
     /** Expire persisted observations on access, even if collection stays disabled. */
     @Synchronized fun prune(nowMillis: Long = System.currentTimeMillis()) {
         val current = state.value
-        val next = retained(current, nowMillis)
-        if (next != current) persist(next)
+        val next = retained(current.copy(stays = mergeStays(current.stays, pendingClosures.values.toList())), nowMillis)
+        if (next != current || pendingClosures.isNotEmpty()) persist(next)
     }
 
     @Synchronized fun startSession(sessionStartElapsedMillis: Long = 0L) {
@@ -51,10 +54,13 @@ class LocationHistoryRepository internal constructor(private val directory: File
         reason: LocationStayEndReason = LocationStayEndReason.USER_STOP,
         confirmedAtMillis: Long? = null,
     ) {
-        stayDetector?.finish(reason, confirmedAtMillis)?.let { updateStays(listOf(it)) }
-        stayDetector = null
-        detector = null
-        mutableState.value = state.value.copy(latestSample = null)
+        try {
+            stayDetector?.finish(reason, confirmedAtMillis)?.let { updateStays(listOf(it)) }
+        } finally {
+            stayDetector = null
+            detector = null
+            mutableState.value = state.value.copy(latestSample = null)
+        }
     }
 
     @Synchronized fun expireStay(nowElapsedRealtimeMillis: Long, nowMillis: Long) {
@@ -62,8 +68,13 @@ class LocationHistoryRepository internal constructor(private val directory: File
     }
 
     private fun updateStays(changes: List<LocationStay>) {
+        rememberClosures(changes)
         if (changes.isNotEmpty()) persist(retained(state.value.copy(
             stays = mergeStays(state.value.stays, changes)), System.currentTimeMillis()))
+    }
+
+    private fun rememberClosures(changes: List<LocationStay>) {
+        changes.filter { it.status == LocationStayStatus.CLOSED }.forEach { pendingClosures[it.id] = it }
     }
 
     private fun mergeStays(existing: List<LocationStay>, changes: List<LocationStay>): List<LocationStay> {
@@ -76,10 +87,12 @@ class LocationHistoryRepository internal constructor(private val directory: File
         val result = detector?.accept(sample, nowElapsedRealtimeMillis) ?: return false
         if (!result.accepted) return false
         val old = state.value
+        val stayChanges = stayDetector?.accept(sample).orEmpty()
+        rememberClosures(stayChanges)
         val next = retained(old.copy(
             points = if (result.retainPoint) old.points + sample else old.points,
             events = old.events + result.events,
-            stays = mergeStays(old.stays, stayDetector?.accept(sample).orEmpty()),
+            stays = mergeStays(old.stays, stayChanges),
             latestSample = sample
         ), System.currentTimeMillis())
         if (old.points != next.points || old.events != next.events || old.stays != next.stays) persist(next)
@@ -117,12 +130,15 @@ class LocationHistoryRepository internal constructor(private val directory: File
 
     @Synchronized fun clearHistory() {
         requireStopped()
+        prune() // Flush pending terminal revisions before an explicit clear removes them.
         persist(state.value.copy(points = emptyList(), events = emptyList(), stays = emptyList(), latestSample = null))
     }
 
     private fun requireStopped() { check(detector == null) { "Stop location history before changing settings" } }
 
-    private fun persist(snapshot: LocationHistorySnapshot) {
+    private fun persist(requested: LocationHistorySnapshot) {
+        val snapshot = retained(requested.copy(stays = mergeStays(requested.stays, pendingClosures.values.toList())),
+            System.currentTimeMillis())
         check(directory.isDirectory || directory.mkdirs()) { "Cannot create location history storage" }
         val json = JSONObject().put("version", 2).put("dwell_minutes", snapshot.dwellMinutes)
             .put("places", JSONArray().apply { snapshot.places.forEach { put(it.toJson()) } })
@@ -139,6 +155,7 @@ class LocationHistoryRepository internal constructor(private val directory: File
         }
         // Publish only after the atomic file has committed.
         mutableState.value = snapshot
+        pendingClosures.clear()
     }
 
     private fun load(): LocationHistorySnapshot {

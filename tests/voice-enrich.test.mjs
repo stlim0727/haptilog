@@ -368,6 +368,32 @@ test("rejects unsupported language values before provider call", async () => {
   }
 });
 
+test("system instruction offers UNKNOWN with an unintelligible-audio escape hatch", async () => {
+  for (const language of [undefined, "ko", "en"]) {
+    const { handler, calls } = fixture();
+    const body = { recording_id: payload.recording_id };
+    if (language) body.language = language;
+    assert.equal((await handler(request(body))).status, 200);
+    const text = calls.input.systemInstruction.parts[0].text;
+    assert.ok(text.includes("MEMO or UNKNOWN"));
+    assert.ok(text.includes("do not guess or invent content"));
+  }
+});
+
+test("unintelligible audio is stored as UNKNOWN instead of a forced guess", async () => {
+  const unclear = {
+    transcript: "",
+    summary: "음성이 불명확하여 인식할 수 없음",
+    intent_type: "UNKNOWN",
+    structured_data: {},
+  };
+  assert.deepEqual(validateResult(unclear), unclear);
+  const { handler, calls } = fixture({ providerResult: unclear });
+  const response = await handler(request());
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls.writes[0].intent_type, "UNKNOWN");
+});
+
 test("context pruning: sensitive IDs, storage paths, and coordinates are never sent to Gemini", async () => {
   const { handler, calls } = fixture({
     ownerId: "confidential-caller-uuid",

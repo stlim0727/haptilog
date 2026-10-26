@@ -4,11 +4,19 @@
 .place-editor label { display: grid; gap: .25rem; }
 .place-editor input { min-width: 0; max-width: 100%; }
 .place-editor button { min-height: 44px; }
-.location-dialog { width: min(860px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1rem; background: var(--bg-primary, #fff); color: var(--text-primary, #111); border: 1px solid var(--border-color, #888); border-radius: 1rem; }
+.location-dialog { box-sizing: border-box; width: min(860px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1rem; background: var(--bg-surface, #1c1d24); color: var(--text-primary, #f4f4f6); border: 1px solid var(--border-strong, #4a4a5a); border-radius: 1rem; }
 .location-dialog::backdrop { background: #0009; }
 .location-workspace { display: grid; gap: 1rem; }
 .location-workspace section, .location-workspace fieldset { min-width: 0; }
 .location-workspace button, .location-workspace select { min-height: 44px; margin: .25rem; }
+.location-dialog button { max-width: calc(100% - .5rem); color: var(--text-primary); background: var(--bg-surface-elevated); border: 1px solid var(--border-strong); border-radius: .5rem; padding: .5rem .75rem; white-space: normal; overflow-wrap: anywhere; }
+.location-dialog button:disabled { opacity: .6; }
+.location-workspace input, .location-workspace select { color: var(--text-primary); background: var(--bg-surface-elevated); border: 1px solid var(--border-strong); border-radius: .25rem; padding: .5rem; max-width: 100%; box-sizing: border-box; }
+.location-workspace fieldset { border: 1px solid var(--border-strong); border-radius: .5rem; }
+.location-workspace p { overflow-wrap: anywhere; }
+.location-workspace label { color: var(--text-primary); }
+.location-workspace label:has(input[type="checkbox"]) { display: flex; align-items: flex-start; gap: .5rem; }
+.location-workspace input[type="checkbox"] { width: 1.125rem; height: 1.125rem; min-height: 0; padding: 0; margin-top: .25rem; flex: 0 0 auto; accent-color: var(--accent-rose); }
 .location-workspace li { margin-block: .5rem; overflow-wrap: anywhere; }
 /* Narrow-viewport guard: the launcher renders bare in the mobile header flow. */
 .secondary-button[aria-haspopup="dialog"] { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }

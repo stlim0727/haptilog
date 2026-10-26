@@ -86,4 +86,60 @@ class LocationStayDetectorTest {
         assertNotEquals(stay.id, next.id)
         assertNotEquals(stay.sessionId, next.sessionId)
     }
+    @Test fun prolongedUncertaintySplitsStayDespiteRegularAcceptedSamples() {
+        val detector = LocationStayDetector(5)
+        val first = qualify(detector)
+        for (seconds in listOf(360L, 420L, 480L)) {
+            assertTrue(detector.accept(sample(seconds, 100.0, 30f)).isEmpty())
+        }
+        val closed = detector.accept(sample(481, 100.0, 30f)).single()
+        assertEquals(first.id, closed.id)
+        assertEquals(LocationStayEndReason.OBSERVATION_GAP, closed.endReason)
+        assertEquals(first.lastObservedAtMillis, closed.lastObservedAtMillis)
+        assertEquals(first.observedDurationMillis, closed.observedDurationMillis)
+        // Returning to the old anchor starts new evidence, never bridges the unknown interval.
+        assertTrue(detector.accept(sample(540)).isEmpty())
+        for (seconds in 600L..780 step 60) assertTrue(detector.accept(sample(seconds)).isEmpty())
+        val second = detector.accept(sample(840)).single()
+        assertNotEquals(first.id, second.id)
+        assertEquals(sample(540).timestampMillis, second.startedAtMillis)
+    }
+
+    @Test fun timerExpiresUncertainStayFromLastInsideEvidenceWithStrictBoundary() {
+        val detector = LocationStayDetector(5)
+        val first = qualify(detector)
+        detector.accept(sample(360, 100.0, 30f))
+        detector.accept(sample(420, 100.0, 30f))
+        assertNull(detector.expire(480_000, sample(480).timestampMillis))
+        val closed = detector.expire(480_001, sample(481).timestampMillis)!!
+        assertEquals(first.id, closed.id)
+        assertEquals(LocationStayEndReason.OBSERVATION_GAP, closed.endReason)
+        assertEquals(first.lastObservedAtMillis, closed.lastObservedAtMillis)
+    }
+
+    @Test fun firstInsideSampleAfterLongUncertaintyStartsNewEvidenceInsteadOfReopeningStay() {
+        val detector = LocationStayDetector(5)
+        val first = qualify(detector)
+        for (seconds in listOf(360L, 420L, 480L)) detector.accept(sample(seconds, 100.0, 30f))
+        val changes = detector.accept(sample(481))
+        assertEquals(1, changes.size)
+        assertEquals(first.id, changes.single().id)
+        assertEquals(LocationStayEndReason.OBSERVATION_GAP, changes.single().endReason)
+        for (seconds in 541L..721 step 60) assertTrue(detector.accept(sample(seconds)).isEmpty())
+        val next = detector.accept(sample(781)).single()
+        assertNotEquals(first.id, next.id)
+        assertEquals(sample(481).timestampMillis, next.startedAtMillis)
+    }
+
+    @Test fun insideObservationExactlyAtEvidenceGapBoundaryKeepsStayIdentity() {
+        val detector = LocationStayDetector(5)
+        val first = qualify(detector)
+        detector.accept(sample(360, 100.0, 30f))
+        detector.accept(sample(420, 100.0, 30f))
+        val update = detector.accept(sample(480)).single()
+        assertEquals(first.id, update.id)
+        assertEquals(LocationStayStatus.ACTIVE, update.status)
+        assertEquals(first.observedDurationMillis, update.observedDurationMillis)
+    }
+
 }

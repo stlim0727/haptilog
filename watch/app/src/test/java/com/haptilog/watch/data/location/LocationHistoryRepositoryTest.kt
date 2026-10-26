@@ -193,4 +193,60 @@ class LocationHistoryRepositoryTest {
         assertEquals(20, repository.state.value.dwellMinutes)
     }
 
+    @Test fun failedStopCommitReleasesLifecycleAndRetriesClosureBeforeSameInstanceRestart() {
+        val directory = temporary.newFolder()
+        val repository = LocationHistoryRepository(directory)
+        repository.setDwellMinutes(5)
+        repository.startSession()
+        for (seconds in 0L..300 step 60) repository.recordSample(point(seconds), seconds * 1000)
+        val active = repository.state.value.stays.single()
+        val backup = File(directory.parentFile, directory.name + ".saved")
+        assertTrue(directory.renameTo(backup))
+        assertTrue(directory.createNewFile())
+        try {
+            assertThrows(IllegalStateException::class.java) {
+                repository.stopSession(LocationStayEndReason.USER_STOP, point(360).timestampMillis)
+            }
+            assertNull(repository.state.value.latestSample)
+            // Lifecycle is released; remaining failure is disk access, not 'session already active'.
+            val retry = assertThrows(IllegalStateException::class.java) { repository.startSession(400_000) }
+            assertEquals("Cannot create location history storage", retry.message)
+        } finally {
+            assertTrue(directory.delete())
+            assertTrue(backup.renameTo(directory))
+        }
+        repository.startSession(400_000)
+        val closed = repository.state.value.stays.single()
+        assertEquals(active.id, closed.id)
+        assertEquals(LocationStayEndReason.USER_STOP, closed.endReason)
+        assertEquals(active.sourceRevision + 1, closed.sourceRevision)
+        assertTrue(kotlin.math.abs(point(360).timestampMillis - closed.endConfirmedAtMillis!!) < 1_000L)
+        repository.stopSession()
+        val reloaded = LocationHistoryRepository(directory).state.value.stays.single()
+        assertEquals(closed, reloaded)
+    }
+
+    @Test fun failedGapClosureIsRetriedByLaterWriteWithoutResurrectingActiveStay() {
+        val directory = temporary.newFolder()
+        val repository = LocationHistoryRepository(directory)
+        repository.setDwellMinutes(5)
+        repository.startSession()
+        for (seconds in 0L..300 step 60) repository.recordSample(point(seconds), seconds * 1000)
+        val backup = File(directory.parentFile, directory.name + ".saved")
+        assertTrue(directory.renameTo(backup))
+        assertTrue(directory.createNewFile())
+        try {
+            assertThrows(IllegalStateException::class.java) {
+                repository.expireStay(480_001, point(481).timestampMillis)
+            }
+        } finally {
+            assertTrue(directory.delete())
+            assertTrue(backup.renameTo(directory))
+        }
+        repository.stopSession()
+        repository.prune()
+        assertEquals(LocationStayEndReason.OBSERVATION_GAP, repository.state.value.stays.single().endReason)
+        assertEquals(repository.state.value.stays, LocationHistoryRepository(directory).state.value.stays)
+    }
+
 }

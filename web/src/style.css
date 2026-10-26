@@ -987,12 +987,6 @@ body.light-mode .sync-note > svg {
 body.light-mode .calendar-card-amount {
   color: var(--ph-orange);
 }
-:root[data-theme="light"] .timeline-expense,
-body.light-mode .timeline-expense {
-  background: var(--cat-expense-bg);
-  border-color: var(--cat-expense-border);
-  color: var(--cat-expense-ink);
-}
 :root[data-theme="light"] .gps-pill,
 body.light-mode .gps-pill {
   background: var(--cat-travel-bg);
@@ -1004,26 +998,6 @@ body.light-mode .no-gps-pill {
   background: var(--bg-surface-elevated);
   border-color: var(--border-subtle);
   color: var(--text-muted);
-}
-:root[data-theme="light"] .node-expense,
-body.light-mode .node-expense {
-  border-color: #f59e0b;
-  color: #b45309;
-}
-:root[data-theme="light"] .node-travel,
-body.light-mode .node-travel {
-  border-color: #10b981;
-  color: #047857;
-}
-:root[data-theme="light"] .node-workout,
-body.light-mode .node-workout {
-  border-color: #0ea5e9;
-  color: #0369a1;
-}
-:root[data-theme="light"] .node-memo,
-body.light-mode .node-memo {
-  border-color: #a855f7;
-  color: #6b21a8;
 }
 :root[data-theme="light"] .error-banner,
 body.light-mode .error-banner {
@@ -1987,167 +1961,8 @@ audio {
 }
 
 /* ==========================================================================
-   Spatio-Temporal Split View (Timeline + Map)
+   Location pills (shared between Calendar and inspector)
    ========================================================================== */
-.spatiotemporal-grid {
-  display: grid;
-  grid-template-columns: minmax(420px, 46%) 1fr;
-  gap: 24px;
-  align-items: start;
-  margin-bottom: 30px;
-}
-@media (max-width: 960px) {
-  .spatiotemporal-grid {
-    grid-template-columns: 1fr;
-  }
-}
-.timeline-pane {
-  min-height: 400px;
-}
-.map-pane {
-  position: sticky;
-  top: 24px;
-  background: var(--bg-surface);
-  border: 2px solid var(--border);
-  box-shadow: var(--ph-shadow-offset);
-  border-radius: 8px;
-  padding: 16px;
-}
-.map-pane .recording-map {
-  height: 520px;
-  border-radius: 8px;
-}
-
-/* ==========================================================================
-   Timeline Stream Component
-   ========================================================================== */
-.timeline-container {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.timeline-day-group {
-  display: flex;
-  flex-direction: column;
-}
-.timeline-day-header {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  color: var(--text-primary);
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 6px 12px;
-  margin-bottom: 14px;
-  align-self: flex-start;
-}
-.timeline-day-count {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 500;
-  margin-left: 4px;
-}
-.timeline-rail {
-  position: relative;
-  padding-left: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.timeline-rail::before {
-  content: "";
-  position: absolute;
-  left: 11px;
-  top: 8px;
-  bottom: 8px;
-  width: 2px;
-  background: var(--border);
-}
-.timeline-item {
-  position: relative;
-  cursor: pointer;
-  outline: none;
-}
-.timeline-node {
-  position: absolute;
-  left: -32px;
-  top: 14px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-surface);
-  border: 2px solid var(--border-strong);
-  z-index: 2;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-.timeline-item:hover .timeline-node {
-  transform: scale(1.15);
-}
-.timeline-item.selected .timeline-node {
-  transform: scale(1.2);
-  border-color: var(--accent-rose);
-  box-shadow: 0 0 8px rgba(244, 63, 94, 0.5);
-}
-.node-expense {
-  border-color: #9a3412;
-  color: #ffb38a;
-}
-.node-travel {
-  border-color: #0369a1;
-  color: #7dd3fc;
-}
-.node-workout {
-  border-color: #047857;
-  color: #6ee7b7;
-}
-.node-memo {
-  border-color: #7e22ce;
-  color: #d8b4fe;
-}
-.node-voice {
-  border-color: #3f3f54;
-  color: #a1a1aa;
-}
-
-.timeline-card {
-  background: var(--bg-surface);
-  border: 2px solid var(--border);
-  box-shadow: 2px 2px 0px var(--border);
-  border-radius: 6px;
-  padding: 14px 16px;
-  transition: transform 80ms ease, box-shadow 80ms ease, background 120ms ease;
-}
-.timeline-item:hover .timeline-card {
-  background: var(--bg-surface-elevated);
-  box-shadow: 3px 3px 0px var(--border);
-  transform: translate(-1px, -1px);
-}
-.timeline-item.selected .timeline-card {
-  background: var(--bg-surface-elevated);
-  border-color: var(--border);
-  outline: 2px solid var(--ph-lemon);
-  box-shadow: 3px 3px 0px var(--border);
-}
-.timeline-card-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-}
-.timeline-time {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
 .gps-pill {
   font-size: 11px;
   font-weight: 500;
@@ -2167,56 +1982,6 @@ audio {
   border: 1px solid var(--border-subtle);
   padding: 2px 5px;
   border-radius: 4px;
-}
-.timeline-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  display: block;
-  line-height: 1.45;
-  margin-bottom: 8px;
-}
-.timeline-expense {
-  font-size: 13px;
-  font-weight: 700;
-  color: #ffb38a;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #2b1708;
-  border: 1px solid #9a3412;
-  padding: 3px 8px;
-  border-radius: 5px;
-  margin-bottom: 8px;
-}
-.merchant-tag {
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-.timeline-card-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-muted);
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 8px;
-  margin-top: 4px;
-}
-.timeline-inspect-btn {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: transparent;
-  border: 1px solid var(--border);
-  padding: 2px 8px;
-  border-radius: 4px;
-  transition: all 0.15s ease;
-}
-.timeline-inspect-btn:hover {
-  color: var(--accent-rose);
-  border-color: var(--accent-rose);
-  background: rgba(244, 63, 94, 0.08);
 }
 
 /* ==========================================================================
