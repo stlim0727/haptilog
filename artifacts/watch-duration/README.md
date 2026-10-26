@@ -1,0 +1,7 @@
+# Location collection duration
+
+The location journal previously imposed an eight-hour service and provider-request limit. It now offers a persisted local choice of eight hours (default), 24 hours or continuous, before starting a session. Timed sessions use a monotonic deadline; continuous leaves the provider duration unlimited. Every mode remains explicitly started and non-sticky. Permission, device-location, notification, provider and storage guards remain in place; voice recording has its separate unchanged timeout.
+
+Validation: 149 Wear OS unit tests, `lintDebug` and `assembleDebug` passed. New service regressions run on API 30 and 34: default eight-hour expiry; 24-hour capture surviving eight hours and expiring at 24 despite later preference writes; continuous capture surviving two days of simulated monotonic time and ending on user stop. These clock tests do not measure physical battery/GPS performance.
+
+Native UI evidence uses the existing round Wear OS API 34 x86_64 emulator (454×454) and an unpublished debug APK with a matching x86_64 library. The normal-font screen shows the duration entry above Start. Three choices use a separate screen and preserve the selection across process termination. English and Korean text and Korean 200% font are checked; screenshots and matching XML contain only the synthetic settings UI. Physical-watch long-run validation remains issue #54. Internal build 25 predates this change.

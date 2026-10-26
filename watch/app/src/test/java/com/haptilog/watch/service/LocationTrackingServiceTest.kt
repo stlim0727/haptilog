@@ -14,6 +14,7 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.haptilog.watch.data.location.LocationHistoryRepository
 import com.haptilog.watch.data.location.LocationStayEndReason
+import com.haptilog.watch.data.location.LocationSessionDuration
 import com.haptilog.watch.data.location.LocationSample
 import com.haptilog.watch.R
 import org.junit.Assert.*
@@ -35,6 +36,7 @@ class LocationTrackingServiceTest {
     @Before fun setUp() {
         application = RuntimeEnvironment.getApplication()
         updates = FakeUpdates()
+        application.getSharedPreferences("location_collection", android.content.Context.MODE_PRIVATE).edit().clear().commit()
         // The WorkManager singleton can survive between Robolectric SDK variants.
         // Initialize only when the test application has no instance yet.
         try { androidx.work.WorkManager.getInstance(application) }
@@ -128,7 +130,7 @@ class LocationTrackingServiceTest {
         assertNotNull(shadowOf(service).lastForegroundNotification)
         service.onStartCommand(startIntent(), 0, 2)
         assertEquals(1, updates.requests)
-        assertTrue(updates.request!!.durationMillis in 1..LocationTrackingService.MAX_SESSION_MILLIS)
+        assertTrue(updates.request!!.durationMillis in 1..LocationSessionDuration.EIGHT_HOURS.millis!!)
         service.onStartCommand(Intent(application, LocationTrackingService::class.java)
             .setAction(LocationTrackingService.ACTION_STOP), 0, 3)
         await { !LocationTrackingService.isTracking.value }
@@ -227,6 +229,59 @@ class LocationTrackingServiceTest {
         controller.destroy()
     }
 
+    @Test fun defaultEightHourSessionStopsAtItsDeadline() {
+        assertEquals(LocationSessionDuration.EIGHT_HOURS, LocationSessionDuration.load(application))
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val controller = controller()
+        controller.get().onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofHours(8))
+        updates.callback!!.onLocationResult(com.google.android.gms.location.LocationResult.create(emptyList()))
+        await { !LocationTrackingService.isTracking.value }
+        assertEquals(application.getString(R.string.location_service_timeout), LocationTrackingService.status.value)
+        controller.destroy()
+    }
+
+    @Test fun daySessionSurvivesEightHoursAndStopsAtTwentyFour() {
+        LocationSessionDuration.save(application, LocationSessionDuration.TWENTY_FOUR_HOURS)
+        assertEquals(LocationSessionDuration.TWENTY_FOUR_HOURS, LocationSessionDuration.load(application))
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val controller = controller()
+        controller.get().onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        assertTrue(updates.request!!.durationMillis > 23 * 60 * 60 * 1_000L)
+        // A later preference write must not mutate an already running session.
+        LocationSessionDuration.save(application, LocationSessionDuration.EIGHT_HOURS)
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofHours(8))
+        updates.callback!!.onLocationResult(com.google.android.gms.location.LocationResult.create(emptyList()))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(LocationTrackingService.isTracking.value)
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofHours(16))
+        updates.callback!!.onLocationResult(com.google.android.gms.location.LocationResult.create(emptyList()))
+        await { !LocationTrackingService.isTracking.value }
+        assertEquals(application.getString(R.string.location_service_timeout), LocationTrackingService.status.value)
+        controller.destroy()
+    }
+
+    @Test fun continuousHasNoProviderLimitAndCanBeStoppedAfterMultipleDays() {
+        LocationSessionDuration.save(application, LocationSessionDuration.CONTINUOUS)
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val controller = controller()
+        val service = controller.get()
+        service.onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        assertEquals(Long.MAX_VALUE, updates.request!!.durationMillis)
+        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofDays(2))
+        updates.callback!!.onLocationResult(com.google.android.gms.location.LocationResult.create(emptyList()))
+        shadowOf(Looper.getMainLooper()).idle()
+        assertTrue(LocationTrackingService.isTracking.value)
+        service.onStartCommand(Intent(application, LocationTrackingService::class.java)
+            .setAction(LocationTrackingService.ACTION_STOP), 0, 2)
+        await { !LocationTrackingService.isTracking.value }
+        assertTrue(updates.removals > 0)
+        controller.destroy()
+    }
+
     private fun controller() = Robolectric.buildService(LocationTrackingService::class.java).apply {
         get().locationUpdates = updates
         create()
@@ -245,11 +300,13 @@ class LocationTrackingServiceTest {
         var requests = 0
         var removals = 0
         var request: LocationRequest? = null
+        var callback: LocationCallback? = null
         var registered: (() -> Unit)? = null
         var failed: (() -> Unit)? = null
         override fun request(request: LocationRequest, callback: LocationCallback, registered: () -> Unit, failed: () -> Unit) {
             requests++
             this.request = request
+            this.callback = callback
             this.registered = registered
             this.failed = failed
         }
