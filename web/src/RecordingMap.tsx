@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { hasLocation, latest } from "./domain";
+import { CLUSTER_MAX_ZOOM, clusterLocations } from "./mapClustering";
 import type { Recording } from "./domain";
 
 export default function RecordingMap({
@@ -26,6 +27,7 @@ export default function RecordingMap({
   const markers = useRef<L.LayerGroup | null>(null);
   const routeLayer = useRef<L.Polyline | null>(null);
   const markersById = useRef(new Map<string, L.Marker>());
+  const clusterSizes = useRef(new Map<string, number>());
   const selected = useRef(selectedId);
   selected.current = selectedId;
   const pinSelection = useRef<string | null>(null);
@@ -35,6 +37,7 @@ export default function RecordingMap({
   const selection = useRef(onSelect);
   selection.current = onSelect;
   const [tileError, setTileError] = useState(false);
+  const [clusterRevision, setClusterRevision] = useState(0);
   const [mobile, setMobile] = useState(() => window.matchMedia("(max-width: 700px)").matches);
   const [dismissedId, setDismissedId] = useState<string | null>(null);
   useEffect(() => {
@@ -74,6 +77,7 @@ export default function RecordingMap({
       const fit = pendingFit.current;
       pendingFit.current = null;
       fit?.();
+      setClusterRevision((revision) => revision + 1);
     });
     const tiles = L.tileLayer(
       "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -113,10 +117,21 @@ export default function RecordingMap({
     if (!instance || !layer) return;
     layer.clearLayers();
     markersById.current.clear();
+    clusterSizes.current.clear();
     if (routeLayer.current) {
       routeLayer.current.remove();
       routeLayer.current = null;
     }
+
+    // Fit before grouping so pins cluster at the zoom the view actually lands on.
+    if (initialBounds.current !== locations) {
+      instance.fitBounds(
+        L.latLngBounds(located.map((r) => [r.latitude, r.longitude])),
+        { padding: [36, 36], maxZoom: 15, animate: false },
+      );
+      initialBounds.current = locations;
+    }
+    const zoom = instance.getZoom();
 
     // Connect sequential GPS records with a coral route line
     if (showRoute && located.length > 1) {
@@ -132,19 +147,24 @@ export default function RecordingMap({
       }).addTo(instance);
     }
 
-    const groups = new Map<string, typeof located>();
-    for (const r of located) {
-      const key = `${r.latitude},${r.longitude}`;
-      groups.set(key, [...(groups.get(key) ?? []), r]);
-    }
-    for (const entries of groups.values()) {
+    for (const cluster of clusterLocations(located, zoom)) {
+      const entries = cluster.members;
       const first = [...entries].sort((a, b) =>
         new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
       )[0];
-      const label = entries.length > 1
-        ? `${entries.length} recordings at this place`
-        : `Recording ${new Date(first.recorded_at).toLocaleString()}`;
-      const marker = L.marker([first.latitude, first.longitude], {
+      const label = entries.length < 2
+        ? `Recording ${new Date(first.recorded_at).toLocaleString()}`
+        : lang === "ko"
+          ? (cluster.coLocated
+              ? `이 장소의 기록 ${entries.length}개`
+              : `이 근처의 기록 ${entries.length}개`)
+          : (cluster.coLocated
+              ? `${entries.length} recordings at this place`
+              : `${entries.length} recordings nearby`);
+      // Nearby-but-distinct places drill down instead of opening a list.
+      const expandable = entries.length > 1 && !cluster.coLocated &&
+        zoom < instance.getMaxZoom();
+      const marker = L.marker([cluster.latitude, cluster.longitude], {
         title: label,
         alt: label,
         keyboard: true,
@@ -156,7 +176,10 @@ export default function RecordingMap({
           popupAnchor: [0, -32],
         }),
       }).addTo(layer);
-      entries.forEach((r) => markersById.current.set(r.id, marker));
+      entries.forEach((r) => {
+        markersById.current.set(r.id, marker);
+        clusterSizes.current.set(r.id, entries.length);
+      });
       const popup = document.createElement("div");
       popup.className = "map-recordings";
       for (const r of entries) {
@@ -172,6 +195,18 @@ export default function RecordingMap({
       }
       if (!mobile) marker.bindPopup(popup, { className: "recording-popup", maxWidth: 240, minWidth: 180, autoPan: false });
       marker.on("click", () => {
+        if (expandable) {
+          const expand = () => {
+            if (map.current !== instance) return;
+            instance.fitBounds(
+              L.latLngBounds(entries.map((r) => [r.latitude, r.longitude])),
+              { padding: [36, 36] },
+            );
+          };
+          if (zooming.current) pendingFit.current = expand;
+          else expand();
+          return;
+        }
         setDismissedId(null);
         const id = entries.find((r) => r.id === selected.current)?.id ?? first.id;
         pinSelection.current = id;
@@ -189,14 +224,7 @@ export default function RecordingMap({
         }
       });
     }
-    if (initialBounds.current !== locations) {
-      instance.fitBounds(
-        L.latLngBounds(located.map((r) => [r.latitude, r.longitude])),
-        { padding: [36, 36], maxZoom: 15, animate: false },
-      );
-      initialBounds.current = locations;
-    }
-  }, [markerData, locations, showRoute, mobile, lang]);
+  }, [markerData, locations, showRoute, mobile, lang, clusterRevision]);
 
   useEffect(() => {
     const instance = map.current;
@@ -221,12 +249,10 @@ export default function RecordingMap({
       if (!mobile && changed) activeMarker?.openPopup();
     }
     pinSelection.current = null;
-  }, [selectedId, markerData, mobile, lang, showRoute]);
+  }, [selectedId, markerData, mobile, lang, showRoute, clusterRevision]);
 
   const active = located.find((r) => r.id === selectedId);
-  const placeCount = active ? located.filter((r) =>
-    r.latitude === active.latitude && r.longitude === active.longitude
-  ).length : 0;
+  const placeCount = active ? clusterSizes.current.get(active.id) ?? 0 : 0;
 
   function showAll() {
     const instance = map.current;
