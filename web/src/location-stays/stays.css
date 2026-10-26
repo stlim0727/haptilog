@@ -10,3 +10,5 @@
 .location-workspace section, .location-workspace fieldset { min-width: 0; }
 .location-workspace button, .location-workspace select { min-height: 44px; margin: .25rem; }
 .location-workspace li { margin-block: .5rem; overflow-wrap: anywhere; }
+/* Narrow-viewport guard: the launcher renders bare in the mobile header flow. */
+.secondary-button[aria-haspopup="dialog"] { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
