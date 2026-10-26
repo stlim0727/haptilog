@@ -75,8 +75,7 @@ import {
 } from "./domain";
 import type { Correction, Recording, TimelineItem } from "./domain";
 import { createLocationRepository } from "./location-stays/repository";
-import { recordingAssociation } from "./location-stays/domain";
-import { stayEndReason, stayState, stayStateText, stayTitle, stayToTimelineItem } from "./location-stays/journal";
+import { relatedRecordings, stayEndReason, stayState, stayStateText, stayTitle, stayToTimelineItem } from "./location-stays/journal";
 import { useLocationStays } from "./location-stays/useLocationStays";
 import { translations, getInitialLanguage } from "./i18n";
 import type { Language, TranslationKeys } from "./i18n";
@@ -689,16 +688,19 @@ function App() {
       () => repository.deleteStays([id], epoch),
       lang === "ko" ? "체류를 삭제했습니다." : "Stay deleted.",
     );
+    // A hidden frequent-area summary cannot be mapped back to one deleted stay,
+    // so drop the browser-local preferences conservatively.
+    if (deleted) location.clearSecrets();
     if (deleted && selected === id) setSelected(null);
   }
   /** One detail view for both kinds of journal item; a stay simply has no audio half. */
-  function inspectorFor(item: TimelineItem, onDirtyChange?: (dirty: boolean) => void) {
+  function inspectorFor(
+    item: TimelineItem,
+    onDirtyChange?: (dirty: boolean) => void,
+    onSelectItem?: (id: string) => void,
+  ) {
     const related = isStayItem(item)
-      ? records.filter((r) => {
-        if (r.deleted_at) return false;
-        const match = recordingAssociation(r, [item.stay], location.now);
-        return match.kind === "candidate" && match.stayIds[0] === item.id;
-      })
+      ? relatedRecordings(records, location.stays, item.id, location.now)
       : [];
     return <Inspector
       key={`${item.id}:${connection?.session_id ?? ""}`}
@@ -710,7 +712,7 @@ function App() {
       onRestore={restoreRecording}
       onDeletePermanently={deletePermanently}
       onDeleteStay={deleteStay}
-      onSelectItem={setSelected}
+      onSelectItem={onSelectItem ?? setSelected}
       lang={lang}
       t={t}
       isDemo={isDemo}
@@ -1101,9 +1103,9 @@ function App() {
           date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
           summary={summary} count={dateFilteredActiveRecords.length} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
-          isDemo={isDemo} onResetDemo={resetSampleData} now={location.now}
+          isDemo={isDemo} onResetDemo={resetSampleData} now={location.now} locationLoaded={location.loaded}
           locationControl={<Suspense fallback={null}><PlacesPanel data={location} lang={lang} isDemo={isDemo} /></Suspense>}
-          renderInspector={(item, onDirtyChange) => inspectorFor(item, onDirtyChange)} />
+          renderInspector={(item, onDirtyChange, onSelectItem) => inspectorFor(item, onDirtyChange, onSelectItem)} />
       ) : (
         <main className="workspace">
           {!accountEmail && supabase && (

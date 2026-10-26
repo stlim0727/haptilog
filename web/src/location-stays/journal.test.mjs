@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mockStay, MOCK_NOW, mockPlaces } from "./fixtures.ts";
-import { stayState, stayStateText, stayTitle, stayToTimelineItem, containingPlaces } from "./journal.ts";
+import { stayState, stayStateText, stayTitle, stayToTimelineItem, containingPlaces, relatedRecordings } from "./journal.ts";
 import { intentType, isRecordingItem, isStayItem, itemSummary } from "../domain.ts";
 
 const secondPlace = { id: "mock-place-2", revision: 1, name: "예시 오피스", latitude: 37.5, longitude: 127, radius_meters: 300 };
@@ -43,4 +43,19 @@ test("the merged journal keeps a stay distinguishable from a voice recording", (
   assert.equal(intentType(recording), "EXPENSE");
   assert.equal(itemSummary(stay), "예시 카페");
   assert.equal(itemSummary(recording), "Coffee on the corner");
+});
+test("a recording links to one stay, and overlapping stays claim nothing", () => {
+  const stay = mockStay();
+  const atCafe = { id: "rec-1", recorded_at: "2026-10-26T05:30:00Z",
+    latitude: 37.5, longitude: 127, accuracy: 10, deleted_at: null };
+  const farAway = { ...atCafe, id: "rec-2", latitude: 37.6, longitude: 127.1 };
+  const trashed = { ...atCafe, id: "rec-3", deleted_at: "2026-10-26T06:30:00Z" };
+  const records = [atCafe, farAway, trashed];
+  assert.deepEqual(relatedRecordings(records, [stay], stay.id, MOCK_NOW).map(r => r.id), ["rec-1"]);
+  const twin = mockStay({ id: "mock-stay-2", representative_latitude: 37.5, representative_longitude: 127 });
+  assert.deepEqual(relatedRecordings(records, [stay, twin], stay.id, MOCK_NOW), []);
+  assert.deepEqual(relatedRecordings(records, [stay, twin], twin.id, MOCK_NOW), []);
+  const office = mockStay({ id: "mock-stay-3", representative_latitude: 37.6, representative_longitude: 127.1 });
+  assert.deepEqual(relatedRecordings(records, [stay, office], stay.id, MOCK_NOW).map(r => r.id), ["rec-1"]);
+  assert.deepEqual(relatedRecordings(records, [stay, office], office.id, MOCK_NOW).map(r => r.id), ["rec-2"]);
 });

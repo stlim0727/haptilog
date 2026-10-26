@@ -6,7 +6,7 @@ export async function staysFixture(page: Page) {
   const portal = await fixture(page);
   await page.clock.install({ time: new Date("2026-10-26T06:00:00Z") });
   const state = {
-    failSnapshot: false, forbidden: false, conflictNext: false, snapshotCalls: 0, puts: [] as any[],
+    failSnapshot: false, forbidden: false, conflictNext: false, snapshotCalls: 0, snapshotDelay: 0, puts: [] as any[],
     data: {
       protocol_version: 1,
       state: { consent_enabled: true, consent_revision: 2, sync_epoch: 3, upload_cutoff: "2026-10-20T00:00:00Z", places_revision: 4, applied_places_revision: 3, threshold_minutes: 10 },
@@ -26,6 +26,7 @@ export async function staysFixture(page: Page) {
     if (state.forbidden) return respond({ error: "FORBIDDEN" });
     if (p_action === "snapshot") {
       state.snapshotCalls++;
+      if (state.snapshotDelay) await new Promise((resolve) => setTimeout(resolve, state.snapshotDelay));
       if (state.failSnapshot) return route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ code: "NETWORK" }) });
       return respond(state.data);
     }

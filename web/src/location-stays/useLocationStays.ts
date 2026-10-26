@@ -15,10 +15,11 @@ export function useLocationStays({ owner, repository, lang }: {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState(""), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const [now, setNow] = useState(Date.now());
+  const [loaded, setLoaded] = useState(false);
   const [dismissals, setDismissals] = useState(() => loadDismissals(localStorage, owner));
   const generation = useRef(0), mounted = useRef(true), mutating = useRef(false);
   const load = useCallback(async () => {
-    if (!repository) return null;
+    if (!repository) { setLoaded(true); return null; }
     const token = ++generation.current;
     try {
       const next = await repository.snapshot();
@@ -33,13 +34,16 @@ export function useLocationStays({ owner, repository, lang }: {
         setSnapshot(null); clearDismissals(localStorage, owner); setDismissals([]);
       }
       setError(code);
+    } finally {
+      if (mounted.current && token === generation.current) setLoaded(true);
     }
     return null;
   }, [repository, owner]);
   useEffect(() => {
     mounted.current = true;
     // An owner or session switch must not leave the previous journal on screen.
-    setSnapshot(null); setDismissals(loadDismissals(localStorage, owner)); void load();
+    setSnapshot(null); setDismissals(loadDismissals(localStorage, owner)); setLoaded(false);
+    void load();
     const timer = setInterval(() => {
       setNow(Date.now()); setDismissals(loadDismissals(localStorage, owner));
       if (document.visibilityState === "visible" && !mutating.current) void load();
@@ -98,6 +102,6 @@ export function useLocationStays({ owner, repository, lang }: {
         : error === "CONSENT_REQUIRED"
           ? (ko ? "워치에서 클라우드 동기를 켜면 체류와 장소를 볼 수 있습니다." : "Turn on cloud sync on the watch to see places and stays.")
           : (ko ? "위치 정보를 불러오거나 변경하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요." : "Could not load or update location data. Check your connection and retry.");
-  return { repository, snapshot, places, stays, suggestions, dismissals, now, timeZone, error, errorText, message, busy, setMessage, setError, load, perform, mutate, hideSuggestion, clearSecrets };
+  return { repository, snapshot, places, stays, suggestions, dismissals, now, timeZone, error, errorText, message, busy, loaded, setMessage, setError, load, perform, mutate, hideSuggestion, clearSecrets };
 }
 export type LocationData = ReturnType<typeof useLocationStays>;

@@ -67,6 +67,8 @@ type Props = {
   records: TimelineItem[];
   filtered: TimelineItem[];
   loaded: boolean;
+  /** False while the stay feed has not settled, so a stay deep link is not discarded too early. */
+  locationLoaded: boolean;
   truncated: boolean;
   date: string;
   setDate: (value: string) => void;
@@ -95,6 +97,7 @@ type Props = {
   renderInspector: (
     item: TimelineItem,
     onDirtyChange: (dirty: boolean) => void,
+    onSelectItem: (id: string) => void,
   ) => React.ReactNode;
 };
 
@@ -134,6 +137,9 @@ export function MobileWorkspace(p: Props) {
   discardMessageRef.current = discardMessage;
   const detail = records.find((r) => r.id === detailId);
   const detailTrashed = detail && isRecordingItem(detail) ? !!detail.deleted_at : false;
+  // A deep-linked stay can open before its snapshot joins the merged feed.
+  const stayPending = !detail && !!detailId && !p.locationLoaded &&
+    new URLSearchParams(location.search).get("stay") === detailId;
   const isTrash = p.category === "Trash";
   const categories = [
     ["All", t.all_cat],
@@ -260,16 +266,21 @@ export function MobileWorkspace(p: Props) {
     );
     setDetailId(item.id);
   }
+  /** Linked-record chips inside the stay detail navigate this pane, not the desktop selection. */
+  function openItemById(id: string) {
+    const next = records.find((r) => r.id === id);
+    if (next) openDetail(next);
+  }
   // A deleted/removed record must never silently switch the detail to another one.
   useEffect(() => {
     if (
-      p.loaded && detailId && (!detail || (detailTrashed !== isTrash))
+      p.loaded && p.locationLoaded && detailId && (!detail || (detailTrashed !== isTrash))
     ) {
       dirty.current = false;
       p.onDraftChange(false);
       closeDetail();
     }
-  }, [p.loaded, detailId, detail?.id, detailTrashed, isTrash, !!detail]);
+  }, [p.loaded, p.locationLoaded, detailId, detail?.id, detailTrashed, isTrash, !!detail]);
 
   useEffect(() => {
     if (notionOpen) {
@@ -740,9 +751,11 @@ export function MobileWorkspace(p: Props) {
             className="inspector"
             aria-label={ko ? "기록 상세" : "Recording details"}
           >
-            {detail ? p.renderInspector(detail, onDirtyChange) : (
-              <p>
-                {ko ? "기록을 찾을 수 없어요." : "Recording unavailable."}
+            {detail ? p.renderInspector(detail, onDirtyChange, openItemById) : (
+              <p role={stayPending ? "status" : undefined}>
+                {stayPending
+                  ? (ko ? "체류를 불러오는 중이에요." : "Loading this stay.")
+                  : (ko ? "기록을 찾을 수 없어요." : "Recording unavailable.")}
               </p>
             )}
           </div>

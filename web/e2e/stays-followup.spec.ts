@@ -1,5 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "./fixtures";
+import { baseRecording } from "./portal-fixture";
 import { staysFixture, openStays, hiddenKey, stayOwner } from "./stays-fixture";
 test.use({ timezoneId: "UTC" });
 
@@ -54,6 +55,33 @@ test("the phone layout lists the stay and opens it without audio", async ({ page
   await page.screenshot({ path: "test-results/stay-as-record-mobile.png" });
   await page.getByRole("button", { name: "Back to recordings" }).click();
   await expect(cards).toHaveCount(2);
+});
+
+test("the phone stay detail navigates to its linked recording", async ({ page }) => {
+  const { portal } = await staysFixture(page);
+  portal.additional.push({ ...structuredClone(baseRecording),
+    id: "88888888-8888-4888-8888-888888888888", recorded_at: "2026-10-26T05:30:00Z",
+    latitude: 37.5, longitude: 127, accuracy: 10 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.locator(".mobile-record").filter({ hasText: "Original cafe" }).click();
+  const detail = page.locator(".mobile-detail");
+  await expect(detail.locator(".inspector h2")).toHaveText("Original cafe");
+  await detail.getByRole("button", { name: /Coffee on the corner/ }).click();
+  await expect(page).toHaveURL(/recording=88888888/);
+  await expect(detail.locator(".inspector h2")).toHaveText("Coffee on the corner");
+  await expect(detail.locator(".audio-load")).toBeVisible();
+});
+
+test("a stay deep link survives the slower location snapshot", async ({ page }) => {
+  const { state } = await staysFixture(page);
+  state.snapshotDelay = 700;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/?stay=${stayId}`);
+  await expect(page.locator(".mobile-detail")).toContainText("Loading this stay");
+  await expect(page.locator(".mobile-detail .inspector h2")).toHaveText("Original cafe");
+  const url = new URL(page.url());
+  expect(url.searchParams.get("stay")).toBe(stayId);
 });
 
 test("deleting a stay from the detail leaves the voice record and the place", async ({ page }) => {
@@ -171,7 +199,7 @@ test("turning cloud sync off on the watch drops the stay and locks the place edi
   await expect(page.locator(".record-card").filter({ hasText: "Original cafe" })).toHaveCount(0);
 });
 
-for (const action of ["delete", "consent", "logout"] as const) {
+for (const action of ["delete", "detail", "consent", "logout"] as const) {
   test(`${action} clears hidden location coordinates from this browser`, async ({ page }) => {
     const { state } = await staysFixture(page);
     const dialog = await openStays(page);
@@ -179,6 +207,11 @@ for (const action of ["delete", "consent", "logout"] as const) {
     if (action === "delete") {
       await dialog.getByRole("button", { name: "Delete all server stays", exact: true }).click();
       await dialog.getByRole("button", { name: "Permanently delete stays", exact: true }).click();
+    } else if (action === "detail") {
+      await dialog.getByRole("button", { name: "Close", exact: true }).click();
+      await page.locator(".record-card").filter({ hasText: "Original cafe" }).click();
+      await page.getByLabel("Recording options", { exact: true }).click();
+      await page.getByRole("button", { name: "Delete this stay" }).click();
     } else if (action === "consent") {
       state.data.state.consent_enabled = false;
       await dialog.getByRole("button", { name: "Refresh", exact: true }).click();

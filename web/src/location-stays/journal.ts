@@ -1,6 +1,6 @@
-import { distanceMeters, presence } from "./domain.ts";
+import { distanceMeters, presence, recordingAssociation } from "./domain.ts";
 import type { SavedPlace, Stay } from "./types.ts";
-import type { StayItem } from "../domain.ts";
+import type { Recording, StayItem } from "../domain.ts";
 
 /** A stay is named only by the one saved area that contains its observed point. */
 export function containingPlaces(stay: Stay, places: SavedPlace[]) {
@@ -48,4 +48,17 @@ const END_REASONS: Record<string, [string, string]> = {
 export function stayEndReason(item: StayItem, ko: boolean) {
   const reason = item.stay.end_reason;
   return reason ? END_REASONS[reason]?.[ko ? 0 : 1] ?? reason : null;
+}
+/**
+ * Recordings that belong to exactly this stay. Every visible stay competes for a
+ * recording, so overlapping stays claim nothing rather than each claiming it.
+ */
+export function relatedRecordings(
+  records: Recording[], stays: Stay[], stayId: string, now: number,
+) {
+  return records.filter((record) => {
+    if (record.deleted_at) return false;
+    const match = recordingAssociation(record, stays, now);
+    return match.kind === "candidate" && match.stayIds[0] === stayId;
+  });
 }
