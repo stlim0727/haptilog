@@ -28,6 +28,7 @@ import com.haptilog.watch.sync.LocationSyncWorker
 import com.haptilog.watch.R
 import com.haptilog.watch.data.location.LocationHistoryRepository
 import com.haptilog.watch.data.location.LocationStayEndReason
+import com.haptilog.watch.data.location.LocationSessionDuration
 import com.haptilog.watch.data.location.LocationSample
 import com.haptilog.watch.presentation.LocationJournalActivity
 import kotlinx.coroutines.CoroutineScope
@@ -46,7 +47,6 @@ class LocationTrackingService : Service() {
     companion object {
         const val ACTION_START = "com.haptilog.watch.action.LOCATION_START"
         const val ACTION_STOP = "com.haptilog.watch.action.LOCATION_STOP"
-        const val MAX_SESSION_MILLIS = 8 * 60 * 60 * 1_000L
         private const val CHANNEL_ID = "haptilog_location_journal"
         private const val NOTIFICATION_ID = 1002
         private val mutableIsTracking = MutableStateFlow(false)
@@ -75,7 +75,8 @@ class LocationTrackingService : Service() {
     private var started = false
     private var stopping = false
     private var receiverRegistered = false
-    private var sessionDeadline = 0L
+    private var sessionDeadline = Long.MAX_VALUE
+    private var sessionDuration = LocationSessionDuration.EIGHT_HOURS
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -199,6 +200,7 @@ class LocationTrackingService : Service() {
             stopTracking(getString(R.string.location_service_notifications_required), LocationStayEndReason.NOTIFICATIONS_DISABLED)
             return
         }
+        sessionDuration = LocationSessionDuration.load(applicationContext)
         try {
             startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
         } catch (_: RuntimeException) {
@@ -210,7 +212,7 @@ class LocationTrackingService : Service() {
         mutableIsTracking.value = true
         mutableStatus.value = null
         val sessionStartElapsed = SystemClock.elapsedRealtime()
-        sessionDeadline = sessionStartElapsed + MAX_SESSION_MILLIS
+        sessionDeadline = sessionDuration.millis?.let { sessionStartElapsed + it } ?: Long.MAX_VALUE
         writes.trySend(Write.Start(sessionStartElapsed))
         mainScope.launch {
             while (started && !stopping) {
@@ -247,7 +249,11 @@ class LocationTrackingService : Service() {
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60_000L)
             .setMinUpdateIntervalMillis(30_000L)
             .setMaxUpdateAgeMillis(0L)
-            .setDurationMillis((sessionDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(1))
+            .apply {
+                if (sessionDuration.millis != null) {
+                    setDurationMillis((sessionDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(1))
+                }
+            }
             .build()
         try {
             locationUpdates!!.request(request, locationCallback, registered = {
@@ -311,7 +317,7 @@ class LocationTrackingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle(getString(R.string.location_service_title))
-            .setContentText(getString(R.string.location_service_body))
+            .setContentText(getString(R.string.location_service_body, getString(sessionDuration.label)))
             .setContentIntent(open)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)
