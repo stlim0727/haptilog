@@ -144,6 +144,92 @@ test("mobile map stays first and locationless records remain reachable", async (
     .toBeFocused();
 });
 
+test("mobile map uses compact pins and a dismissible summary below the map", async ({ page }) => {
+  await mobile(page, 3);
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  const marker = page.locator(".voice-marker").first();
+  await marker.click();
+  await expect(page.locator(".leaflet-popup")).toHaveCount(0);
+  const card = page.locator(".map-selection-card");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("3 recordings here");
+  const mapBox = (await page.locator(".recording-map").boundingBox())!;
+  expect((await card.boundingBox())!.y).toBeGreaterThanOrEqual(mapBox.y + mapBox.height);
+  expect((await marker.boundingBox())!.width).toBe(44);
+  expect((await marker.locator(".voice-pin").boundingBox())!.width).toBe(22);
+  await page.getByRole("button", { name: "Dismiss summary" }).click();
+  await expect(card).toHaveCount(0);
+  await marker.click();
+  await expect(card).toBeVisible();
+  await page.screenshot({ path: "test-results/map-summary-mobile.png", fullPage: true });
+  await card.getByRole("button", { name: /View details/ }).click();
+  await expect(page.locator(".mobile-detail")).toBeVisible();
+  await page.goBack();
+  await expect(card).toBeVisible();
+  await expect(page.locator(".voice-marker.active")).toHaveCount(1);
+});
+
+test("map selection preserves the view and Show all restores the filtered extent", async ({ page }) => {
+  const state = await mobile(page, 3);
+  state.additional[0].latitude = 37.55;
+  state.additional[0].longitude = 127.07;
+  state.additional[1].latitude = 37.53;
+  state.additional[1].longitude = 127.04;
+  await page.getByRole("button", { name: "Refresh recordings" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  const map = page.locator(".recording-map");
+  const pins = page.locator(".voice-marker");
+  await expect(pins).toHaveCount(3);
+  const positions = () => pins.evaluateAll((els) => els.map((el) => {
+    const rect = el.getBoundingClientRect();
+    const mapRect = el.closest(".recording-map")!.getBoundingClientRect();
+    return [Math.round(rect.x - mapRect.x), Math.round(rect.y - mapRect.y)];
+  }));
+  const initial = await positions();
+  for (let index = 0; index < 3; index++) {
+    await pins.nth(index).click();
+    await expect.poll(positions).toEqual(initial);
+  }
+  await map.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(positions).not.toEqual(initial);
+  await page.getByRole("button", { name: "Show all locations" }).click();
+  await expect.poll(positions).toEqual(initial);
+  await expect(page.locator(".map-selection-card")).toBeVisible();
+  await page.locator(".map-selection-close").focus();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".map-selection-card")).toHaveCount(0);
+  await expect.poll(positions).toEqual(initial);
+
+  // Selecting an offscreen place from the list pans without changing scale.
+  await map.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(positions).not.toEqual(initial);
+  await expect(map.locator(".leaflet-zoom-anim")).toHaveCount(0);
+  const zoomed = await positions();
+  const separation = (points: number[][]) => [
+    points[1][0] - points[0][0], points[1][1] - points[0][1],
+  ];
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.locator(".mobile-place-select select").selectOption({ index: 1 });
+  await expect.poll(positions).not.toEqual(zoomed);
+  expect(separation(await positions())).toEqual(separation(zoomed));
+  const beforeDetail = await positions();
+  await page.locator(".map-selection-detail").click();
+  await expect(page.locator(".mobile-detail")).toBeVisible();
+  await page.goBack();
+  await expect(page.locator(".map-selection-card")).toBeVisible();
+  await expect.poll(positions).toEqual(beforeDetail);
+
+  // A summary update or language change must not undo manual map navigation.
+  state.additional[0].voice_enrichments[0].summary = "Updated place summary";
+  await page.getByRole("button", { name: "Refresh recordings" }).click();
+  await expect(page.locator(".map-selection-card")).toContainText("Updated place summary");
+  await expect.poll(positions).toEqual(beforeDetail);
+  await page.getByRole("button", { name: "Toggle language" }).click();
+  await expect(page.getByRole("button", { name: "전체 보기", exact: true })).toBeVisible();
+  await expect.poll(positions).toEqual(beforeDetail);
+  await page.screenshot({ path: "test-results/map-show-all-mobile.png", fullPage: true });
+});
+
 test("mobile unsaved transcript warns on Back and cancellation preserves edits", async ({ page }) => {
   await mobile(page);
   await page.locator(".mobile-record").click();
