@@ -18,13 +18,17 @@ paths, timestamps and GPS are never migrated or rewritten.
   old browser storage. Recovery reissues a normal 30-day `portal_connections`
   grant for the new authenticated session. Existing RLS, Storage access, edits,
   deletion and Notion export continue to authorize through that session grant.
+  Restore renews a grant that is still live and creates one for a session that
+  has no grant yet; it never clears a revocation.
 - Account & watches lists saved watches. Selecting a watch changes the active
   session grant, clears loaded recordings and unmounts the prior editor/player.
   Connect a new watch adds a replacement while retaining old watch links.
 - Sign out and Disconnect browser preserve durable account links. Unlink watch
   removes that account's durable link and revokes all its browser grants for the
   watch. Other explicitly paired browsers remain independent. Watch-side browser
-  revocation revokes a session, not the account recovery link.
+  revocation revokes a session, not the account recovery link. That revocation
+  holds for the session: reloading the portal does not restore it, and granting
+  that browser access again requires a new watch code.
 
 Only uploaded recordings from previously linked watches can be recovered.
 Google login cannot recover audio lost with an uninstalled app or missing watch,
