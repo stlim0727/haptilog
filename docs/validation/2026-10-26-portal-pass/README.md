@@ -2,6 +2,8 @@
 
 Date: 2026-10-26. Baseline: main `e0e24d4` (PR #78 merged). This closes the last release gate named in [the location stays architecture note](../../architecture/location-stays-sync.md) and item 5 of [the follow-up checklist](../../design/location-stays-followup.md).
 
+**Scope: this record is historical.** PR #84 replaced the standalone stays workspace measured here with the unified voice/stay journal, so nothing below accepts the redesigned UI. Issue #86 tracks the live pass for the redesign. The `location_stays` contract, authorization behaviour and revocation path are unchanged by that redesign, so the authorization findings still hold; the layout, focus-order and locale findings describe the retired surface.
+
 ## How it was driven
 
 A real pairing, not a mock. The Wear OS watch ran `WebAccessActivity`, produced a one-time code, and the HaptiLog Chrome profile redeemed it on `https://haptilog.keepory.app/`. The redeemed session carried `is_anonymous: false` with a Google identity, so the portal rendered the connected workspace with **production data**: one saved place with a 200 m radius and closed stays ingested by the watch earlier the same day. Everything below was measured in that live session; the only synthetic evidence is the locale regression, which mocks the `location_stays` RPC.
@@ -51,10 +53,12 @@ Revoking the pairing from the watch side was then verified end to end: the porta
 
 The live pass was conducted in English, so the Korean rendering is now pinned by a browser regression instead of a one-off measurement: `web/e2e/stays-locale.spec.ts` (four scenarios, mocked RPC, `npm run test:e2e --prefix web`).
 
-It asserts the localized consent section, threshold select (`공통 체류 기준` / `10분`), place list, suggestion section, stay date field, timeline region and expanded stay body; the place editor's map region, tile-failure fallback, coordinate labels and actions; the deletion confirmation and the Korean `FORBIDDEN` message after authorization loss; and that `Escape` returns focus to the trigger while the header language switch re-renders the same workspace in English with `document.documentElement.lang` and the stored preference updated. Each scenario also asserts the absence of the other language's strings, so an unmapped label fails the test.
+It asserted the localized consent section, threshold select (`공통 체류 기준` / `10분`), place list, suggestion section, stay date field, timeline region and expanded stay body; the place editor's map region, tile-failure fallback, coordinate labels and actions; the deletion confirmation and the Korean `FORBIDDEN` message after authorization loss; and that `Escape` returns focus to the trigger while the header language switch re-renders the same workspace in English with `document.documentElement.lang` and the stored preference updated. Each scenario also asserts the absence of the other language's strings, so an unmapped label fails the test.
 
-![Korean workspace](korean-workspace.png)
-![Korean place editor](korean-place-editor.png)
+PR #84 kept the four scenarios and retargeted them at Place settings and the stay inspector, adding a check that the settings dialog no longer carries a second stay timeline. The two frames below are from the original run, so they show the retired workspace.
+
+![Korean workspace, before the unified journal](korean-workspace.png)
+![Korean place editor, before the unified journal](korean-place-editor.png)
 
 ## What this pass does not certify
 
