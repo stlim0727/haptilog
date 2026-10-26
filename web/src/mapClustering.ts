@@ -7,6 +7,7 @@ export type ClusterPoint = {
 export type MapCluster<T> = {
   latitude: number;
   longitude: number;
+  /** Members in input order; the first one anchors the group. */
   members: T[];
   /** Members share one coordinate, so zooming in cannot separate them. */
   coLocated: boolean;
@@ -17,6 +18,10 @@ const TILE_SIZE = 256;
 export const CLUSTER_RADIUS_PX = 64;
 // Above this zoom GPS noise is smaller than a real distance between places.
 export const CLUSTER_MAX_ZOOM = 18;
+// A place list has no zoom, so it groups by ground distance instead. 250m is
+// the screen radius the map applies at its default fit (zoom 15) at ~37°N.
+export const PLACE_RADIUS_M = 250;
+const EARTH_CIRCUMFERENCE_M = 2 * Math.PI * 6378137;
 
 function projectX(longitude: number, scale: number) {
   return ((longitude + 180) / 360) * scale;
@@ -42,8 +47,42 @@ export function clusterLocations<T extends ClusterPoint>(
   zoom: number,
   radiusPx = CLUSTER_RADIUS_PX,
 ): MapCluster<T>[] {
-  const radius = zoom > CLUSTER_MAX_ZOOM ? 0 : radiusPx;
-  const scale = TILE_SIZE * 2 ** zoom;
+  return groupByRadius(
+    points,
+    zoom > CLUSTER_MAX_ZOOM ? 0 : radiusPx,
+    TILE_SIZE * 2 ** zoom,
+  );
+}
+
+/**
+ * Groups places by ground distance so a list can show one entry per place the
+ * way the map shows one pin per group.
+ */
+export function clusterPlaces<T extends ClusterPoint>(
+  points: T[],
+  radiusMeters = PLACE_RADIUS_M,
+): MapCluster<T>[] {
+  // Web Mercator stretches ground distance by sec(latitude); one mean keeps a
+  // city-scale list on a single grid.
+  const cosine = points.length
+    ? points.reduce(
+      (sum, point) => sum + Math.cos((point.latitude * Math.PI) / 180),
+      0,
+    ) / points.length
+    : 1;
+  // At this scale one projected unit is one metre on the equator.
+  return groupByRadius(
+    points,
+    radiusMeters / Math.max(Math.min(cosine, 1), 0.01),
+    EARTH_CIRCUMFERENCE_M,
+  );
+}
+
+function groupByRadius<T extends ClusterPoint>(
+  points: T[],
+  radius: number,
+  scale: number,
+): MapCluster<T>[] {
   const cell = Math.max(radius, 1);
   const projected = points.map((point) => ({
     point,

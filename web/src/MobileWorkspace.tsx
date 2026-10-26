@@ -29,6 +29,8 @@ import {
 import CalendarView from "./CalendarView";
 import { CategoryIcon } from "./TimelineView";
 import { NotionExport } from "./NotionExport";
+import { clusterPlaces } from "./mapClustering";
+import type { MapCluster } from "./mapClustering";
 import {
   expense,
   hasLocation,
@@ -133,12 +135,20 @@ export function MobileWorkspace(p: Props) {
     ["Memo", t.memo_cat],
   ];
   const located = filtered.filter(hasLocation);
-  const placeKey = (r: Recording) => `${r.latitude},${r.longitude}`;
-  const places = [...new Set(located.map(placeKey))];
-  const currentPlace = selectedPlace && places.includes(selectedPlace)
-    ? selectedPlace
-    : places[0];
-  const placeRecords = located.filter((r) => placeKey(r) === currentPlace);
+  // Coordinates a short walk apart are the same stop, so the place list shows
+  // one counted group per place the way the map shows one pin per group.
+  const places = clusterPlaces(located);
+  const groupKey = (group: MapCluster<Recording>) => group.members.reduce(
+    (lowest, member) => (member.id < lowest ? member.id : lowest),
+    group.members[0].id,
+  );
+  const groupAt = (key: string) => places.find((place) => groupKey(place) === key);
+  const selectedGroup = (selectedPlace ? groupAt(selectedPlace) : undefined)
+    ?? places[0];
+  const groupKeyByRecording = new Map(places.flatMap((group) => group.members.map(
+    (r) => [r.id, groupKey(group)] as const,
+  )));
+  const placeRecords = selectedGroup?.members ?? [];
   const onDirtyChange = useCallback((value: boolean) => {
     dirty.current = value;
     p.onDraftChange(value);
@@ -601,7 +611,7 @@ export function MobileWorkspace(p: Props) {
                           if (!r) {
                             return;
                           }
-                          setSelectedPlace(placeKey(r));
+                          setSelectedPlace(groupKeyByRecording.get(r.id) ?? null);
                           setMapSelected(id);
                           if (reveal) {
                             openDetail(r);
@@ -636,25 +646,28 @@ export function MobileWorkspace(p: Props) {
                     <label className="mobile-place-select">
                       {ko ? "장소 선택" : "Choose a place"}
                       <select
-                        value={currentPlace}
+                        value={selectedGroup ? groupKey(selectedGroup) : ""}
                         onChange={(e) => {
                           setSelectedPlace(e.target.value);
                           setMapSelected(
-                            located.find((r) => placeKey(r) === e.target.value)
-                              ?.id ?? null,
+                            groupAt(e.target.value)?.members[0].id ?? null,
                           );
                         }}
                       >
-                        {places.map((key, index) => (
-                          <option key={key} value={key}>
-                            {ko ? `장소 ${index + 1}` : `Place ${index + 1}`} ·
-                            {" "}
-                            {located.filter((r) =>
-                              placeKey(r) === key
-                            ).length}
-                            {ko ? "개 기록" : " recordings"}
-                          </option>
-                        ))}
+                        {places.map((group, index) => {
+                          const key = groupKey(group);
+                          const count = group.members.length;
+                          return (
+                            <option key={key} value={key}>
+                              {ko ? `장소 ${index + 1}` : `Place ${index + 1}`} ·
+                              {" "}
+                              {count}
+                              {ko
+                                ? "개 기록"
+                                : count === 1 ? " recording" : " recordings"}
+                            </option>
+                          );
+                        })}
                       </select>
                     </label>
                   )}
