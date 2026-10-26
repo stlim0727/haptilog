@@ -25,13 +25,15 @@ timestamp advancing. Previously the same state aborted the session at the next r
 
 ## Not covered here
 
-Cloud upload and withdrawal were not exercised on device: the location migration is still unapplied
-to the hosted Supabase environment (release task 1 in
-[`docs/design/location-stays-followup.md`](../../design/location-stays-followup.md)), so there is no
-server side to talk to yet. The single-consent derivation and the flag reconcile in both directions
-are covered by `LocationConsentTest`; the worker's idle guard itself is not unit-tested because
-`androidx.work:work-testing` is not a dependency of this module. Actual battery drain against the
-previous baseline also remains an open release measurement.
+Cloud upload and withdrawal were not exercised on device. The synchronization backend is applied in
+production, so the server side exists, but the switch this change rides on is the same one that
+starts uploading audio: turning it on for a paired watch sends that watch's retained recordings as
+well as its stays. That pass is left for the owner to run against real data, together with the
+battery-drain measurement against the previous baseline.
+
+The single-consent derivation and the flag reconcile in both directions are covered by
+`LocationConsentTest`; the worker's idle guard itself is not unit-tested because
+`androidx.work:work-testing` is not a dependency of this module.
 
 ## Checks
 
