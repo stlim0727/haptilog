@@ -43,6 +43,8 @@ The agreed implementation target combines voice recordings and observed stays in
 
 The watch target is one **체류 기록 / Stay recording** settings entry. Collection start/stop and optional **웹에도 표시 / Show on the web** synchronization are available together. Explicit location synchronization consent remains separate from audio consent, but enabling it does not require stopping collection. Retained-history upload is optional and off by default. Sync errors or pending withdrawal do not prevent local capture. Downloaded place and threshold changes still apply at the next session; the UI must state this when pending.
 
+Before starting collection, choose **8 hours**, **24 hours** or **Continuous**. The default is eight hours and the local selection persists across launches. A session keeps its starting choice; continuous has no app-imposed duration limit but does not restart after process death or reboot. Permission, device-location, notification and storage/provider failures may still stop any mode. Voice recording keeps its separate safety timeout.
+
 The web target places sync, saved-place management, suggestions and cloud-data deletion in **장소 설정 / Place settings**, rather than a second stay timeline. Voice export controls identify their voice-only scope. Stay deletion is a separately confirmed permanent operation; audio trash behavior remains distinct. Location failures must leave voice records usable.
 
 These decisions were reviewed twice by UX and product marketing before implementation. They describe the intended revision, not a deployment claim. See [the review and acceptance scenarios](2026-10-26-unified-journal-review.md) for scope and validation boundaries.

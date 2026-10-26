@@ -166,6 +166,7 @@ class LocationJournalActivity : ComponentActivity() {
                     var syncConsentOpen by rememberSaveable { mutableStateOf(false) }
                     var syncDetails by rememberSaveable { mutableStateOf(false) }
                     var syncBackfill by rememberSaveable { mutableStateOf(false) }
+                    var duration by remember { mutableStateOf(LocationSessionDuration.load(this@LocationJournalActivity)) }
                     var advanced by rememberSaveable { mutableStateOf(false) }
                     LaunchedEffect(Unit) {
                         while (true) {
@@ -192,9 +193,19 @@ class LocationJournalActivity : ComponentActivity() {
                         ScalingLazyColumn(state = list, autoCentering = null,
                             contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 38.dp, bottom = 48.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
-                            item { Text(stringResource(R.string.location_journal_title), textAlign = TextAlign.Center) }
+                            item { Text(stringResource(if (page == "duration") R.string.location_duration_title else R.string.location_journal_title), textAlign = TextAlign.Center) }
                             if (page != "home") (notice ?: serviceNotice)?.let { item { JournalText(it) } }
-                            if (page == "place") {
+                            if (page == "duration") {
+                                LocationSessionDuration.entries.forEach { option -> item {
+                                    DetailAction(enabled = !busy && !active, onClick = {
+                                        change(onSuccess = { duration = option; page = "home" }) {
+                                            LocationSessionDuration.save(this@LocationJournalActivity, option)
+                                        }
+                                    }, label = { Text((if (option == duration) "✓ " else "") + stringResource(option.label)) })
+                                } }
+                                item { JournalText(stringResource(R.string.location_duration_hint)) }
+                                item { JournalAction(R.string.location_back, !busy) { page = "home" } }
+                            } else if (page == "place") {
                                 item { JournalField(stringResource(R.string.location_place_name), name, !busy && !syncBusy && !cloudManaged) { name = it.take(40) } }
                                 item { JournalAction(R.string.location_use_current, !busy && !syncBusy && !active && !cloudManaged) { requestLocation("locate") } }
                                 item { JournalField(stringResource(R.string.location_latitude), latitude, !busy && !syncBusy && !cloudManaged) { latitude = it } }
@@ -258,11 +269,16 @@ class LocationJournalActivity : ComponentActivity() {
                                 item { JournalAction(R.string.location_back) { page = "home" } }
                             } else {
                                 item { JournalText(stringResource(if (active) R.string.location_running else R.string.location_stopped)) }
+                                item { DetailAction(enabled = !busy && !active, onClick = { page = "duration" },
+                                    label = { Text(stringResource(R.string.location_duration_setting, stringResource(duration.label))) }) }
                                 item { DetailAction(enabled = !busy, colors = ButtonDefaults.buttonColors(
                                     containerColor = WatchColors.Record, contentColor = WatchColors.OnRecord), onClick = {
                                     if (active) startService(Intent(this@LocationJournalActivity, LocationTrackingService::class.java)
                                         .setAction(LocationTrackingService.ACTION_STOP)) else requestLocation("start")
                                 }, label = { Text(stringResource(if (active) R.string.location_stop else R.string.location_start)) }) }
+                                if (duration == LocationSessionDuration.CONTINUOUS) {
+                                    item { JournalText(stringResource(R.string.location_duration_hint)) }
+                                }
                                 item { JournalText(stringResource(if (cloudManaged) R.string.location_sync_on else R.string.location_sync_off)) }
                                 if (cloudManaged) {
                                     item { JournalAction(R.string.location_sync_disable, !syncBusy) {
