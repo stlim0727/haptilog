@@ -164,6 +164,48 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
     .toHaveCount(0);
 });
 
+test("map groups close places into one counted pin and splits them on tap", async ({ page }) => {
+  const state = await fixture(page);
+  state.additional.push({
+    ...structuredClone(baseRecording),
+    id: "66666666-6666-4666-8666-666666666666",
+    latitude: 37.5419,
+    longitude: 127.0568,
+  }, {
+    ...structuredClone(baseRecording),
+    id: "77777777-7777-4777-8777-777777777777",
+    latitude: 37.49,
+    longitude: 127.03,
+  });
+  await page.route("https://tile.openstreetmap.org/**", (route) =>
+    route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jf6kAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    }),
+  );
+  await page.goto("/");
+  await page.getByRole("button", { name: "Show map" }).click();
+  const pins = page.locator(".voice-marker");
+  await expect(pins).toHaveCount(2);
+  const group = page.getByTitle("2 recordings nearby", { exact: true });
+  await expect(group).toBeVisible();
+  await expect(page.locator(".voice-pin-count")).toHaveText("2");
+
+  // Tapping a group zooms to it instead of picking one recording arbitrarily.
+  await group.click();
+  await expect(pins).toHaveCount(3);
+  await expect(page.locator(".voice-pin-count")).toHaveCount(0);
+  await expect(page.locator(".leaflet-popup")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Show all locations" }).click();
+  await expect(pins).toHaveCount(2);
+  await expect(group).toBeVisible();
+  await page.screenshot({ path: "test-results/map-clustered.png", fullPage: true });
+});
+
 test("a map download failure leaves the recording list and details usable", async ({ page }) => {
   await fixture(page);
   await page.route("**/src/RecordingMap.tsx*", route => route.abort());
