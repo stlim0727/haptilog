@@ -13,6 +13,8 @@ import android.os.Looper
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.haptilog.watch.data.location.LocationHistoryRepository
+import com.haptilog.watch.data.location.LocationStayEndReason
+import com.haptilog.watch.data.location.LocationSample
 import com.haptilog.watch.R
 import org.junit.Assert.*
 import org.junit.Before
@@ -142,6 +144,31 @@ class LocationTrackingServiceTest {
         updates.failed!!.invoke()
         await { !LocationTrackingService.isTracking.value }
         assertEquals(application.getString(R.string.location_service_provider_error), LocationTrackingService.status.value)
+        controller.destroy()
+    }
+
+    @Test fun explicitStopPersistsStayWithUserStopReason() {
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val controller = controller()
+        val service = controller.get()
+        service.onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        val repository = LocationHistoryRepository.get(application)
+        // Inject already validated session-time observations without waiting five real minutes.
+        val elapsedStart = android.os.SystemClock.elapsedRealtime()
+        val wallStart = System.currentTimeMillis()
+        for (seconds in 0L..600 step 60) {
+            val elapsed = elapsedStart + seconds * 1000
+            repository.recordSample(LocationSample(37.0, 127.0, 10f,
+                wallStart + seconds * 1000, elapsed), elapsed)
+        }
+        val activeId = repository.state.value.stays.last().id
+        service.onStartCommand(Intent(application, LocationTrackingService::class.java)
+            .setAction(LocationTrackingService.ACTION_STOP), 0, 2)
+        await { !LocationTrackingService.isTracking.value }
+        val closed = repository.state.value.stays.single { it.id == activeId }
+        assertEquals(LocationStayEndReason.USER_STOP, closed.endReason)
+        assertEquals(600_000L, closed.observedDurationMillis)
         controller.destroy()
     }
 

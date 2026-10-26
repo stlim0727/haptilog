@@ -40,4 +40,12 @@
     <string name="location_dwell_setting">Stay: %1$d min · tap to change</string>
     <string name="location_places_hint">GPS places · Stop the journal to edit. At most 20 places. Keeps 7 days, up to 2,000 points and 500 events.</string>
     <string name="location_add_place">Add a place</string>
+    <string name="location_stay_observed">Stay · last confirmed</string>
+    <string name="location_stay_stale">Stay · awaiting fresh location</string>
+    <string name="location_stay_closed">Stay · ended</string>
+    <string name="location_stay_moved">Stay · movement confirmed</string>
+    <string name="location_stay_gap">Stay · location observations stopped</string>
+    <string name="location_stay_interrupted">Stay · tracking interrupted</string>
+    <string name="location_manage_on_web">Place and stay settings are managed on the web while location sync is enabled.</string>
+    <string name="location_disclosure_synced">Location collection runs only after you start it. Location sync is enabled: saved places and stay summaries sync separately from voice recordings. Raw movement points stay on this watch.</string>
 </resources>

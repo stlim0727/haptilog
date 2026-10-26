@@ -113,4 +113,84 @@ class LocationHistoryRepositoryTest {
         assertEquals(1, reloaded.state.value.places.size)
         assertFalse(File(directory, "history.json").readText().contains("accuracy_meters"))
     }
+    @Test fun legacyVersionOneMigratesWithoutInventingStays() {
+        val directory = temporary.newFolder()
+        val original = LocationHistoryRepository(directory)
+        original.addPlace(SavedPlace("home", "Home", 37.0, 127.0))
+        original.setDwellMinutes(5)
+        original.startSession()
+        for (seconds in 0L..300 step 60) original.recordSample(point(seconds), seconds * 1000)
+        original.stopSession()
+        val file = File(directory, "history.json")
+        val legacy = org.json.JSONObject(file.readText()).put("version", 1)
+        legacy.remove("stays")
+        file.writeText(legacy.toString())
+        val restored = LocationHistoryRepository(directory)
+        assertEquals(original.state.value.events, restored.state.value.events)
+        assertEquals(original.state.value.points, restored.state.value.points)
+        assertTrue(restored.state.value.stays.isEmpty())
+        assertEquals(2, org.json.JSONObject(file.readText()).getInt("version"))
+    }
+
+    @Test fun recoveredActiveStayClosesInterruptedWithoutInventingEndTime() {
+        val directory = temporary.newFolder()
+        val repository = LocationHistoryRepository(directory)
+        repository.setDwellMinutes(5)
+        repository.startSession()
+        for (seconds in 0L..300 step 60) repository.recordSample(point(seconds), seconds * 1000)
+        val active = repository.state.value.stays.single()
+        val recovered = LocationHistoryRepository(directory).state.value.stays.single()
+        assertEquals(active.id, recovered.id)
+        assertEquals(LocationStayStatus.CLOSED, recovered.status)
+        assertEquals(LocationStayEndReason.INTERRUPTED, recovered.endReason)
+        assertNull(recovered.endConfirmedAtMillis)
+        assertEquals(active.sourceRevision + 1, recovered.sourceRevision)
+        assertEquals(active.observedDurationMillis, recovered.observedDurationMillis)
+    }
+
+    @Test fun stopPersistsStayAndNewSessionUsesNewIdentity() {
+        val directory = temporary.newFolder()
+        val repository = LocationHistoryRepository(directory)
+        repository.setDwellMinutes(5)
+        repository.startSession()
+        for (seconds in 0L..360 step 60) repository.recordSample(point(seconds), seconds * 1000)
+        val active = repository.state.value.stays.single()
+        assertEquals(2L, active.sourceRevision)
+        repository.stopSession(LocationStayEndReason.SESSION_TIMEOUT, point(400).timestampMillis)
+        val closed = LocationHistoryRepository(directory).state.value.stays.single()
+        assertEquals(LocationStayEndReason.SESSION_TIMEOUT, closed.endReason)
+        assertEquals(active.lastObservedAtMillis, closed.lastObservedAtMillis)
+        repository.startSession(500_000)
+        for (seconds in 500L..800 step 60) repository.recordSample(point(seconds), seconds * 1000)
+        assertEquals(2, repository.state.value.stays.size)
+        assertNotEquals(closed.sessionId, repository.state.value.stays.last().sessionId)
+        repository.stopSession()
+        repository.clearHistory()
+        assertTrue(repository.state.value.stays.isEmpty())
+    }
+
+    @Test fun silentProviderExpiresStayButDoesNotExtendDuration() {
+        val repository = LocationHistoryRepository(temporary.newFolder())
+        repository.setDwellMinutes(5)
+        repository.startSession()
+        for (seconds in 0L..300 step 60) repository.recordSample(point(seconds), seconds * 1000)
+        repository.expireStay(480_000, point(480).timestampMillis)
+        assertEquals(LocationStayStatus.ACTIVE, repository.state.value.stays.single().status)
+        repository.expireStay(480_001, point(481).timestampMillis)
+        assertEquals(LocationStayEndReason.OBSERVATION_GAP, repository.state.value.stays.single().endReason)
+        assertEquals(300_000L, repository.state.value.stays.single().observedDurationMillis)
+    }
+
+    @Test fun syncedPlacesAreDeferredWhileTrackingAndAppliedWhenStopped() {
+        val repository = LocationHistoryRepository(temporary.newFolder())
+        val places = listOf(SavedPlace("home", "Home", 37.0, 127.0))
+        repository.startSession()
+        assertFalse(repository.applySyncedPlaces(places, 20))
+        assertTrue(repository.state.value.places.isEmpty())
+        repository.stopSession()
+        assertTrue(repository.applySyncedPlaces(places, 20))
+        assertEquals(places, repository.state.value.places)
+        assertEquals(20, repository.state.value.dwellMinutes)
+    }
+
 }
