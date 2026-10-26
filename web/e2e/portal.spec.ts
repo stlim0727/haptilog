@@ -80,11 +80,15 @@ test("desktop and mobile layouts fit; disconnect revokes the grant", async ({ pa
     fullPage: true,
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  ).toBe(true);
+  // The portal swaps to its narrow layout from a matchMedia effect, so the
+  // header keeps desktop geometry for a commit or two after the resize.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    )
+    .toBe(true);
   await page.screenshot({
     path: "test-results/review-mobile.png",
     fullPage: true,
@@ -148,11 +152,13 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
   }).click();
   await expect(page.locator(".transcript")).toHaveText("Second transcript");
   await page.setViewportSize({ width: 390, height: 844 });
-  expect(
-    await page.evaluate(() =>
-      document.documentElement.scrollWidth <= innerWidth
-    ),
-  ).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    )
+    .toBe(true);
   await page.screenshot({
     path: "test-results/map-mobile.png",
     fullPage: true,
