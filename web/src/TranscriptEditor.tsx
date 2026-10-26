@@ -21,22 +21,6 @@ export function TranscriptEditor({ recording, lang, onChange, onError, onDirtyCh
   const [draft, setDraft] = useState(current);
   const [busy, setBusy] = useState(false);
   useEffect(() => { onDirtyChange?.((editing && draft !== current) || busy); }, [editing, draft, current, busy, onDirtyChange]);
-  const [history, setHistory] = useState<Revision[] | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [originalOpen, setOriginalOpen] = useState(false);
-  const [historyError, setHistoryError] = useState(false);
-  useEffect(() => {
-    if (!historyOpen || !supabase) return;
-    let active = true;
-    setHistory(null);
-    setHistoryError(false);
-    supabase.from("recording_correction_history").select("id,created_at,before_value,after_value")
-      .eq("recording_id", recording.id).order("id", { ascending: false }).limit(100)
-      .then(({ data, error }) => {
-        if (active) { setHistoryError(!!error); setHistory(error ? [] : data as Revision[]); }
-      });
-    return () => { active = false; };
-  }, [historyOpen, recording.id, recording.recording_corrections?.updated_at]);
   async function save() {
     setBusy(true);
     if (isDemoSessionActive() || recording.id.startsWith("demo-")) {
@@ -80,6 +64,12 @@ export function TranscriptEditor({ recording, lang, onChange, onError, onDirtyCh
     } finally { setBusy(false); }
   }
   return <section className="transcript-editor">
+    <div className="transcript-heading">
+      <h3>{ko ? "전사" : "Transcript"}</h3>
+      <span>{recording.recording_corrections?.transcript != null
+        ? (ko ? "사용자 편집" : "Edited") : (ko ? "AI 생성" : "AI generated")}</span>
+      {!editing && !recording.deleted_at && <button className="transcript-edit" aria-label={ko ? "텍스트 편집" : "Edit transcript"} onClick={() => { setDraft(current); setEditing(true); }}>{ko ? "편집" : "Edit"}</button>}
+    </div>
     {editing ? <form onSubmit={event => { event.preventDefault(); void save(); }}>
       <label>{ko ? "해석된 텍스트" : "Transcript"}
         <textarea autoFocus rows={7} maxLength={50000} value={draft} disabled={busy}
@@ -95,8 +85,29 @@ export function TranscriptEditor({ recording, lang, onChange, onError, onDirtyCh
       <button type="button" className="secondary-button" disabled={busy} onClick={() => { setEditing(false); onDirtyChange?.(false); }}>{ko ? "취소" : "Cancel"}</button>
     </form> : <>
       <p className="transcript">{current || (ko ? "인식된 음성이 없습니다." : "No speech detected.")}</p>
-      {!recording.deleted_at && <button className="secondary-button" onClick={() => { setDraft(current); setEditing(true); }}>{ko ? "텍스트 편집" : "Edit transcript"}</button>}
     </>}
+  </section>;
+}
+
+export function TranscriptHistory({ recording, lang }: { recording: Recording; lang: "ko" | "en" }) {
+  const ko = lang === "ko";
+  const [history, setHistory] = useState<Revision[] | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [originalOpen, setOriginalOpen] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
+  useEffect(() => {
+    if (!historyOpen || !supabase) return;
+    let active = true;
+    setHistory(null);
+    setHistoryError(false);
+    supabase.from("recording_correction_history").select("id,created_at,before_value,after_value")
+      .eq("recording_id", recording.id).order("id", { ascending: false }).limit(100)
+      .then(({ data, error }) => {
+        if (active) { setHistoryError(!!error); setHistory(error ? [] : data as Revision[]); }
+      });
+    return () => { active = false; };
+  }, [historyOpen, recording.id, recording.recording_corrections?.updated_at]);
+  return <section className="transcript-history">
     <details onToggle={event => setOriginalOpen(event.currentTarget.open)}><summary>{ko ? "원본 AI 텍스트" : "Original AI transcript"}</summary>
       {originalOpen && <p className="transcript">{latest(recording)?.transcript}</p>}
     </details>

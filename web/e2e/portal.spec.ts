@@ -192,6 +192,7 @@ test("moves a recording to trash with undo and restores from the trash tab", asy
   await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
 
   // Move to trash
+  await page.getByLabel("Recording options", { exact: true }).click();
   await page.getByRole("button", { name: "Move recording to trash" }).click();
   await expect(page.getByRole("status")).toContainText("Recording moved to trash");
   await expect(page.getByText("아이스 라떼 5,000원")).toHaveCount(0);
@@ -201,6 +202,7 @@ test("moves a recording to trash with undo and restores from the trash tab", asy
   await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
 
   // Move to trash again
+  await page.getByLabel("Recording options", { exact: true }).click();
   await page.getByRole("button", { name: "Move recording to trash" }).click();
   await expect(page.getByText("아이스 라떼 5,000원")).toHaveCount(0);
 
@@ -271,10 +273,11 @@ test("transcript edits preserve originals, can be cancelled, and expose history"
   await expect(page.locator(".transcript-editor > p.transcript")).toHaveText("Corrected coffee text");
   expect(state.corrections.at(-1).transcript).toBe("Corrected coffee text");
   expect(state.recording.voice_enrichments[0].transcript).toBe(baseRecording.voice_enrichments[0].transcript);
+  await page.getByText("Recording details", { exact: true }).click();
   await page.getByText("Original AI transcript", { exact: true }).click();
-  await expect(page.locator(".transcript-editor details").first()).toContainText(baseRecording.voice_enrichments[0].transcript);
+  await expect(page.locator(".transcript-history details").first()).toContainText(baseRecording.voice_enrichments[0].transcript);
   await page.getByText("Edit history", { exact: true }).click();
-  await expect(page.locator(".transcript-editor article")).toContainText("Corrected coffee text");
+  await expect(page.locator(".transcript-history article")).toContainText("Corrected coffee text");
   await page.reload();
   await expect(page.locator(".transcript-editor > p.transcript")).toHaveText("Corrected coffee text");
 });
