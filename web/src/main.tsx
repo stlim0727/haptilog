@@ -20,6 +20,7 @@ import {
   LogOut,
   Luggage,
   MapPin,
+  MoreHorizontal,
   Mic,
   Receipt,
   RefreshCw,
@@ -47,7 +48,7 @@ import {
 } from "./demo";
 import { MobileWorkspace } from "./MobileWorkspace";
 import { NotionExport } from "./NotionExport";
-import { TranscriptEditor } from "./TranscriptEditor";
+import { TranscriptEditor, TranscriptHistory } from "./TranscriptEditor";
 import { purgeRecordings } from "./purge";
 import TimelineView, { CategoryBadge } from "./TimelineView";
 import CalendarView from "./CalendarView";
@@ -1648,12 +1649,12 @@ function Inspector({
     }
   }, [r.recording_corrections?.updated_at, e?.created_at, dirty]);
   async function prepareAudio() {
-    if (audioUrl) return;
+    if (audioUrl) return audioUrl;
     if (isDemo || r.audio_path?.startsWith("demo/")) {
       const blob = createDemoAudioBlob();
       objectUrl.current = URL.createObjectURL(blob);
       setAudioUrl(objectUrl.current);
-      return;
+      return objectUrl.current;
     }
     if (!supabase || !r.audio_path) return;
     setAudioBusy(true);
@@ -1668,6 +1669,15 @@ function Inspector({
       setAudioUrl(objectUrl.current);
     }
     setAudioBusy(false);
+    return error || !data ? undefined : objectUrl.current;
+  }
+  async function downloadAudio() {
+    const url = await prepareAudio();
+    if (!url || !mounted.current) return;
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `haptilog-${r.id}.m4a`;
+    link.click();
   }
   async function retry() {
     if (isDemo || r.id.startsWith("demo-")) {
@@ -1809,33 +1819,34 @@ function Inspector({
         </div>
       )}
       <div className="inspector-top">
-        <span className="eyebrow">{t.original_details}</span>
+        <h2>{e?.summary || (lang === "ko" ? "보존된 음성 기록." : "Your voice, preserved.")}</h2>
         <div className="inspector-top-actions">
-          <span className={`state-pill ${state === "Ready" ? "is-ready" : ""}`}>
-            {state}
-          </span>
-          {!r.deleted_at && (
-            <button
-              className="trash-trigger"
-              onClick={() => onMoveToTrash(r.id)}
-              title={t.move_to_trash}
-              aria-label={lang === "en" ? "Move recording to trash" : t.move_to_trash}
-            >
-              <Trash2 size={13} /> {t.move_to_trash}
-            </button>
-          )}
+          {state !== "Ready" && <span className="state-pill">{state}</span>}
+          <details className="recording-actions" onKeyDown={event => {
+            if (event.key === "Escape") {
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector("summary")?.focus();
+            }
+          }} onBlur={event => {
+            if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+          }}>
+            <summary aria-label={lang === "ko" ? "녹음 옵션" : "Recording options"}><MoreHorizontal size={20} /></summary>
+            <div className="recording-actions-popover">
+              <button onClick={() => { if (!audioBusy) void downloadAudio(); }} disabled={!r.audio_path} aria-disabled={audioBusy}>
+                <ArrowDownToLine size={14} /> {audioBusy ? t.loading_audio : t.download_audio}
+              </button>
+              {!r.deleted_at && <button className="trash-trigger" onClick={() => onMoveToTrash(r.id)} aria-label={lang === "en" ? "Move recording to trash" : t.move_to_trash}>
+                <Trash2 size={14} /> {t.move_to_trash}
+              </button>}
+            </div>
+          </details>
         </div>
       </div>
-      <h2>{e?.summary || (lang === "ko" ? "보존된 음성 기록." : "Your voice, preserved.")}</h2>
       <p className="detail-time">
         {new Date(r.recorded_at).toLocaleString()} ·{" "}
         {r.duration_seconds ?? (lang === "ko" ? "알 수 없음" : "Unknown")} {lang === "ko" ? "초" : "seconds"}
       </p>
       <section className="audio-section">
-        <div className="section-label">
-          <Headphones size={16} /> {t.original_audio}{" "}
-          <span>{t.audio_truth}</span>
-        </div>
         {audioUrl ? (
           <>
             <audio
@@ -1866,9 +1877,6 @@ function Inspector({
                   ))}
                 </select>
               </label>
-              <a href={audioUrl} download={`haptilog-${r.id}.m4a`}>
-                <ArrowDownToLine size={14} /> {t.download_audio}
-              </a>
             </div>
           </>
         ) : (
@@ -1915,12 +1923,6 @@ function Inspector({
       )}
       {e && (
         <>
-          <div className="section-label">
-            <Mic size={16} /> {t.transcript}{" "}
-            <span>{r.recording_corrections?.transcript != null
-              ? (lang === "ko" ? "사용자 편집 · 원본 보존" : "Edited · original preserved")
-              : t.transcript_note}</span>
-          </div>
           <TranscriptEditor recording={r} lang={lang} onChange={onChange} onError={onError} onDirtyChange={updateTranscriptDirty} />
           {x && (
             <form
@@ -2007,53 +2009,34 @@ function Inspector({
               ))}
             </section>
           )}
+        </>
+      )}
+      <section className="recording-location">
+        <span><MapPin size={16} aria-hidden="true" /> {lang === "ko" ? "녹음 위치" : "Recording location"}</span>
+        {hasLocation(r) ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.latitude},${r.longitude}`)}`} target="_blank" rel="noopener noreferrer">{t.open_in_maps}</a>
+          : <p className="muted">{t.no_location}</p>}
+      </section>
+      <details className="recording-details">
+        <summary>{lang === "ko" ? "기록 상세" : "Recording details"}</summary>
+        <p className="muted">{t.audio_truth}</p>
+        {e && <TranscriptHistory recording={r} lang={lang} />}
+        {hasLocation(r) && <section className="context">
+          <h3>{t.captured_context}</h3>
+          <dl>
+            <div><dt>{lang === "ko" ? "정확도" : "Accuracy"}</dt><dd>{r.accuracy != null ? `±${Math.round(r.accuracy)} m` : "—"}</dd></div>
+            <div><dt>{lang === "ko" ? "고도" : "Altitude"}</dt><dd>{r.altitude != null ? `${Math.round(r.altitude)} m` : "—"}</dd></div>
+            <div><dt>{lang === "ko" ? "속도" : "Speed"}</dt><dd>{r.speed != null ? `${Number(r.speed.toFixed(1))} m/s` : "—"}</dd></div>
+          </dl>
+          <small>{t.location_snapshot}</small>
+        </section>}
+        {e && (
           <details className="structured">
             <summary>{t.all_details}</summary>
             <pre>{JSON.stringify(e.structured_data, null, 2)}</pre>
             <small>{t.analysis_version}: {e.pipeline_version ?? "legacy"}</small>
           </details>
-        </>
-      )}
-      <section className="context">
-        <div className="section-label">
-          <MapPin size={16} /> {t.captured_context}
-        </div>
-        {hasLocation(r) ? (
-          <>
-            <p>
-              <a
-                className="secondary-button"
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.latitude},${r.longitude}`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <MapPin size={16} aria-hidden="true" /> {t.open_in_maps}
-              </a>
-            </p>
-            <dl>
-              <div>
-                <dt>Accuracy</dt>
-                <dd>
-                  {r.accuracy != null ? `± ${r.accuracy} m` : "Unavailable"}
-                </dd>
-              </div>
-              <div>
-                <dt>Altitude</dt>
-                <dd>
-                  {r.altitude != null ? `${r.altitude} m` : "Unavailable"}
-                </dd>
-              </div>
-              <div>
-                <dt>Speed</dt>
-                <dd>{r.speed != null ? `${r.speed} m/s` : "Unavailable"}</dd>
-              </div>
-            </dl>
-            <small>{t.location_snapshot}</small>
-          </>
-        ) : (
-          <p className="muted">{t.no_location}</p>
         )}
-      </section>
+      </details>
     </>
   );
 }

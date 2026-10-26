@@ -253,6 +253,7 @@ test("mobile unsaved transcript warns on Back and cancellation preserves edits",
 test("mobile trash, restore, and disconnect remain available from the menu", async ({ page }) => {
   await mobile(page);
   await page.locator(".mobile-record").click();
+  await page.getByLabel("Recording options", { exact: true }).click();
   await page.getByRole("button", { name: "Move recording to trash" }).click();
   await expect(page.locator(".mobile-detail")).toHaveCount(0);
   await page.getByRole("button", { name: "More options" }).click();
@@ -404,4 +405,82 @@ test("mobile reload preserves history so cancelling browser Back keeps the draft
   await page.goBack();
   await expect(page.locator(".mobile-record")).toBeVisible();
   await expect(page.locator(".mobile-detail")).toHaveCount(0);
+});
+
+
+test("compact detail keeps provenance folded and downloads from keyboard-accessible options", async ({ page }) => {
+  const state = await fixture(page);
+  state.recording.voice_enrichments[0].intent_type = "NOTE";
+  state.recording.voice_enrichments[0].structured_data = {};
+  state.recording.altitude = 114.599998474121;
+  state.recording.accuracy = 27.041;
+  await page.goto("/");
+  await page.locator(".mobile-record").click();
+  await expect(page.locator(".transcript-editor > .transcript")).toBeVisible();
+  await expect(page.getByText("Original AI transcript", { exact: true })).toBeHidden();
+  await expect(page.getByText("Edit history", { exact: true })).toBeHidden();
+  await expect(page.getByText("114.599998474121 m", { exact: true })).toHaveCount(0);
+  const options = page.getByLabel("Recording options", { exact: true });
+  await options.focus();
+  await page.keyboard.press("Enter");
+  const downloading = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download .m4a", exact: true }).click();
+  expect((await downloading).suggestedFilename()).toBe(`haptilog-${state.recording.id}.m4a`);
+  expect(state.audioLoads).toBe(1);
+  await page.keyboard.press("Escape");
+  await expect(options).toBeFocused();
+  await expect(page.getByRole("button", { name: "Download .m4a", exact: true })).toBeHidden();
+  await page.getByText("Recording details", { exact: true }).click();
+  await expect(page.getByText("115 m", { exact: true })).toBeVisible();
+  await expect(page.getByText("±27 m", { exact: true })).toBeVisible();
+  await page.getByText("Recording details", { exact: true }).click();
+  await page.reload();
+  for (const lang of ["en", "ko"]) {
+    if (lang === "ko") {
+      await page.getByRole("button", { name: "Back to recordings" }).click();
+      await page.getByRole("button", { name: "Toggle language" }).click();
+      await page.locator(".mobile-record").click();
+    }
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.evaluate(() => {
+      const sizes = [...document.querySelectorAll<HTMLElement>(".mobile-detail *")]
+        .filter(el => el.namespaceURI === "http://www.w3.org/1999/xhtml")
+        .map(el => [el, parseFloat(getComputedStyle(el).fontSize)] as const);
+      for (const [el, size] of sizes) el.style.fontSize = `${size * 2}px`;
+    });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+    await page.screenshot({ path: `test-results/compact-detail-${lang}-320-text200.png`, fullPage: true });
+    await page.evaluate(() => document.querySelectorAll<HTMLElement>(".mobile-detail *").forEach(el => el.style.removeProperty("font-size")));
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "test-results/compact-detail-ko.png", fullPage: true });
+});
+
+test("wrapped recording headings keep every options action inside the viewport", async ({ page }) => {
+  const state = await fixture(page);
+  state.recording.voice_enrichments[0].summary = "A long recording summary that wraps onto several lines on a narrow phone screen";
+  await page.goto("/");
+  await page.locator(".mobile-record").click();
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const scale of [1, 2]) {
+      await page.locator(".inspector h2").evaluate((el, scale) => {
+        (el as HTMLElement).style.fontSize = `${25 * scale}px`;
+      }, scale);
+      const options = page.getByLabel("Recording options", { exact: true });
+      await options.click();
+      for (const selector of [".recording-actions-popover", ".recording-actions-popover > button"]) {
+        for (const item of await page.locator(selector).all()) {
+          await item.scrollIntoViewIfNeeded();
+          const box = await item.boundingBox();
+          expect(box).not.toBeNull();
+          expect(box!.x).toBeGreaterThanOrEqual(0);
+          expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+          await expect(item).toBeInViewport({ ratio: 1 });
+        }
+      }
+      await page.keyboard.press("Escape");
+      await expect(options).toBeFocused();
+    }
+  }
 });
