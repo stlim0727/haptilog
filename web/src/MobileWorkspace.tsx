@@ -751,7 +751,7 @@ export function MobileWorkspace(p: Props) {
           }}
         >
           <FileText size={18} />
-          {ko ? "Notion 연결" : "Notion integration"}
+          {ko ? "Notion으로 내보내기" : "Export to Notion"}
         </button>
         <button
           disabled={p.busy}
