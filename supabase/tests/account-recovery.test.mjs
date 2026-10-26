@@ -34,6 +34,19 @@ await assert.rejects(manage('save'),/Active watch connection required/);
 await db.query(`select public.issue_watch_code('${owner}','first-code')`);
 await db.query(`select public.redeem_account_watch_code('${account}','${session}','','first-code')`);
 assert.equal((await manage('list')).rows[0].result.watches[0].owner_user_id,owner);
+// Restore keeps renewing a live connection, which is what the rotation keep-alive needs.
+await db.exec(`update public.portal_connections set expires_at=now()+interval '1 hour' where session_id='${session}';`);
+await manage('restore',account,session,owner);
+const renewed = (await db.query(`select expires_at,revoked_at from public.portal_connections where session_id='${session}'`)).rows[0];
+assert.ok(renewed.expires_at>new Date(),'live connection must be renewed');
+assert.equal(renewed.revoked_at,null);
+// Revoking from the watch must outlive the next portal load: restore cannot resurrect it.
+await db.exec(`update public.portal_connections set revoked_at=now() where session_id='${session}';`);
+const frozen = (await db.query(`select expires_at from public.portal_connections where session_id='${session}'`)).rows[0].expires_at;
+assert.equal((await manage('restore',account,session,owner)).rows[0].result.error,'revoked');
+const held = (await db.query(`select revoked_at,expires_at from public.portal_connections where session_id='${session}'`)).rows[0];
+assert.ok(held.revoked_at,'revoked connection must stay revoked');
+assert.equal(held.expires_at.getTime(),frozen.getTime(),'revoked connection must not restart its window');
 // A replacement device/session recovers without a watch code.
 await manage('restore',account,next,owner);
 assert.equal((await db.query(`select owner_user_id from public.portal_connections where session_id='${next}'`)).rows[0].owner_user_id,owner);
