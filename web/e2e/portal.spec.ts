@@ -324,17 +324,19 @@ test("transcript edits preserve originals, can be cancelled, and expose history"
   await expect(page.locator(".transcript-editor > p.transcript")).toHaveText("Corrected coffee text");
 });
 
-test("switches between List, Timeline & Map, and Calendar views seamlessly", async ({ page }) => {
+test("switches between List and Calendar and toggles the time slider and map", async ({ page }) => {
   await fixture(page);
   await page.goto("/");
 
-  // 1. Initial list view
+  // 1. Default list view, both toggles off
   await expect(page.locator(".review-layout")).toBeVisible();
   await expect(page.locator(".global-filters-bar")).toBeVisible();
   await expect(page.locator(".category-expense")).toBeVisible();
+  await expect(page.locator(".time-strip-container")).toHaveCount(0);
+  await expect(page.locator(".map-section")).toHaveCount(0);
 
-  // 2. Switch to Timeline & Map view (Option C: TimeSliderStrip + Timeline + Map)
-  await page.getByRole("tab", { name: "Timeline & Map" }).click();
+  // 2. Time Slider toggle in List
+  await page.getByRole("button", { name: "Time Slider", exact: true }).click();
   await expect(page.locator(".time-strip-container")).toBeVisible();
   await expect(page.locator(".time-strip-card").first()).toBeVisible();
   await page.locator(".time-strip-card").first().click();
@@ -342,30 +344,26 @@ test("switches between List, Timeline & Map, and Calendar views seamlessly", asy
   await page.locator(".time-strip-all-btn").click();
   await expect(page.locator(".time-strip-all-btn")).toHaveClass(/active/);
 
-  await expect(page.locator(".spatiotemporal-grid")).toBeVisible();
-  await expect(page.locator(".timeline-container")).toBeVisible();
+  // 3. Map toggle in List
+  await page.getByRole("button", { name: "Show map" }).click();
+  await expect(page.locator(".map-section")).toBeVisible();
   await expect(page.locator(".recording-map")).toBeVisible();
 
-  // Click a timeline item to select
-  await page.locator(".timeline-item").first().click();
-  await expect(page.locator(".timeline-item").first()).toHaveClass(/selected/);
-
-  // Keyboard navigation on card and nested detail button
-  await page.locator(".timeline-item").first().focus();
-  await page.keyboard.press("Enter");
-  await expect(page.locator(".timeline-item").first()).toHaveClass(/selected/);
-
-  await page.locator(".timeline-inspect-btn").first().focus();
-  await page.keyboard.press("Enter");
-  await expect(page.locator(".inspector")).toBeVisible();
-
-  // 3. Switch to Calendar view
+  // 4. Switch to Calendar — Map persists, Time Slider toggle is not offered
   await page.getByRole("tab", { name: "Calendar" }).click();
   await expect(page.locator(".calendar-view-container")).toBeVisible();
   await expect(page.locator(".calendar-grid")).toBeVisible();
   await expect(page.locator(".calendar-day-panel")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hide Slider", exact: true })).toHaveCount(0);
 
-  // 4. Return to List view
+  // 5. Map toggle in Calendar
+  await page.getByRole("button", { name: "Hide map" }).click();
+  await expect(page.locator(".map-section")).toHaveCount(0);
+  await page.getByRole("button", { name: "Show map" }).click();
+  await expect(page.locator(".map-section")).toBeVisible();
+  await expect(page.locator(".recording-map")).toBeVisible();
+
+  // 6. Return to List
   await page.getByRole("tab", { name: "List" }).click();
   await expect(page.locator(".review-layout")).toBeVisible();
 });

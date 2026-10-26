@@ -6,7 +6,7 @@ import {
   MapPin,
   Clock,
 } from "lucide-react";
-import { CategoryBadge } from "./TimelineView";
+import { CategoryBadge } from "./CategoryBadge";
 import { expense, hasLocation, latest, localDate, money, toLocalDateString } from "./domain";
 import type { Recording } from "./domain";
 import type { TranslationKeys } from "./i18n";

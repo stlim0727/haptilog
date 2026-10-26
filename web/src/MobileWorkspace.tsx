@@ -27,7 +27,7 @@ import {
   X,
 } from "lucide-react";
 import CalendarView from "./CalendarView";
-import { CategoryIcon } from "./TimelineView";
+import { CategoryIcon } from "./CategoryBadge";
 import { NotionExport } from "./NotionExport";
 import {
   expense,

@@ -50,7 +50,7 @@ import { MobileWorkspace } from "./MobileWorkspace";
 import { NotionExport } from "./NotionExport";
 import { TranscriptEditor, TranscriptHistory } from "./TranscriptEditor";
 import { purgeRecordings } from "./purge";
-import TimelineView, { CategoryBadge } from "./TimelineView";
+import { CategoryBadge } from "./CategoryBadge";
 import CalendarView from "./CalendarView";
 import TimeSliderStrip from "./TimeSliderStrip";
 import {
@@ -169,7 +169,7 @@ function App() {
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
   const [showTimeSlider, setShowTimeSlider] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "spatiotemporal" | "calendar">("list");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
   const [stripDateKey, setStripDateKey] = useState<string>("ALL");
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
@@ -610,12 +610,9 @@ function App() {
     );
   });
   const active = filtered.find((r) => r.id === selected) ?? filtered[0];
-  const spatioFiltered = stripDateKey === "ALL"
-    ? filtered
-    : filtered.filter((r) => localDate(r.recorded_at) === stripDateKey);
   const displayRecordings =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
-      ? spatioFiltered
+      ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)
       : filtered;
   const dateFilteredActiveRecords = activeRecords.filter((r) => {
     const day = localDate(r.recorded_at),
@@ -1201,18 +1198,6 @@ function App() {
               <button
                 type="button"
                 role="tab"
-                aria-selected={viewMode === "spatiotemporal"}
-                className={viewMode === "spatiotemporal" ? "active" : ""}
-                onClick={() => {
-                  if (category === "Trash") setCategory("All");
-                  setViewMode("spatiotemporal");
-                }}
-              >
-                <Clock size={14} /> {t.view_timeline_map}
-              </button>
-              <button
-                type="button"
-                role="tab"
                 aria-selected={viewMode === "calendar"}
                 className={viewMode === "calendar" ? "active" : ""}
                 onClick={() => {
@@ -1225,16 +1210,18 @@ function App() {
                 <CalendarDays size={14} /> {t.view_calendar}
               </button>
             </div>
-            {viewMode === "list" && !isTrashView && (
+            {!isTrashView && (
               <div className="workbench-toggles">
-                <button
-                  type="button"
-                  className={`workbench-toggle-btn ${showTimeSlider ? "active" : ""}`}
-                  onClick={() => setShowTimeSlider(!showTimeSlider)}
-                  aria-expanded={showTimeSlider}
-                >
-                  <Clock size={14} /> {showTimeSlider ? t.hide_time_slider : t.toggle_time_slider}
-                </button>
+                {viewMode === "list" && (
+                  <button
+                    type="button"
+                    className={`workbench-toggle-btn ${showTimeSlider ? "active" : ""}`}
+                    onClick={() => setShowTimeSlider(!showTimeSlider)}
+                    aria-expanded={showTimeSlider}
+                  >
+                    <Clock size={14} /> {showTimeSlider ? t.hide_time_slider : t.toggle_time_slider}
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`workbench-toggle-btn ${showMap ? "active" : ""}`}
@@ -1300,43 +1287,30 @@ function App() {
             </div>
           )}
 
-          {viewMode === "spatiotemporal" ? (
-            <div className="spatiotemporal-view">
-              <TimeSliderStrip
-                recordings={filtered}
-                selectedDateKey={stripDateKey}
-                onSelectDate={setStripDateKey}
-                t={t}
-                lang={lang}
-              />
-              <div className="spatiotemporal-grid">
-                <div className="timeline-pane">
-                  <TimelineView
-                    recordings={spatioFiltered}
-                    selectedId={active?.id ?? null}
-                    onSelect={(id, revealDetails) => {
-                      setSelected(id);
-                      if (revealDetails) {
-                        requestAnimationFrame(() =>
-                          document.querySelector(".inspector")?.scrollIntoView({
-                            block: "start",
-                            behavior: "smooth",
-                          }),
-                        );
-                      }
-                    }}
-                    t={t}
-                  />
-                </div>
-                <div className="map-pane">
+          {viewMode === "calendar" ? (
+            <>
+              {showMap && (
+                <section className="map-section" aria-label="Recording map view">
+                  <div className="map-heading">
+                    <div>
+                      <p>{t.map_desc}</p>
+                    </div>
+                    <button
+                      className="map-close-btn"
+                      onClick={() => setShowMap(false)}
+                      aria-label="Close map"
+                      title={t.hide_map}
+                    >
+                      ✕
+                    </button>
+                  </div>
                   <MapBoundary>
                     <Suspense fallback={<p>{t.loading_map}</p>}>
                       <RecordingMap
                         heading={t.map_heading}
                         lang={lang}
-                        recordings={spatioFiltered}
+                        recordings={filtered}
                         selectedId={active?.id ?? null}
-                        showRoute={true}
                         onSelect={(id, revealDetails) => {
                           setSelected(id);
                           if (revealDetails) {
@@ -1351,34 +1325,33 @@ function App() {
                       />
                     </Suspense>
                   </MapBoundary>
-                </div>
-              </div>
-            </div>
-          ) : viewMode === "calendar" ? (
-            <CalendarView
-              recordings={filtered}
-              selectedId={active?.id ?? null}
-              onSelect={(id, revealDetails) => {
-                setSelected(id);
-                if (revealDetails) {
-                  requestAnimationFrame(() =>
-                    document.querySelector(".inspector")?.scrollIntoView({
-                      block: "start",
-                      behavior: "smooth",
-                    }),
-                  );
-                }
-              }}
-              t={t}
-              lang={lang}
-              onDateChange={() => {
-                if (draftInProgress && !window.confirm(lang === "ko"
-                  ? "저장하지 않은 변경을 버리고 날짜를 바꿀까요?"
-                  : "Discard unsaved changes and change the date?")) return false;
-                setSelected(null);
-                return true;
-              }}
-            />
+                </section>
+              )}
+              <CalendarView
+                recordings={filtered}
+                selectedId={active?.id ?? null}
+                onSelect={(id, revealDetails) => {
+                  setSelected(id);
+                  if (revealDetails) {
+                    requestAnimationFrame(() =>
+                      document.querySelector(".inspector")?.scrollIntoView({
+                        block: "start",
+                        behavior: "smooth",
+                      }),
+                    );
+                  }
+                }}
+                t={t}
+                lang={lang}
+                onDateChange={() => {
+                  if (draftInProgress && !window.confirm(lang === "ko"
+                    ? "저장하지 않은 변경을 버리고 날짜를 바꿀까요?"
+                    : "Discard unsaved changes and change the date?")) return false;
+                  setSelected(null);
+                  return true;
+                }}
+              />
+            </>
           ) : (
             <>
               {showTimeSlider && (
@@ -1566,7 +1539,7 @@ function App() {
           </>
           )}
 
-          {viewMode !== "list" && active && (viewMode !== "calendar" || selected === active.id) && (
+          {viewMode === "calendar" && active && selected === active.id && (
             <section className="inspector" style={{ marginTop: "24px" }} aria-label="Selected recording details">
               <Inspector
                 key={active.id}
