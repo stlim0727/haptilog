@@ -51,6 +51,33 @@ test("preview test login button appears in preview environment and launches demo
   await expect(testLoginButton).toBeVisible();
 });
 
+test("summary metrics numbers have dark contrast and are visible in light mode", async ({ page }) => {
+  await fixture(page, { connected: false });
+  await page.goto("/");
+
+  const testLoginButton = page.getByTestId("preview-test-login-button");
+  await testLoginButton.click();
+  await expect(page.getByRole("status", { name: "Demo mode notice" })).toBeVisible();
+
+  // Locate the Ready to review metric section
+  const readyStrong = page.locator(".metrics section").nth(2).locator("strong");
+  await expect(readyStrong).toBeVisible();
+
+  // Toggle to light mode
+  const themeButton = page.locator(".theme-switch-btn");
+  await themeButton.click();
+  await expect(page.locator("body")).toHaveClass(/light-mode/);
+
+  // In light mode, verify .metrics strong color is dark ink (rgb(24, 24, 27)) and not invisible white
+  const color = await readyStrong.evaluate((el) => window.getComputedStyle(el).color);
+  expect(color).not.toBe("rgb(255, 255, 255)");
+  expect(color).toBe("rgb(24, 24, 27)");
+
+  // Verify full ready metric text contains both ready count and total count
+  const text = (await readyStrong.textContent())?.replace(/\s+/g, " ").trim();
+  expect(text).toMatch(/^\d+\s*\/\s*\d+$/);
+});
+
 test("production domain excludes test login button", async ({ page }) => {
   await fixture(page, { connected: false });
   await page.addInitScript(() => {
