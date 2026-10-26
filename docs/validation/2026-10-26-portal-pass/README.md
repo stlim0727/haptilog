@@ -1,6 +1,12 @@
 # Portal browser and accessibility pass — location workspace
 
-Date: 2026-10-26. Baseline: main `e0e24d4` (PR #78 merged). This closes the last release gate named in [the location stays architecture note](../../architecture/location-stays-sync.md) and item 5 of [the follow-up checklist](../../design/location-stays-followup.md).
+Date: 2026-10-26. Baseline: main `e0e24d4` (PR #78 merged). This closed the last release gate named in [the location stays architecture note](../../architecture/location-stays-sync.md) for the interface measured here; read [Scope and currency](#scope-and-currency) before treating it as evidence for the shipped journal.
+
+## Scope and currency
+
+This pass measured the standalone location workspace: the `Stays and my places` launcher, the modal `<dialog>` it opened, and the separate stay timeline inside it. Later the same day, PR #84 replaced that surface with the unified journal — stays render as journal cards and `StayInspector`, the trigger is now **장소 설정 / Place settings**, and the timeline module has been deleted as unreachable code.
+
+So the numbers below are valid evidence for the interface they were taken against, and the mocked English/Korean suites in `web/e2e/stays-locale.spec.ts` still run in CI. They are **not** evidence for the shipped journal. Keyboard and focus order, dialog return-focus, the 390 and 320 CSS-pixel geometry and contrast all have to be re-measured against the unified journal before item 5 of [the follow-up checklist](../../design/location-stays-followup.md) can be called closed.
 
 ## How it was driven
 
@@ -60,7 +66,7 @@ It asserts the localized consent section, threshold select (`공통 체류 기�
 
 - No assistive technology was used. Screen-reader announcement order, landmarks and live-region behaviour on `role="alert"`/`role="status"` remain unverified; this is a keyboard, focus, name and contrast pass.
 - Recording-to-stay association has no live evidence: the emulator watch had no uploaded recordings, so the linked-recordings list inside a stay was only exercised by mock tests.
-- The collapsed stay summary always reads "Unnamed stay"/"이름 없는 체류" even when the expanded body reports a named place candidate. Consistent with the no-auto-assignment rule, but a UX follow-up rather than a defect.
+- The collapsed stay summary always reads "Unnamed stay"/"이름 없는 체류" even when the expanded body reports a named place candidate. Consistent with the no-auto-assignment rule, but a UX follow-up rather than a defect. That timeline component is gone with the unified journal; the same wording now comes from `journalTitle` in `web/src/journal.ts`, which reads "Unnamed place"/"이름 없는 장소" whenever the saved areas do not resolve to exactly one candidate, so the follow-up still applies and needs re-checking there.
 - Physical expiry cleanup still awaits the first `pg_cron` run on 2026-10-27 04:15 UTC; read exclusion is not deletion.
 - Battery, GNSS accuracy and ambient watch operation are tracked separately in the [follow-up checklist](../../design/location-stays-followup.md).
 

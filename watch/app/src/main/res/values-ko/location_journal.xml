@@ -31,7 +31,7 @@
     <string name="location_disclosure">화면이 꺼져도 머문 장소와 시간을 워치에 보관합니다. 배터리를 사용하며 8시간 후 자동 종료됩니다. 웹 동기화는 아래에서 선택합니다.</string>
     <string name="location_stop">체류 기록 중지</string>
     <string name="location_start">체류 기록 시작</string>
-    <string name="location_counts">위치 %1$d개 · 이벤트 %2$d개</string>
+    <string name="location_counts">위치 %1$d개 · 체류 %2$d개</string>
     <string name="location_last_fix">최근 위치: %1$s</string>
     <string name="location_waiting_fix">정확한 위치를 기다리고 있습니다. 야외에서 시도해 주세요. 위치 수신이 지연될 수 있습니다.</string>
     <string name="location_open_settings">권한 및 알림 설정</string>
