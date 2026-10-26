@@ -795,15 +795,25 @@ function App() {
                           <h3>{t.account}</h3>
                           <p>{t.recovery_help}</p>
                         </div>
-                        <button
-                          type="button"
-                          className="google-button full"
-                          disabled={busy || draftInProgress}
-                          onClick={() => googleLogin(true)}
-                        >
-                          <GoogleIcon size={18} />
-                          <span>{t.google_existing}</span>
-                        </button>
+                        <div className="account-guest-actions">
+                          <button
+                            type="button"
+                            className="google-button full"
+                            disabled={busy || draftInProgress}
+                            onClick={() => googleLogin()}
+                          >
+                            <GoogleIcon size={18} />
+                            <span>{t.google_signin}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="account-secondary-btn"
+                            disabled={busy || draftInProgress}
+                            onClick={() => googleLogin(true)}
+                          >
+                            <span>{t.google_existing}</span>
+                          </button>
+                        </div>
                         <p className="account-help-note">{t.google_existing_help}</p>
                       </>
                     )}
