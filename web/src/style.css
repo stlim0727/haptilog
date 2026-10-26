@@ -357,7 +357,7 @@ button {
   letter-spacing: -1.8px;
   line-height: 1.18;
   margin: 24px 0;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 .pair-story h1 em {
   font-style: normal;
@@ -393,7 +393,7 @@ button {
 .voice-card p {
   font-size: 16px;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-primary);
   margin-top: 5px;
 }
 .voice-line {
@@ -437,7 +437,7 @@ button {
   font-weight: 700;
   letter-spacing: -0.6px;
   margin: 14px 0 10px;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 .pair-card > p {
   color: var(--text-secondary);
@@ -445,7 +445,7 @@ button {
   line-height: 1.7;
 }
 .pair-card strong {
-  color: #ffffff;
+  color: var(--text-primary);
   font-weight: 600;
 }
 form label {
@@ -682,7 +682,7 @@ footer a:hover {
   letter-spacing: -0.8px;
   font-weight: 750;
   margin: 12px 0 6px;
-  color: #ffffff;
+  color: var(--text-primary);
 }
 .metrics strong > span:not(.metric-unit) {
   display: block;
@@ -972,6 +972,10 @@ body.light-mode .state-pill {
 body.light-mode .state-pill.is-ready {
   color: #059669;
   border-color: #059669;
+}
+:root[data-theme="light"] .metrics strong,
+body.light-mode .metrics strong {
+  color: var(--text-primary);
 }
 :root[data-theme="light"] .metrics small .status-dot,
 body.light-mode .metrics small .status-dot,
@@ -1362,7 +1366,7 @@ audio {
 }
 .empty h3 {
   font-size: 18px;
-  color: #ffffff;
+  color: var(--text-primary);
   font-weight: 650;
   margin-bottom: 10px;
 }
@@ -1402,7 +1406,7 @@ audio {
 .inspector-empty h2 {
   font-size: 22px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-primary);
   margin-bottom: 12px;
 }
 .inspector-empty p {
