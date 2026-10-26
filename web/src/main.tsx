@@ -1112,6 +1112,8 @@ function App() {
                   <MapBoundary>
                     <Suspense fallback={<p>{t.loading_map}</p>}>
                       <RecordingMap
+                        heading={t.map_heading}
+                        lang={lang}
                         recordings={spatioFiltered}
                         selectedId={active?.id ?? null}
                         showRoute={true}
@@ -1175,7 +1177,6 @@ function App() {
                   <section className="map-section" aria-label="Recording map view">
                     <div className="map-heading">
                       <div>
-                        <h2>{t.map_heading}</h2>
                         <p>{t.map_desc}</p>
                       </div>
                       <button
@@ -1190,6 +1191,8 @@ function App() {
                     <MapBoundary>
                       <Suspense fallback={<p>{t.loading_map}</p>}>
                         <RecordingMap
+                          heading={t.map_heading}
+                          lang={lang}
                           recordings={displayRecordings}
                           selectedId={active?.id ?? null}
                           onSelect={(id, revealDetails) => {

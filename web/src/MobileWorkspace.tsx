@@ -577,7 +577,6 @@ export function MobileWorkspace(p: Props) {
               )}
               {view === "map" && (
                 <section className="mobile-map-view">
-                  <h2>{t.map_heading}</h2>
                   <p className="mobile-note">
                     {ko
                       ? `위치 있는 기록 ${located.length}개 · 장소 ${places.length}곳`
@@ -590,6 +589,7 @@ export function MobileWorkspace(p: Props) {
                   >
                     <Suspense fallback={<p>{t.loading_map}</p>}>
                       <RecordingMap
+                        heading={t.map_heading}
                         recordings={filtered}
                         selectedId={mapSelected}
                         showRoute={false}
