@@ -232,9 +232,9 @@ test("map selection preserves the view and Show all restores the filtered extent
 
 test("place selection offers one counted group per place", async ({ page }) => {
   const state = await mobile(page, 3);
-  // mobile-1 lands ~50m from the shared coordinate, mobile-2 across the city.
-  state.additional[0].latitude = 37.5413;
-  state.additional[0].longitude = 127.0564;
+  // mobile-1 lands ~240m from the shared coordinate, mobile-2 across the city.
+  state.additional[0].latitude = 37.5432;
+  state.additional[0].longitude = 127.056;
   state.additional[1].latitude = 37.49;
   state.additional[1].longitude = 127.03;
   await page.getByRole("button", { name: "Refresh recordings" }).click();
@@ -242,6 +242,7 @@ test("place selection offers one counted group per place", async ({ page }) => {
 
   const select = page.locator(".mobile-place-select select");
   const options = page.locator(".mobile-place-select option");
+  const pins = page.locator(".voice-marker");
   await expect(page.getByText("3 located recordings · 2 places"))
     .toBeVisible();
   await expect(options).toHaveCount(2);
@@ -249,17 +250,42 @@ test("place selection offers one counted group per place", async ({ page }) => {
   await expect(options.nth(1)).toHaveText(/Place 2\s+·\s+1 recording/);
   await expect(page.locator(".mobile-map-view [data-record-id]"))
     .toHaveCount(2);
+  // Nothing is dimmed until a place is actually chosen.
+  await expect(pins).toHaveCount(2);
+  await expect(page.locator(".voice-marker.muted")).toHaveCount(0);
 
   await select.selectOption({ index: 1 });
   await expect(page.locator(".mobile-map-view [data-record-id]"))
     .toHaveCount(1);
   await expect(page.locator(".mobile-map-view [data-record-id='mobile-2']"))
     .toBeVisible();
+  await expect(page.locator(".voice-marker.active")).toHaveCount(1);
+  await expect(page.locator(".voice-marker.muted")).toHaveCount(1);
 
   await select.selectOption({ index: 0 });
   await expect(page.locator(".mobile-map-view [data-record-id]"))
     .toHaveCount(2);
+  await expect(page.locator(".voice-marker.active")).toHaveCount(1);
+  await expect(page.locator(".voice-marker.muted")).toHaveCount(1);
   await page.screenshot({ path: "test-results/place-groups-mobile.png", fullPage: true });
+
+  // Zoom in until the group's own pins separate; every one of them stays lit.
+  const map = page.locator(".recording-map");
+  const zoomIn = map.getByRole("button", { name: "Zoom in" });
+  for (let level = 0; level < 8 && (await pins.count()) !== 3; level++) {
+    await zoomIn.click();
+    await expect(map.locator(".leaflet-zoom-anim")).toHaveCount(0);
+  }
+  await expect(pins).toHaveCount(3);
+  await expect(page.locator(".voice-marker.active")).toHaveCount(2);
+  await expect(page.locator(".voice-marker.muted")).toHaveCount(1);
+
+  // Re-grouping on "Show all" keeps the chosen place standing out.
+  await page.getByRole("button", { name: "Show all locations" }).click();
+  await expect(pins).toHaveCount(2);
+  await expect(page.locator(".voice-marker.active")).toHaveCount(1);
+  await expect(page.locator(".voice-marker.muted")).toHaveCount(1);
+  await page.screenshot({ path: "test-results/place-group-focus-mobile.png", fullPage: true });
 });
 
 test("mobile unsaved transcript warns on Back and cancellation preserves edits", async ({ page }) => {
