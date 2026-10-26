@@ -7,9 +7,12 @@ the audio and transcript halves hidden. Sample/demo mode never loads stays. Repo
 
 - `journal.ts` turns a stay into a journal item: the name comes from the single saved area that
   contains its observed point, so an ambiguous or unnamed area stays honestly "Unnamed stay".
+  `relatedRecordings` scores each recording against every visible stay and keeps a unique candidate,
+  so overlapping stays claim nothing rather than each claiming the same recording.
 - `useLocationStays.ts` owns one owner's snapshot (poll, visibility refresh, mutation generation) and
-  the browser-local hidden-area preferences. It exposes no consent control: the watch's cloud sync
-  switch is the only authorization, and the server mirror simply reports it.
+  the browser-local hidden-area preferences. `loaded` reports the first settled snapshot so a
+  deep-linked stay is not discarded while its feed is still arriving. It exposes no consent control:
+  the watch's cloud sync switch is the only authorization, and the server mirror simply reports it.
 - `PlacesPanel.tsx` is the only place editor for watch and web. It edits saved areas, the shared stay
   threshold and frequent-area suggestions, and can delete server stays.
 - `types.ts` follows `docs/architecture/location-stays-sync.md` wire stay fields.
@@ -35,10 +38,12 @@ npm run build --prefix web
 ```
 
 `web/e2e/stays-followup.spec.ts` uses mocked RPCs to cover the stay appearing as a record (list,
-detail without audio, `?stay=` deep link, calendar, map, phone layout), editing recovery, authorization
-loss, hidden-coordinate cleanup and theme/narrow-screen rendering. This is not live backend or complete
-accessibility evidence. Still required before release: explicit historical association persistence,
-broader browser/accessibility verification and real device/backend synchronization evidence. Watch-side
+detail without audio, `?stay=` deep link including a snapshot slower than the recordings, linked
+recording navigation on the phone, calendar, map, phone layout), editing recovery, authorization loss,
+hidden-coordinate cleanup after bulk and single-stay deletion and theme/narrow-screen rendering. This
+is not live backend or complete accessibility evidence. Still required before release: explicit
+historical association persistence, broader browser/accessibility verification and real
+device/backend synchronization evidence. Watch-side
 consent reconciliation adopts a re-enable's bumped consent token and disables locally on server-side
 revocation (see `LocationSyncClient.ensureConsentCurrent`). Track remaining product and release work in
 [the follow-up checklist](../../../docs/design/location-stays-followup.md).
