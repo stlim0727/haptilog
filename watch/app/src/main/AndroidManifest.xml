@@ -82,7 +82,7 @@
         <service
             android:name=".presentation.complication.HaptiLogComplicationService"
             android:exported="true"
-            android:icon="@android:drawable/ic_btn_speak_now"
+            android:icon="@drawable/ic_haptilog_monochrome"
             android:label="HaptiLog Record"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
