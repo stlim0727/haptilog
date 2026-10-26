@@ -54,6 +54,7 @@ class SettingsActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 val list = rememberScalingLazyListState(initialCenterItemIndex = 0)
                 val focus = remember { FocusRequester() }
+                var collectionScope by remember { mutableStateOf(com.haptilog.watch.data.location.LocationCollection.load(this)) }
                 var cloud by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
                 var crashes by remember { mutableStateOf(AppReports.crashReportsEnabled(this)) }
                 var hapticIntensity by remember { mutableStateOf(HapticPreferences.getIntensity(this)) }
@@ -66,7 +67,11 @@ class SettingsActivity : ComponentActivity() {
                 var queued by remember { mutableStateOf(AppReports.pending(this)) }
                 DisposableEffect(Unit) {
                     val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME) queued = AppReports.pending(this@SettingsActivity)
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            queued = AppReports.pending(this@SettingsActivity)
+                            cloud = RecordingSyncWorker.enabled(this@SettingsActivity)
+                            collectionScope = com.haptilog.watch.data.location.LocationCollection.load(this@SettingsActivity)
+                        }
                     }
                     lifecycle.addObserver(observer)
                     onDispose { lifecycle.removeObserver(observer) }
@@ -87,9 +92,9 @@ class SettingsActivity : ComponentActivity() {
                         item { Text(stringResource(when { consenting -> R.string.cloud_consent_title; reporting -> R.string.report_action; else -> R.string.settings_title }), fontSize = 18.sp, textAlign = TextAlign.Center) }
                         notice?.let { message -> item { Text(message, fontSize = 12.sp, textAlign = TextAlign.Center) } }
                         if (consenting) {
-                            item { Text("Adults 18+ · Optional cloud AI", fontSize = 16.sp, textAlign = TextAlign.Center) }
-                            item { Text("Enabling uploads existing completed recordings and future recordings, including audio and saved location, to Supabase. Audio and recording time go to Google Gemini for transcription and organization. Location and internal IDs are excluded from Gemini metadata. Avoid sensitive recordings. AI results can be wrong.", fontSize = 12.sp, textAlign = TextAlign.Center) }
-                            item { Text("Turning off stops future sync and queues server consent withdrawal when online. Cloud copies stay until deleted in the portal. Requests already sent may finish. Local recording remains available without cloud consent.", fontSize = 12.sp, textAlign = TextAlign.Center) }
+
+                            item { Text(stringResource(R.string.unified_cloud_disclosure), fontSize = 12.sp, textAlign = TextAlign.Center) }
+                            item { Text(stringResource(R.string.unified_cloud_withdrawal), fontSize = 12.sp, textAlign = TextAlign.Center) }
                             item { Text("Privacy: haptilog.keepory.app/privacy.html", fontSize = 12.sp, textAlign = TextAlign.Center) }
                             item { FlexibleChip(enabled = !busy, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(if (busy) R.string.connecting_notice else R.string.agree_cloud)) }, onClick = {
                                 busy = true
@@ -98,7 +103,7 @@ class SettingsActivity : ComponentActivity() {
                                         withContext(Dispatchers.IO) { CloudConsent.enable(this@SettingsActivity) }
                                         cloud = true
                                         consenting = false
-                                        notice = "Cloud enabled. Existing completed recordings may upload."
+                                        notice = getString(R.string.unified_cloud_enabled)
                                     } catch (_: Exception) { notice = "Could not enable cloud. Check your connection and retry." }
                                     finally { busy = false }
                                 }
@@ -145,6 +150,11 @@ class SettingsActivity : ComponentActivity() {
                             }
                             item { FlexibleChip(enabled = !busy, onClick = { reporting = false; notice = null }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.cancel_action)) }) }
                         } else {
+                            item { SettingsSection(stringResource(R.string.location_scope_group)) }
+                            item { FlexibleChip(onClick = {
+                                startActivity(Intent(this@SettingsActivity, LocationSettingsActivity::class.java))
+                            }, label = { Text(stringResource(R.string.location_scope_title), maxLines = Int.MAX_VALUE) },
+                                secondaryLabel = { Text(stringResource(collectionScope.label), maxLines = Int.MAX_VALUE) }) }
                             item { SettingsSection(stringResource(R.string.connection_group)) }
                             item {
                                 ToggleChip(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp),
@@ -156,6 +166,7 @@ class SettingsActivity : ComponentActivity() {
                                             notice = "Sync stopped. Server withdrawal will be sent when online. Cloud copies remain until deleted."
                                         }
                                     }, label = { Text(stringResource(R.string.cloud_sync_title), maxLines = Int.MAX_VALUE) },
+                                    secondaryLabel = { Text(stringResource(R.string.unified_cloud_scope), maxLines = Int.MAX_VALUE) },
                                     colors = ToggleChipDefaults.toggleChipColors(
                                         checkedStartBackgroundColor = Color(0xFF142A38),
                                         checkedEndBackgroundColor = Color(0xFF142A38),

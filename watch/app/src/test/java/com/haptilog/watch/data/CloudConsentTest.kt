@@ -30,7 +30,7 @@ class CloudConsentTest {
         val client = object : CloudApi {
             override fun authenticate() = "verified-token" to "watch-owner"
             override fun request(path: String, method: String, bytes: ByteArray?, token: String?, contentType: String, extra: Map<String, String>): String {
-                assertEquals("/rest/v1/rpc/set_cloud_consent", path)
+                assertEquals("/rest/v1/rpc/set_unified_cloud_consent", path)
                 assertEquals("verified-token", token)
                 body = JSONObject(String(bytes!!))
                 return ""
@@ -39,6 +39,6 @@ class CloudConsentTest {
         CloudConsent.send(client, false)
         assertFalse(body!!.getBoolean("p_enabled"))
         assertFalse(body!!.getBoolean("p_adult"))
-        assertEquals(2, body!!.length())
+        assertEquals(CloudConsent.VERSION, body!!.getString("p_policy_version"))
     }
 }

@@ -28,7 +28,7 @@
     <string name="location_more">더 보기</string>
     <string name="location_running">체류 기록 중</string>
     <string name="location_stopped">체류 기록 꺼짐</string>
-    <string name="location_disclosure">화면이 꺼져도 머문 장소와 시간을 워치에 보관합니다. 배터리를 사용하며 선택한 시간 동안 기록합니다. 웹 동기화는 아래에서 선택합니다.</string>
+    <string name="location_disclosure">화면이 꺼져도 머문 장소와 시간을 워치에 보관합니다. 직접 중지할 때까지 기록하며 배터리를 사용합니다. 클라우드 동기화는 설정에서 선택합니다.</string>
     <string name="location_stop">체류 기록 중지</string>
     <string name="location_start">체류 기록 시작</string>
     <string name="location_counts">위치 %1$d개 · 이벤트 %2$d개</string>
@@ -47,14 +47,8 @@
     <string name="location_stay_gap">체류 · 위치 관측 끊김</string>
     <string name="location_stay_interrupted">체류 · 추적 중단</string>
     <string name="location_manage_on_web">위치 동기화가 켜져 있으면 장소와 체류 기준은 웹에서 관리합니다.</string>
-    <string name="location_disclosure_synced">실행 중 머문 장소와 시간을 기록합니다. 배터리를 사용하며 선택한 시간 동안 기록합니다. 체류 요약은 웹에 동기화하고 이동 경로는 워치에만 남습니다.</string>
+    <string name="location_disclosure_synced">실행 중 머문 장소와 시간을 기록합니다. 배터리를 사용하며 직접 중지할 때까지 기록합니다. 체류 요약은 웹에 동기화하고 이동 경로는 워치에만 남습니다.</string>
     <string name="location_more_settings">추가 설정</string>
     <string name="location_less_settings">추가 설정 접기</string>
     <string name="location_collection_summary">배터리 사용 · 언제든 중지 가능</string>
-    <string name="location_duration_title">기록 시간</string>
-    <string name="location_duration_setting">기록 시간 · %1$s</string>
-    <string name="location_duration_eight">8시간</string>
-    <string name="location_duration_day">24시간</string>
-    <string name="location_duration_continuous">계속</string>
-    <string name="location_duration_hint">계속: 직접 중지할 때까지 기록합니다. 앱 종료·워치 재시작·권한 해제 시 중지될 수 있으며 자동 재시작하지 않습니다.</string>
 </resources>

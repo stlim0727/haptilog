@@ -2,6 +2,7 @@ import { stayValid, validatePlace } from "./domain.ts";
 import type { SavedPlace, Stay } from "./types.ts";
 
 export type SyncState = {
+  consent_scope?: "location_only" | "all_records";
   consent_enabled: boolean; consent_revision: number; sync_epoch: number;
   upload_cutoff: string | null; places_revision: number; applied_places_revision: number;
   threshold_minutes: 5 | 10 | 20 | 30;
