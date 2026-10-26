@@ -12,7 +12,7 @@ First release keeps existing accepted-sample filtering and 100m anchor semantics
 
 ## Ownership and synchronization
 
-Owner is existing watch Auth owner; portal access uses current session-bound connection authorization. Location consent is independent of audio. Cloud envelope includes protocol version, consent revision, sync epoch. Server authorizes owner rather than trusting payload. No raw points or full legacy events cross this boundary. Stay-place links are separately versioned derived metadata, never sensor row fields overwritten by watch updates.
+Owner is existing watch Auth owner; portal access uses current session-bound connection authorization. Legacy location consent is independent of audio; new combined-policy accounts use the common cloud choice described below. Cloud envelope includes protocol version, consent revision, sync epoch. Server authorizes owner rather than trusting payload. No raw points or full legacy events cross this boundary. Stay-place links are separately versioned derived metadata, never sensor row fields overwritten by watch updates.
 
 Higher source revision wins; equal revision/equal payload is idempotent, equal revision/different payload conflicts, lower revision is stale. Consent disabled denies uploads. Default cutoff is new stays started after opt-in; explicit backfill may permit the retained preceding seven days. Enabling widens but never narrows an already-granted cutoff, so a later opt-in without backfill keeps an earlier seven-day window; narrowing requires explicit deletion (issue #79). Place updates use expected revision CAS, maximum 20 places, 150–2000m radius and existing name constraints. Downloaded settings apply before the next stopped-to-started transition; report desired/applied revisions separately. Persist an owner-scoped proof of the exact applied revision and settings. The next worker may acknowledge that proof during an active session, but must not acknowledge a newer download, different owner/content or reset local settings. Transient web failures preserve editing drafts; CAS conflicts require explicit review before rebasing.
 
@@ -25,7 +25,7 @@ Deletion serializes with upload, advances owner epoch and retains deleted IDs wi
 - Web worker: new `web/src/location-stays/` modules/tests only initially. No production mounting until API and consent are implemented.
 - Coordinator: this contract, cross-area integration, shared fixture reconciliation and verification.
 
-The initial parallel batch implements testable foundations. Recommendation thresholds (seven days, two distinct days, three visits) remain provisional. Uncertain data must not become a confident recommendation. Full release requires independent location consent UI, deletion/retention integration, authorization tests and device evidence; foundation tests alone are insufficient.
+The initial parallel batch implements testable foundations. Recommendation thresholds (seven days, two distinct days, three visits) remain provisional. Uncertain data must not become a confident recommendation. Full release requires explicit versioned cloud consent UI, deletion/retention integration, authorization tests and device evidence; foundation tests alone are insufficient.
 
 ## Backend RPC foundation
 
@@ -61,3 +61,21 @@ Contract behaviour was checked against production over the real wire as `authent
 A shipping watch client has since driven the same path on its own: enabling consent, uploading a saved place, and ingesting closed stays whose `qualified_at` is start plus the ten-minute threshold, whose `expires_at` is exactly start plus seven days, and whose `source_revision` climbs as the active stay is re-persisted. A Wear OS 4 emulator run with a fresh anonymous account reproduced the whole sequence: consent with backfill off (so `upload_cutoff` is the opt-in instant), the place upload, a stay qualifying ten minutes after the first accepted sample, periodic runs advancing its revision while active, and stopping the journal closing it as `stopped` and triggering an immediate sync.
 
 The portal browser and accessibility pass was run once against production: see [the 2026-10-26 portal pass record](../validation/2026-10-26-portal-pass/README.md) for the live pairing, keyboard/focus, narrow-screen, contrast, read-only-browsing and revocation results, and what the pass deliberately does not certify. It measured the standalone stays workspace that PR #84 has since replaced, so the unified journal still needs its own live pass — tracked in issue #86, not closed here. Database advisors were run against a local mirror of the full schema and reported three pre-existing `auth_rls_initplan` warnings, none from this migration.
+
+## Combined cloud choice (Discussion #93 implementation)
+
+New watch builds use `set_unified_cloud_consent` with policy `2026-10-26-unified`.
+The RPC updates recording and location consent and initial local place import in
+one transaction. It includes completed recordings and retained seven-day stays;
+raw points remain local. Scope selection is watch-local and does not change sync.
+`location_sync_state.consent_scope=all_records` tells the portal that withdrawal
+covers recordings and location together. Existing accounts stay on their prior
+scope until explicit acceptance. After migration, legacy enabling endpoints
+cannot downgrade or regrant consent; legacy withdrawal revokes both flags.
+Deletion epochs, tombstones, revisions and ownership checks remain in force.
+The stay validator accepts durations over eight hours but bounds them by the
+observed timestamp interval. Collection has no session duration limit.
+
+These are source changes, not a claim that the migration or app is deployed.
+Deploy the migration and compatible voice-enrich handler before enabling this
+watch build in production; otherwise the combined RPC/AI processing is unavailable.

@@ -97,11 +97,11 @@ class MainActivity : ComponentActivity() {
             sendToggle()
         } else {
             pendingToggle = true
-            val permissions = mutableListOf(
-                Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-            )
+            val permissions = mutableListOf(Manifest.permission.RECORD_AUDIO)
+            if (com.haptilog.watch.data.location.LocationCollection.load(this).includesRecordings) {
+                permissions += Manifest.permission.ACCESS_FINE_LOCATION
+                permissions += Manifest.permission.ACCESS_COARSE_LOCATION
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 permissions.add(Manifest.permission.POST_NOTIFICATIONS)
             }

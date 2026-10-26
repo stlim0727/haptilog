@@ -10,11 +10,11 @@ The journal is separate from voice recording. Starting it never starts the micro
 
 ## User journey
 
-1. The 2026-10-26 UX revision targets **Settings → Stay recording**, with collection and optional **Show on the web** sync on the same screen. The initial state is stopped. Explain that a session periodically collects location with the screen off, uses battery, runs for a selected eight hours, 24 hours or continuously until stopped (default eight hours), and stores history locally by default. Explicit location consent enables optional uploads without requiring collection to stop. This revised journey is an implementation target, not a deployment claim; see [the two-round review](2026-10-26-unified-journal-review.md).
-2. Press **Start** and grant precise location permission and enable notifications. The location foreground service starts while the activity is visible and displays an ongoing notification with a stop action. Approximate-only access or blocked journal notifications prevent a journal session; voice recording remains available. The journal links to app settings for permission and notification changes.
+1. Open **Settings → Location recording**. Choose Off, Only when recording (default), or Also when not recording. The last choice explicitly starts a visible location session with no time limit. Cloud sync is a separate common setting for recordings, attached location, places and retained stay summaries; raw movement points remain local.
+2. Choose **Also when not recording** and grant precise location permission and enable notifications. The location foreground service starts while the activity is visible and displays an ongoing notification with a stop action. Approximate-only access or blocked journal notifications prevent a journal session; voice recording remains available. The journal links to app settings for permission and notification changes.
 3. In local mode, save a named place from a fresh location or manually entered coordinates. Edit its name, center, or radius while stopped, or remove it. While location sync is enabled, manage places and the common stay threshold in the portal; downloaded changes apply between sessions. The radius represents a GPS area, not a precise building boundary. The watch offers radii of 150, 200, 500, 1,000, and 2,000 m.
 4. Review the recent timeline: filtered location points, entry/exit for named places, and a dwell event when continuous reliable observations establish a sustained stay. Position uncertainty and missing samples can delay or prevent an event.
-5. Press **Stop** in the journal or notification. Sampling ends, and history remains available offline. A new session requires another explicit start. Clear history and delete place definitions from the watch when no longer needed.
+5. Choose **Only when recording** or **Off** in location settings, or press **Stop** in the notification. Sampling ends, and history remains available offline. A new session requires another explicit start. Clear history and delete place definitions from the watch when no longer needed.
 
 ## Architecture and data ownership
 
@@ -22,7 +22,7 @@ The journal is separate from voice recording. Starting it never starts the micro
 - A pure Kotlin detector consumes validated observations and derives point, place-transition, and stay events. It uses great-circle distance, sample accuracy, and boundary hysteresis to suppress jitter.
 - The repository stores the journal in private application storage, independently of `recordings/`. Writes are serialized and atomic; a failed write must not corrupt prior history.
 - Filtered samples are source observations for this feature. Place transitions and dwell records are derived observations, not proof that a user crossed a boundary at an exact time.
-- The recording uploader, audio export and Gemini pipeline do not consume journal data. Audio cloud consent does not change this. A separate location worker and independent consent upload only saved places and allowlisted stay summaries to Supabase.
+- The recording uploader, audio export and Gemini pipeline do not consume journal data. A separately scheduled location worker follows the same explicit combined cloud consent as recordings and uploads only saved places and allowlisted stay summaries to Supabase. Legacy audio-only consent is not expanded automatically.
 
 The repository uses `location_history/history.json` with Android `AtomicFile`. Version 2 stores named places, filtered points, legacy events and sustained-stay records. Version 1 is migrated without inventing visits from legacy DWELL events. Event records preserve the place label as observed, so deleting or changing a place does not rewrite the meaning of an older event. At most 20 places can be saved. Place changes require a stopped session.
 
@@ -44,7 +44,7 @@ The repository uses `location_history/history.json` with Android `AtomicFile`. V
 | Implausible jump filter | Reject lower-bound travel speed above 80 m/s |
 | Retention | Seven days, at most 2,000 points and 500 events |
 
-The service requests high-accuracy location updates every 60 seconds with a 30-second minimum interval (`PRIORITY_HIGH_ACCURACY`), and fetches the immediate latest fix (`lastLocation`) upon session start to eliminate initial fix latency. It does not hold a wake lock, allowing the watch to enter ambient sleep while duty-cycling the GNSS receiver. A session automatically runs for a selected eight hours, 24 hours or continuously until stopped (default eight hours), measured using a monotonic clock; the provider request also has an eight-hour duration limit. The user must start another session explicitly. The separate **Use current location** place-editor action makes a bounded high-accuracy request to fill the center fields.
+The service requests high-accuracy location updates every 60 seconds with a 30-second minimum interval (`PRIORITY_HIGH_ACCURACY`), and fetches the immediate latest fix (`lastLocation`) upon session start to eliminate initial fix latency. It does not hold a wake lock, allowing the watch to enter ambient sleep while duty-cycling the GNSS receiver. Sessions have no app or provider duration limit. System termination, permission changes or reboot may stop collection; users explicitly restart it. The separate **Use current location** place-editor action makes a bounded high-accuracy request to fill the center fields.
 
 These are observation filters, not a guarantee of physical accuracy. No route is interpolated through a gap, and timestamps describe accepted observations.
 

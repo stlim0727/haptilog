@@ -58,7 +58,7 @@ These shorthands retain the repository's existing checks and approval requiremen
    - `PARTIAL_WAKE_LOCK` must be held during recording and released IMMEDIATELY upon stop.
    - Safeguard limit: Enforce a strict maximum recording timeout (e.g. 5 minutes default) to prevent runaway battery drain.
 4. **GPS Snapshot Policy**:
-   - Always snapshot `fusedLocationClient.lastLocation` immediately at the instant the user taps record (< 50ms).
+   - When recording location collection is enabled (default), snapshot `fusedLocationClient.lastLocation` immediately at the instant the user taps record (< 50ms).
    - Concurrently request `getCurrentLocation(PRIORITY_HIGH_ACCURACY)` during the recording window without blocking audio capture.
    - Store GPS coordinates, altitude, and speed alongside the audio recording metadata.
 5. **Separation of Raw Capture vs Derived AI Enrichment**:

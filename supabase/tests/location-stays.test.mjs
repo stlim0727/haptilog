@@ -15,6 +15,7 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
 create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,unique(bucket_id,name));
 alter table storage.objects enable row level security;
+grant select,insert,update on storage.objects to authenticated;
 create function storage.foldername(name text) returns text[] language sql immutable as $$ select string_to_array(name,'/') $$;
 grant usage on schema public,auth,storage to authenticated,anon,service_role;
 insert into auth.users values('${owner}'),('${browser}'),('${stranger}');
@@ -142,5 +143,53 @@ assert.equal((await rpc('snapshot')).error,'FORBIDDEN');
 assert.equal((await db.query('select * from public.location_sync_state')).rows.length,0);
 await db.exec('reset role;set role anon');
 await assert.rejects(rpc('snapshot'),/permission denied/);
+// Combined consent is explicit and atomic, including the first local place import.
+await as(owner);
+const combined=async(enabled,places=null,policy='2026-10-26-unified')=>db.query(
+  'select public.set_unified_cloud_consent($1,$2,$3,$4::jsonb,$5)',
+  [enabled,enabled,policy,places===null?null:JSON.stringify(places),10]);
+await assert.rejects(combined(true,null,'2026-10-18'),/Explicit combined consent required/);
+await db.exec(`reset role;delete from public.location_places where owner_user_id='${owner}';update public.location_sync_state set purged_before=null where owner_user_id='${owner}';`);
+await as(owner);
+const place={id:'66666666-6666-4666-8666-666666666666',name:'Local home',latitude:37,longitude:127,radius_meters:200};
+await combined(true,[place]);
+let unified=(await db.query('select * from public.cloud_consents')).rows[0];
+assert.equal(unified.enabled,true);
+await db.exec(`insert into public.recordings(id,user_id,audio_path) values('88888888-8888-4888-8888-888888888888','${owner}','${owner}/88888888-8888-4888-8888-888888888888.m4a');
+insert into storage.objects(bucket_id,name) values('recordings','${owner}/88888888-8888-4888-8888-888888888888.m4a');`);
+assert.equal(unified.policy_version,'2026-10-26-unified');
+assert.equal((await rpc('snapshot')).state.consent_enabled,true);
+assert.equal((await rpc('snapshot')).places[0].name,'Local home');
+// Multi-day stays no longer hit the former eight-hour server validation cap.
+let state=(await rpc('snapshot')).state;
+const longStay={...stay,id:'77777777-7777-4777-8777-777777777777',started_at:iso(now-2*86400000),
+ qualified_at:iso(now-2*86400000+600000),last_observed_at:iso(now-60000),observed_duration_millis:2*86400000-60000};
+assert.equal((await rpc('ingest',{consent_revision:state.consent_revision,sync_epoch:state.sync_epoch,stay:longStay})).outcome,'accepted');
+assert.equal((await rpc('ingest',{consent_revision:state.consent_revision,sync_epoch:state.sync_epoch,
+ stay:{...longStay,source_revision:2,observed_duration_millis:3*86400000}})).error,'INVALID_PAYLOAD');
+await combined(false);
+await assert.rejects(db.exec(`insert into storage.objects(bucket_id,name) values('recordings','${owner}/99999999-9999-4999-8999-999999999999.m4a');`),/row-level security/);
+const beforeFailure=(await rpc('snapshot')).state;
+await assert.rejects(combined(true,[{...place,name:'Conflicting home'}]),/Saved place conflict/);
+assert.equal((await db.query('select enabled from public.cloud_consents')).rows[0].enabled,false);
+assert.equal((await rpc('snapshot')).state.consent_enabled,false);
+assert.equal((await rpc('snapshot')).state.consent_revision,beforeFailure.consent_revision,'failed import rolls back consent revision');
+await assert.rejects(db.query('select public.set_cloud_consent(true,true)'),/Update required/);
+state=(await rpc('snapshot')).state;
+assert.equal((await rpc('consent',{expected_revision:state.consent_revision,enabled:true})).error,'UPDATE_REQUIRED');
+await combined(true);
+await db.query('select public.set_cloud_consent(false,false)');
+assert.equal((await rpc('snapshot')).state.consent_enabled,false,'old recording client revokes both');
+await combined(true);
+state=(await rpc('snapshot')).state;
+assert.equal((await rpc('consent',{expected_revision:state.consent_revision,enabled:false})).state.consent_enabled,false);
+assert.equal((await db.query('select enabled from public.cloud_consents')).rows[0].enabled,false,'old location client revokes both');
+await assert.rejects(db.query('select private.location_stays_dispatch_legacy($1,$2,$3)',[owner,'consent',{}]),/permission denied/);
+await assert.rejects(db.query('select private.withdraw_unified_cloud($1)',[owner]),/permission denied/);
+await as(stranger);
+await combined(true);
+assert.equal((await rpc('snapshot',{},owner)).error,'FORBIDDEN');
+await db.exec('reset role;set role anon');
+await assert.rejects(combined(true),/permission denied/);
 await db.close();
 console.log('Location stays: authorization, independent consent, CAS/20-place cap, revisions, epoch/deletion, purge, expiry and cleanup passed');

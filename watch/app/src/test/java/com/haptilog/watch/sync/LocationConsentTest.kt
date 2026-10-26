@@ -1,93 +1,87 @@
 package com.haptilog.watch.sync
 
 import android.content.Context
-import org.robolectric.RuntimeEnvironment
 import androidx.work.Configuration
 import androidx.work.WorkManager
 import com.haptilog.watch.data.location.LocationHistoryRepository
-import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
 @RunWith(RobolectricTestRunner::class)
 class LocationConsentTest {
-    private class FakeCloud : CloudApi {
-        var consentRevision = 0L
-        var placesRevision = 0L
-        val places = JSONArray()
-        val actions = mutableListOf<String>()
+    private val context: Context get() = RuntimeEnvironment.getApplication()
+    private class FakeCloud(val fail: Boolean = false) : CloudApi {
+        val requests = mutableListOf<JSONObject>()
         override fun authenticate() = "token" to "owner-uuid"
-        override fun request(path: String, method: String, body: ByteArray?, token: String?,
-                             contentType: String, extra: Map<String, String>): String {
-            val action = JSONObject(String(body!!)).getString("p_action")
-            actions += action
-            val state = JSONObject().put("consent_enabled", consentRevision > 0)
-                .put("consent_revision", consentRevision).put("sync_epoch", 0)
-                .put("upload_cutoff", if (consentRevision > 0) "2020-01-01T00:00:00Z" else JSONObject.NULL)
-                .put("purged_before", JSONObject.NULL)
-                .put("places_revision", placesRevision).put("applied_places_revision", 0)
-                .put("threshold_minutes", 10)
-            return when (action) {
-                "snapshot" -> JSONObject().put("protocol_version", 1).put("state", state)
-                    .put("places", JSONArray(places.toString())).put("stays", JSONArray())
-                    .put("deleted_ids", JSONArray()).toString()
-                "consent" -> { consentRevision = 1; JSONObject().put("state", state).toString() }
-                "put_place" -> {
-                    places.put(JSONObject(String(body!!)).getJSONObject("p_payload"))
-                    state.put("places_revision", ++placesRevision)
-                    JSONObject().put("state", state).toString()
-                }
-                else -> JSONObject().put("state", state).toString()
-            }
+        override fun request(path: String, method: String, body: ByteArray?, token: String?, contentType: String, extra: Map<String, String>): String {
+            assertEquals("/rest/v1/rpc/set_unified_cloud_consent", path)
+            requests += JSONObject(String(body!!))
+            if (fail) throw CloudException(409)
+            return ""
         }
     }
-
     @Before fun setUp() {
-        val context = RuntimeEnvironment.getApplication() as Context
         try { WorkManager.getInstance(context) }
         catch (_: IllegalStateException) { WorkManager.initialize(context, Configuration.Builder().build()) }
+        context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).edit().clear().commit()
         LocationConsent.preferences(context).edit().clear().commit()
-        val directory = java.io.File(context.filesDir, "location_history").apply { mkdirs() }
-        val history = JSONObject().put("version", 2).put("dwell_minutes", 10)
-            .put("places", JSONArray().put(JSONObject().put("id", "55555555-5555-4555-8555-555555555555")
-                .put("name", "Home").put("latitude", 37.0).put("longitude", 127.0).put("radius_meters", 200.0)))
-            .put("points", JSONArray()).put("events", JSONArray()).put("stays", JSONArray())
-        java.io.File(directory, "history.json").writeText(history.toString())
-    }
-
-    @Test fun firstOptInWithEmptyCloudImportsLocalPlacesAndKeepsThem() {
-        val context = RuntimeEnvironment.getApplication() as Context
-        val cloud = FakeCloud()
-        LocationConsent.enable(context, backfill = false, api = cloud)
-
-        assertEquals(1, cloud.places.length())
-        assertEquals("Home", cloud.places.getJSONObject(0).getString("name"))
-        assertTrue(cloud.actions.contains("put_place"))
-        assertEquals(listOf(cloud.places.getJSONObject(0).getString("id")),
-            LocationHistoryRepository.get(context).state.value.places.map { it.id })
-        assertTrue(LocationConsent.enabled(context))
-        assertTrue(LocationConsent.preferences(context).getBoolean("ever_enabled", false))
-    }
-    @Test fun syncCanBeEnabledAndDisabledWithoutStoppingCollection() {
-        val context = RuntimeEnvironment.getApplication() as Context
         val repository = LocationHistoryRepository.get(context)
-        repository.startSession()
-        try {
-            LocationConsent.enable(context, backfill = false, api = FakeCloud())
-            assertTrue(LocationConsent.enabled(context))
-            // Active collection defers downloaded settings instead of requiring a stop.
-            assertFalse(repository.applySyncedPlaces(emptyList(), 20))
-            assertEquals("Home", repository.state.value.places.single().name)
-            LocationConsent.disable(context)
-            assertFalse(LocationConsent.enabled(context))
-            assertTrue(LocationConsent.preferences(context).getBoolean("revoke_pending", false))
-            assertFalse(repository.applySyncedPlaces(emptyList(), 20))
-        } finally { repository.stopSession() }
-        assertTrue(repository.applySyncedPlaces(emptyList(), 20))
+        repository.stopSession()
+        repository.state.value.places.forEach { repository.removePlace(it.id) }
+        repository.addPlace(com.haptilog.watch.data.location.SavedPlace("55555555-5555-4555-8555-555555555555", "Home", 37.0, 127.0, 200.0))
     }
-
+    @Test fun firstOptInImportsPlacesAndEnablesBothThroughOneRpc() {
+        val api = FakeCloud()
+        CloudConsent.enable(context, api)
+        assertEquals(1, api.requests.size)
+        val request = api.requests.single()
+        assertEquals("Home", request.getJSONArray("p_places").getJSONObject(0).getString("name"))
+        assertEquals(CloudConsent.VERSION, request.getString("p_policy_version"))
+        assertTrue(RecordingSyncWorker.enabled(context))
+        assertTrue(LocationConsent.enabled(context))
+    }
+    @Test fun failedTransactionDoesNotEnableEitherUploadWorker() {
+        assertThrows(CloudException::class.java) { CloudConsent.enable(context, FakeCloud(true)) }
+        assertFalse(RecordingSyncWorker.enabled(context))
+        assertFalse(LocationConsent.enabled(context))
+        assertFalse(LocationConsent.preferences(context).getBoolean("ever_enabled", false))
+    }
+    @Test fun laterEnableUsesCloudPlacesAndDisableDoesNotStopCollection() {
+        val repo = LocationHistoryRepository.get(context)
+        repo.startSession()
+        try {
+            CloudConsent.enable(context, FakeCloud())
+            CloudConsent.disable(context)
+            assertFalse(RecordingSyncWorker.enabled(context))
+            assertFalse(LocationConsent.enabled(context))
+            assertFalse(repo.applySyncedPlaces(emptyList(), 20))
+            val api = FakeCloud()
+            CloudConsent.enable(context, api)
+            assertTrue(api.requests.single().isNull("p_places"))
+        } finally { repo.stopSession() }
+    }
+    @Test fun delayedServerWithdrawalCannotUndoNewerExplicitEnable() {
+        CloudConsent.enable(context, FakeCloud())
+        val oldGeneration = CloudConsent.generation(context)
+        CloudConsent.disable(context)
+        CloudConsent.enable(context, FakeCloud())
+        CloudConsent.observeWithdrawal(context, oldGeneration)
+        assertTrue(RecordingSyncWorker.enabled(context))
+        CloudConsent.observeWithdrawal(context, CloudConsent.generation(context))
+        assertFalse(RecordingSyncWorker.enabled(context))
+        assertFalse(LocationConsent.enabled(context))
+    }
+    @Test fun oldIndependentConsentsNeverAuthorizeTheExpandedScope() {
+        context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", true).putString("consent_version", "2026-10-18").commit()
+        LocationConsent.preferences(context).edit().putBoolean("enabled", true)
+            .putString("policy_version", "2026-10-26").commit()
+        assertFalse(RecordingSyncWorker.enabled(context))
+        assertFalse(LocationConsent.enabled(context))
+    }
 }

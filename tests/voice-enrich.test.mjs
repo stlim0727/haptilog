@@ -24,6 +24,7 @@ const request = (body = payload, token = "valid") =>
   });
 function fixture({
   consent = true,
+  consentPolicy = "2026-10-18",
   revokeBeforeProvider = false,
   consentError = false,
   owner = true,
@@ -83,7 +84,7 @@ function fixture({
       from: (table) => ({
         in(_key, ids) {
           consentReads++;
-          return Promise.resolve({ data: consent && !(revokeBeforeProvider && consentReads > 1) ? ids.map(user_id => ({ user_id, enabled: true, adult_attested_at: "now", policy_version: "2026-10-18" })) : [], error: consentError ? "unavailable" : null });
+          return Promise.resolve({ data: consent && !(revokeBeforeProvider && consentReads > 1) ? ids.map(user_id => ({ user_id, enabled: true, adult_attested_at: "now", policy_version: consentPolicy })) : [], error: consentError ? "unavailable" : null });
         },
         select() {
           return this;
@@ -437,4 +438,14 @@ test("withdrawal during preparation blocks the pending provider request", async 
  const {handler,calls}=fixture({revokeBeforeProvider:true});
  assert.equal((await handler(request())).status,403);
  assert.equal(calls.fetch,0);
+});
+
+
+test("combined cloud consent authorizes AI while unknown policy versions fail closed", async () => {
+  const enabled = fixture({ consentPolicy: "2026-10-26-unified" });
+  assert.equal((await enabled.handler(request())).status, 200);
+  assert.equal(enabled.calls.fetch, 1);
+  const unknown = fixture({ consentPolicy: "unknown-policy" });
+  assert.equal((await unknown.handler(request())).status, 403);
+  assert.equal(unknown.calls.fetch, 0);
 });
