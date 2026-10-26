@@ -207,4 +207,52 @@ class LocationConsentTest {
         assertFalse(state.getBoolean("consent_enabled"))
         assertFalse(LocationConsent.reconciliationPending(context))
     }
+
+    @Test fun previouslyIndependentEnabledConsentQueuesCloudOffWithdrawal() {
+        cloudSync(false)
+        LocationConsent.preferences(context).edit().putBoolean("enabled", true)
+            .putBoolean("ever_enabled", true).putString("policy_version", "2026-10-26").commit()
+        assertTrue(LocationConsent.reconciliationPending(context))
+        val cloud = FakeCloud(consentEnabled = true)
+        val state = LocationConsent.reconcile(context, cloud.client(), cloud.snapshot())
+        assertFalse(state.getBoolean("consent_enabled"))
+        assertEquals(listOf("consent"), cloud.actions.map { it.first })
+        assertFalse(LocationConsent.reconciliationPending(context))
+    }
+
+    @Test fun previousCompletedImportDoesNotResurrectACloudDeletedPlace() {
+        cloudSync(true)
+        LocationConsent.preferences(context).edit().putBoolean("ever_enabled", true).commit()
+        val cloud = FakeCloud(consentEnabled = true) // The portal deleted Home while offline.
+        val snapshot = LocationConsent.reconciledSnapshot(context, cloud.client(), cloud.snapshot())
+        assertTrue(cloud.actions.isEmpty())
+        assertTrue(LocationConsent.preferences(context).getBoolean("places_imported", false))
+        val repository = LocationHistoryRepository.get(context)
+        LocationSyncWorker.syncPlaces(context, repository, cloud.client(), snapshot)
+        assertTrue(repository.state.value.places.isEmpty())
+    }
+
+    @Test fun switchOffDuringAlreadyAgreedReconcileKeepsTheNewWithdrawal() {
+        cloudSync(true)
+        LocationConsent.preferences(context).edit().putBoolean("places_imported", true).commit()
+        val cloud = FakeCloud(consentEnabled = true)
+        val snapshot = cloud.snapshot()
+        val switchingState = object : JSONObject(snapshot.getJSONObject("state").toString()) {
+            override fun optBoolean(name: String?): Boolean {
+                val value = super.optBoolean(name)
+                if (name == "consent_enabled") {
+                    cloudSync(false)
+                    LocationConsent.onCloudSwitchChanged(context)
+                }
+                return value
+            }
+        }
+        snapshot.put("state", switchingState)
+        LocationConsent.reconcile(context, cloud.client(), snapshot)
+        assertTrue(cloud.actions.isEmpty())
+        assertTrue(LocationConsent.reconciliationPending(context))
+        val state = LocationConsent.reconcile(context, cloud.client(), cloud.snapshot())
+        assertFalse(state.getBoolean("consent_enabled"))
+        assertFalse(LocationConsent.reconciliationPending(context))
+    }
 }

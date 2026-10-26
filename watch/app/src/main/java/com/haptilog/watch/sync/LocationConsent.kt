@@ -17,24 +17,36 @@ object LocationConsent {
     /** Preserve a withdrawal queued by a build that used the previous marker. */
     @Synchronized internal fun reconciliationPending(context: Context): Boolean {
         val prefs = preferences(context)
-        if (prefs.getBoolean("revoke_pending", false)) {
-            check(prefs.edit().putBoolean("reconcile_pending", true).remove("revoke_pending").commit())
+        if (prefs.contains("enabled") || prefs.contains("ever_enabled") || prefs.contains("revoke_pending")) {
+            val edit = prefs.edit()
+            if (prefs.getBoolean("revoke_pending", false) || prefs.getBoolean("enabled", false)) {
+                edit.putBoolean("reconcile_pending", true)
+            }
+            // An old completed import also includes authoritative cloud deletions.
+            if (prefs.getBoolean("ever_enabled", false)) edit.putBoolean("places_imported", true)
+            check(edit.remove("enabled").remove("ever_enabled").remove("policy_version")
+                .remove("revoke_pending").commit())
         }
         return prefs.getBoolean("reconcile_pending", false)
     }
 
     /** The switch moved: stop in-flight sends, then push the new position before work can idle. */
-    fun onCloudSwitchChanged(context: Context) {
+    @Synchronized fun onCloudSwitchChanged(context: Context) {
         LocationSyncWorker.cancelActive()
-        check(preferences(context).edit().putBoolean("reconcile_pending", true).commit())
+        val prefs = preferences(context)
+        check(prefs.edit().putBoolean("reconcile_pending", true)
+            .putLong("reconcile_generation", prefs.getLong("reconcile_generation", 0) + 1).commit())
         LocationSyncWorker.schedule(context)
     }
 
     /** Returns the state to work against, after the server flag agrees with the switch. */
     fun reconcile(context: Context, client: LocationSyncClient, snapshot: JSONObject): JSONObject {
         val state = snapshot.getJSONObject("state")
-        val desired = enabled(context)
         val prefs = preferences(context)
+        val (desired, generation) = synchronized(this) {
+            reconciliationPending(context)
+            enabled(context) to prefs.getLong("reconcile_generation", 0)
+        }
         var next = if (state.optBoolean("consent_enabled") == desired) state else
             client.call("consent", JSONObject().put("enabled", desired).put("backfill", desired)
                 .put("expected_revision", state.getLong("consent_revision"))).getJSONObject("state")
@@ -43,7 +55,11 @@ object LocationConsent {
         if (desired && !prefs.getBoolean("places_imported", false)) {
             next = importPlaces(context, client, next, snapshot.getJSONArray("places"))
         }
-        check(prefs.edit().remove("reconcile_pending").commit())
+        synchronized(this) {
+            if (prefs.getLong("reconcile_generation", 0) == generation && enabled(context) == desired) {
+                check(prefs.edit().remove("reconcile_pending").commit())
+            }
+        }
         return next
     }
 
