@@ -455,3 +455,32 @@ test("compact detail keeps provenance folded and downloads from keyboard-accessi
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: "test-results/compact-detail-ko.png", fullPage: true });
 });
+
+test("wrapped recording headings keep every options action inside the viewport", async ({ page }) => {
+  const state = await fixture(page);
+  state.recording.voice_enrichments[0].summary = "A long recording summary that wraps onto several lines on a narrow phone screen";
+  await page.goto("/");
+  await page.locator(".mobile-record").click();
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const scale of [1, 2]) {
+      await page.locator(".inspector h2").evaluate((el, scale) => {
+        (el as HTMLElement).style.fontSize = `${25 * scale}px`;
+      }, scale);
+      const options = page.getByLabel("Recording options", { exact: true });
+      await options.click();
+      for (const selector of [".recording-actions-popover", ".recording-actions-popover > button"]) {
+        for (const item of await page.locator(selector).all()) {
+          await item.scrollIntoViewIfNeeded();
+          const box = await item.boundingBox();
+          expect(box).not.toBeNull();
+          expect(box!.x).toBeGreaterThanOrEqual(0);
+          expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+          await expect(item).toBeInViewport({ ratio: 1 });
+        }
+      }
+      await page.keyboard.press("Escape");
+      await expect(options).toBeFocused();
+    }
+  }
+});

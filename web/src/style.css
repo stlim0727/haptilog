@@ -3431,7 +3431,7 @@ audio {
 /* Recording detail: keep listening and reading ahead of provenance. */
 .inspector .inspector-top { align-items: flex-start; margin-bottom: 8px; }
 .inspector .inspector-top h2 { min-width: 0; overflow-wrap: anywhere; }
-.inspector .inspector-top-actions { flex-shrink: 0; }
+.inspector .inspector-top-actions { flex-shrink: 0; margin-left: auto; }
 .inspector .audio-section {
   padding: 0;
   background: transparent;
