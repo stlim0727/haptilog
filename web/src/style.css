@@ -1665,11 +1665,27 @@ audio {
   box-shadow: 2px 2px 0px var(--border);
   z-index: 0;
 }
-.voice-marker { display: grid; place-items: center; background: #233f32; color: white; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px #0004; font-weight: 700; }
-.voice-marker.active { background: #b85625; }
-.voice-marker:focus-visible { outline: 3px solid var(--ph-lemon); outline-offset: 3px; }
-.map-recordings { display: grid; gap: 8px; max-height: 180px; overflow: auto; margin-top: 10px; }
-.map-recordings button { text-align: left; color: var(--text-primary); border: 1.5px solid var(--border); border-radius: 6px; padding: 10px; background: var(--bg-surface); cursor: pointer; box-shadow: 1.5px 1.5px 0px var(--border); }
+.voice-marker { background: transparent; border: 0; color: #233f32; }
+.voice-pin { position: absolute; left: 11px; top: 8px; width: 22px; height: 28px; filter: drop-shadow(0 1px 2px #0004); }
+.voice-pin svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.voice-pin path { fill: currentColor; stroke: white; stroke-width: 1.5px; }
+.voice-pin circle { fill: white; }
+.voice-marker.active { color: #b85625; z-index: 1000 !important; }
+.voice-pin-count { position: absolute; top: 0; left: 25px; min-width: 17px; height: 17px; padding: 0 3px; border: 1.5px solid white; border-radius: 10px; background: #233f32; color: white; font-size: 10px; line-height: 14px; text-align: center; font-weight: 700; }
+.voice-marker:focus-visible { outline: 3px solid var(--ph-lemon); outline-offset: 1px; border-radius: 8px; }
+.recording-popup .leaflet-popup-content { margin: 10px 24px 10px 12px; }
+.recording-popup .leaflet-popup-content-wrapper { border-radius: 8px; }
+.map-recordings { display: grid; gap: 4px; max-height: 144px; overflow: auto; }
+.map-recordings button { display: grid; gap: 3px; min-width: 0; width: 100%; text-align: left; color: var(--text-primary); border: 0; border-radius: 4px; padding: 6px; background: var(--bg-surface); cursor: pointer; }
+.map-recordings small { color: var(--text-secondary); font-size: 11px; }
+.map-recordings button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.map-recordings button:focus-visible, .map-selection-card button:focus-visible { outline: 2px solid var(--accent-rose); outline-offset: -2px; }
+.map-selection-card { display: flex; align-items: flex-start; gap: 4px; margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-surface); color: var(--text-primary); }
+.map-selection-detail { display: grid; gap: 5px; flex: 1; min-width: 0; padding: 12px; text-align: left; background: transparent; color: inherit; cursor: pointer; }
+.map-selection-detail small { font-size: 11px; color: var(--text-secondary); }
+.map-selection-detail strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.map-selection-detail > span { font-size: 12px; color: var(--accent-rose); }
+.map-selection-close { flex: 0 0 44px; min-height: 44px; font-size: 22px; background: transparent; color: var(--text-secondary); cursor: pointer; }
 @media (max-width: 650px) { .map-heading { align-items: flex-start; flex-direction: column; } .recording-map { height: 280px; } .map-section { padding: 14px; } }
 
 /* Wastebin, Toast, and Restore UX */

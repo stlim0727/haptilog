@@ -144,6 +144,28 @@ test("mobile map stays first and locationless records remain reachable", async (
     .toBeFocused();
 });
 
+test("mobile map uses compact pins and a dismissible summary below the map", async ({ page }) => {
+  await mobile(page, 3);
+  await page.getByRole("button", { name: "Map", exact: true }).click();
+  const marker = page.locator(".voice-marker").first();
+  await marker.click();
+  await expect(page.locator(".leaflet-popup")).toHaveCount(0);
+  const card = page.locator(".map-selection-card");
+  await expect(card).toBeVisible();
+  await expect(card).toContainText("3 recordings here");
+  const mapBox = (await page.locator(".recording-map").boundingBox())!;
+  expect((await card.boundingBox())!.y).toBeGreaterThanOrEqual(mapBox.y + mapBox.height);
+  expect((await marker.boundingBox())!.width).toBe(44);
+  expect((await marker.locator(".voice-pin").boundingBox())!.width).toBe(22);
+  await page.getByRole("button", { name: "Dismiss summary" }).click();
+  await expect(card).toHaveCount(0);
+  await marker.click();
+  await expect(card).toBeVisible();
+  await page.screenshot({ path: "test-results/map-summary-mobile.png", fullPage: true });
+  await card.getByRole("button", { name: /View details/ }).click();
+  await expect(page.locator(".mobile-detail")).toBeVisible();
+});
+
 test("mobile unsaved transcript warns on Back and cancellation preserves edits", async ({ page }) => {
   await mobile(page);
   await page.locator(".mobile-record").click();
