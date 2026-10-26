@@ -11,6 +11,7 @@ export default function RecordingMap({
   className,
   showRoute = true,
   lang = "en",
+  heading,
 }: {
   recordings: Recording[];
   selectedId: string | null;
@@ -18,12 +19,19 @@ export default function RecordingMap({
   className?: string;
   showRoute?: boolean;
   lang?: "ko" | "en";
+  heading?: string;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<L.LayerGroup | null>(null);
   const routeLayer = useRef<L.Polyline | null>(null);
   const markersById = useRef(new Map<string, L.Marker>());
+  const selected = useRef(selectedId);
+  selected.current = selectedId;
+  const pinSelection = useRef<string | null>(null);
+  const previousSelection = useRef(selectedId);
+  const zooming = useRef(false);
+  const pendingFit = useRef<(() => void) | null>(null);
   const selection = useRef(onSelect);
   selection.current = onSelect;
   const [tileError, setTileError] = useState(false);
@@ -54,9 +62,19 @@ export default function RecordingMap({
 
   useEffect(() => {
     if (!container.current || !located.length) return;
-    const instance = L.map(container.current, { scrollWheelZoom: false })
+    const instance = L.map(container.current, {
+      scrollWheelZoom: false,
+      zoomAnimation: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    })
       .setView([located[0].latitude, located[0].longitude], 15);
     map.current = instance;
+    instance.on("zoomstart", () => { zooming.current = true; });
+    instance.on("zoomend", () => {
+      zooming.current = false;
+      const fit = pendingFit.current;
+      pendingFit.current = null;
+      fit?.();
+    });
     const tiles = L.tileLayer(
       "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
       {
@@ -69,11 +87,19 @@ export default function RecordingMap({
     ).addTo(instance);
     tiles.on("tileerror", () => setTileError(true));
     markers.current = L.layerGroup().addTo(instance);
-    const resize = new ResizeObserver(() => instance.invalidateSize());
+    const resize = new ResizeObserver(() => {
+      // Detail navigation hides this map; do not replace its saved size with zero.
+      if (container.current?.clientWidth && container.current.clientHeight) {
+        instance.invalidateSize({ animate: false });
+      }
+    });
     resize.observe(container.current);
 
     return () => {
       resize.disconnect();
+      pendingFit.current = null;
+      zooming.current = false;
+      instance.stop();
       instance.remove();
       map.current = null;
       markers.current = null;
@@ -112,7 +138,9 @@ export default function RecordingMap({
       groups.set(key, [...(groups.get(key) ?? []), r]);
     }
     for (const entries of groups.values()) {
-      const first = entries[0];
+      const first = [...entries].sort((a, b) =>
+        new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime()
+      )[0];
       const label = entries.length > 1
         ? `${entries.length} recordings at this place`
         : `Recording ${new Date(first.recorded_at).toLocaleString()}`;
@@ -142,18 +170,29 @@ export default function RecordingMap({
         button.addEventListener("click", () => selection.current(r.id, true));
         popup.appendChild(button);
       }
-      if (!mobile) marker.bindPopup(popup, { className: "recording-popup", maxWidth: 240, minWidth: 180 });
+      if (!mobile) marker.bindPopup(popup, { className: "recording-popup", maxWidth: 240, minWidth: 180, autoPan: false });
       marker.on("click", () => {
         setDismissedId(null);
-        selection.current(first.id);
+        const id = entries.find((r) => r.id === selected.current)?.id ?? first.id;
+        pinSelection.current = id;
+        selection.current(id);
         // Selecting an already highlighted place should still reveal its records.
-        if (!mobile) marker.openPopup();
+        if (!mobile) {
+          // Only a deliberate pin tap may nudge an edge popup into view.
+          const popup = marker.getPopup();
+          if (popup) {
+            popup.options.autoPan = true;
+            marker.openPopup();
+            popup.update();
+            popup.options.autoPan = false;
+          }
+        }
       });
     }
     if (initialBounds.current !== locations) {
       instance.fitBounds(
         L.latLngBounds(located.map((r) => [r.latitude, r.longitude])),
-        { padding: [36, 36], maxZoom: 15 },
+        { padding: [36, 36], maxZoom: 15, animate: false },
       );
       initialBounds.current = locations;
     }
@@ -165,28 +204,55 @@ export default function RecordingMap({
     for (const marker of markersById.current.values()) {
       marker.getElement()?.classList.remove("active");
     }
+    const changed = previousSelection.current !== selectedId;
+    previousSelection.current = selectedId;
     if (selectedId) {
       const activeMarker = markersById.current.get(selectedId);
       activeMarker?.getElement()?.classList.add("active");
       const active = located.find((r) => r.id === selectedId);
-      if (active) {
-        instance.flyTo(
-          [active.latitude, active.longitude],
-          Math.max(instance.getZoom(), 15),
-          { duration: 0.8 },
-        );
-        if (!mobile) activeMarker?.openPopup();
+      // A direct pin tap never changes the view. External selections only reveal
+      // an offscreen place, retaining the user's zoom.
+      if (active && changed && pinSelection.current !== selectedId) {
+        instance.panInside([active.latitude, active.longitude], {
+          padding: [36, 36],
+          animate: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        });
       }
+      if (!mobile && changed) activeMarker?.openPopup();
     }
-  }, [selectedId, markerData, mobile, lang]);
+    pinSelection.current = null;
+  }, [selectedId, markerData, mobile, lang, showRoute]);
 
   const active = located.find((r) => r.id === selectedId);
   const placeCount = active ? located.filter((r) =>
     r.latitude === active.latitude && r.longitude === active.longitude
   ).length : 0;
 
+  function showAll() {
+    const instance = map.current;
+    if (!instance || !located.length) return;
+    const fit = () => {
+      if (map.current !== instance) return;
+      instance.stop();
+      instance.closePopup();
+      instance.fitBounds(
+        L.latLngBounds(located.map((r) => [r.latitude, r.longitude])),
+        { padding: [36, 36], maxZoom: 15, animate: false },
+      );
+    };
+    // Leaflet cannot reset bounds midway through a CSS zoom transition.
+    if (zooming.current) pendingFit.current = fit;
+    else fit();
+  }
+
   return (
     <>
+      <div className="map-view-toolbar">
+        <h2>{heading ?? (lang === "ko" ? "기록이 남은 장소" : "Your voices, by place.")}</h2>
+        <button type="button" className="map-show-all" disabled={!located.length} onClick={showAll}>
+          {lang === "ko" ? "전체 보기" : "Show all locations"}
+        </button>
+      </div>
       {located.length ? (
         <div
           ref={container}
@@ -200,7 +266,12 @@ export default function RecordingMap({
         </p>
       )}
       {mobile && active && dismissedId !== active.id && (
-        <div className="map-selection-card" aria-label={lang === "ko" ? "선택한 기록" : "Selected recording"}>
+        <div className="map-selection-card" onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setDismissedId(active.id);
+            markersById.current.get(active.id)?.getElement()?.focus();
+          }
+        }} aria-label={lang === "ko" ? "선택한 기록" : "Selected recording"}>
           <button className="map-selection-detail" onClick={() => onSelect(active.id, true)}>
             <small>{shortDate(active.recorded_at)}{placeCount > 1 ? ` · ${lang === "ko" ? `이 장소 기록 ${placeCount}개` : `${placeCount} recordings here`}` : ""}</small>
             <strong>{latest(active)?.summary || (lang === "ko" ? "음성 기록" : "Voice recording")}</strong>

@@ -1665,6 +1665,11 @@ audio {
   box-shadow: 2px 2px 0px var(--border);
   z-index: 0;
 }
+.map-view-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 10px; }
+.map-view-toolbar h2 { min-width: 0; margin: 0; font-size: 18px; }
+.map-show-all { min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-surface); color: var(--text-primary); font-size: 12px; cursor: pointer; }
+.map-show-all:disabled { opacity: .5; cursor: default; }
+.map-show-all:focus-visible { outline: 2px solid var(--accent-rose); outline-offset: 2px; }
 .voice-marker { background: transparent; border: 0; color: #233f32; }
 .voice-pin { position: absolute; left: 11px; top: 8px; width: 22px; height: 28px; filter: drop-shadow(0 1px 2px #0004); }
 .voice-pin svg { display: block; width: 100%; height: 100%; overflow: visible; }
