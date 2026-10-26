@@ -93,6 +93,23 @@ test("paired anonymous browser links Google instead of discarding its existing i
   expect(linkRequest!.searchParams.get("code_challenge_method")).toBe("s256");
 });
 
+test("mobile paired browser can link Google identity from account dropdown panel", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fixture(page);
+  let linkRequest: URL | undefined;
+  await page.route("https://haptilog-test.supabase.co/auth/v1/user/identities/authorize**", async route => {
+    linkRequest = new URL(route.request().url());
+    expect(route.request().headers().authorization).toMatch(/^Bearer /);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ url: "http://127.0.0.1:4178/?google-mock=linked" }) });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Account & watches", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Sign in to an existing Google account" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue with Google", exact: true }).click();
+  await expect.poll(() => linkRequest?.searchParams.get("provider")).toBe("google");
+  expect(linkRequest!.searchParams.get("code_challenge_method")).toBe("s256");
+});
+
  test("PKCE callback exchanges the code before restoring account records", async ({ page }) => {
   await fixture(page, { connected: false, google: true, saved: true });
   await page.addInitScript(() => {

@@ -8,6 +8,7 @@ import {
   AudioLines,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronRight,
   CircleHelp,
   Clock,
@@ -27,6 +28,7 @@ import {
   Sparkles,
   Trash,
   Trash2,
+  User,
   Watch,
 } from "lucide-react";
 import { supabase, authCallbackFailed } from "./client";
@@ -97,6 +99,28 @@ function Brand() {
     </a>
   );
 }
+function GoogleIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 10.04 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"
+      />
+    </svg>
+  );
+}
 function App() {
   const [draftInProgress, setDraftInProgress] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
@@ -114,6 +138,18 @@ function App() {
   const [accountWatches, setAccountWatches] = useState<AccountWatch[]>([]);
   const [addingWatch, setAddingWatch] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!accountOpen) return;
+    function handleOutsideClick(e: MouseEvent) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
+        setAccountOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [accountOpen]);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [checking, setChecking] = useState(true);
   const [error, setError] = useState(authCallbackFailed
@@ -609,76 +645,212 @@ function App() {
   return (
     <>
       <header className="topbar">
-        <Brand />
-        <span className="top-label">{t.brand_slogan}</span>
-        <div className="top-right">
-          <button
-            className="theme-switch-btn"
-            onClick={toggleTheme}
-            title={theme === "dark" ? t.theme_light : t.theme_dark}
-            aria-label={t.theme_toggle}
-          >
-            <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
-            <span className="theme-btn-text">{theme === "dark" ? t.theme_light : t.theme_dark}</span>
-          </button>
-          <button
-            className="lang-switch-btn"
-            onClick={toggleLang}
-            title={lang === "en" ? "한국어로 변경" : "Switch to English"}
-            aria-label="Toggle language"
-          >
-            {lang === "en" ? "KO" : "EN"}
-          </button>
-          {connection ? (
-            <>
+        <div className="topbar-inner">
+          <div className="top-brand-group">
+            <Brand />
+            <span className="top-label">{t.brand_slogan}</span>
+          </div>
+          <div className="top-right">
+            <button
+              className="theme-switch-btn"
+              onClick={toggleTheme}
+              title={theme === "dark" ? t.theme_light : t.theme_dark}
+              aria-label={t.theme_toggle}
+            >
+              <span aria-hidden="true">{theme === "dark" ? "☀️" : "🌙"}</span>
+              <span className="theme-btn-text">{theme === "dark" ? t.theme_light : t.theme_dark}</span>
+            </button>
+            <button
+              className="lang-switch-btn"
+              onClick={toggleLang}
+              title={lang === "en" ? "한국어로 변경" : "Switch to English"}
+              aria-label="Toggle language"
+            >
+              {lang === "en" ? "KO" : "EN"}
+            </button>
+
+            {supabase && (
+              <div className="account-dropdown-wrapper" ref={accountMenuRef}>
+                <button
+                  className={`account-trigger-btn ${accountEmail ? "signed-in" : ""}`}
+                  onClick={() => setAccountOpen(!accountOpen)}
+                  aria-expanded={accountOpen}
+                  aria-label={t.account}
+                >
+                  <span className={`account-avatar-mark ${accountEmail ? "signed-in" : ""}`}>
+                    {accountEmail ? accountEmail.slice(0, 1).toUpperCase() : <User size={15} />}
+                  </span>
+                  <span className="account-btn-text">{t.account}</span>
+                  <ChevronDown size={14} className={`chevron-indicator ${accountOpen ? "open" : ""}`} />
+                </button>
+                {accountOpen && (
+                  <div className="account-dropdown-panel" role="region" aria-label={t.account}>
+                    {accountEmail ? (
+                      <>
+                        <div className="account-user-card">
+                          <span className="account-avatar-mark signed-in">
+                            {accountEmail.slice(0, 1).toUpperCase()}
+                          </span>
+                          <div className="account-user-meta">
+                            <span className="account-user-email">{accountEmail}</span>
+                            <span className="account-user-status">{t.signed_in_as}</span>
+                          </div>
+                        </div>
+
+                        {connection && (
+                          accountWatches.some((w) => w.owner_user_id === connection.owner_user_id) ? (
+                            <div className="account-status-card complete" role="status">
+                              <span className="account-status-badge complete">
+                                {lang === "ko" ? "계정 연결 완료" : "Linked"}
+                              </span>
+                              <p>{t.account_saved}</p>
+                            </div>
+                          ) : (
+                            <div className="account-status-card unlinked">
+                              <div className="account-status-card-header">
+                                <span className="account-status-badge unlinked">
+                                  {lang === "ko" ? "계정 미연결" : "Not linked"}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                className="save-account-btn"
+                                disabled={busy || draftInProgress}
+                                onClick={() => accountOperation("save")}
+                              >
+                                {t.save_account}
+                              </button>
+                            </div>
+                          )
+                        )}
+
+                        <div className="account-section-heading">
+                          <span>{lang === "ko" ? "연결된 워치" : "Connected watches"}</span>
+                        </div>
+                        <div className="account-watches-list">
+                          {accountWatches.map((w) => (
+                            <div className="account-watch-row" key={w.owner_user_id}>
+                              <button
+                                type="button"
+                                className="account-watch-select-btn"
+                                disabled={busy || draftInProgress}
+                                onClick={() => accountOperation("restore", w.owner_user_id)}
+                              >
+                                <Watch size={15} />
+                                <span className="account-watch-name">{w.watch_id}</span>
+                                {connection?.owner_user_id === w.owner_user_id && (
+                                  <span className="current-watch-tag">
+                                    {lang === "ko" ? "현재" : "Active"}
+                                  </span>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="account-watch-unlink-btn"
+                                disabled={busy || draftInProgress}
+                                onClick={() => accountOperation("unlink", w.owner_user_id)}
+                                aria-label={`${t.unlink_watch} ${w.watch_id}`}
+                              >
+                                {t.unlink_watch}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="account-dropdown-actions">
+                          <button
+                            type="button"
+                            className="account-action-btn"
+                            disabled={busy || draftInProgress}
+                            onClick={() => {
+                              setAddingWatch(true);
+                              setAccountOpen(false);
+                            }}
+                          >
+                            <Watch size={15} />
+                            <span>{t.add_watch}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="account-action-btn sign-out"
+                            disabled={busy || draftInProgress}
+                            onClick={async () => {
+                              if (!supabase) return;
+                              const { error } = await supabase.auth.signOut({ scope: "local" });
+                              if (error) setError(t.account_error);
+                            }}
+                          >
+                            <LogOut size={15} />
+                            <span>{t.sign_out}</span>
+                          </button>
+                        </div>
+                        <p className="account-help-note">{t.signout_help}</p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="account-guest-header">
+                          <div className="account-guest-icon">
+                            <User size={20} />
+                          </div>
+                          <h3>{t.account}</h3>
+                          <p>{t.recovery_help}</p>
+                        </div>
+                        <div className="account-guest-actions">
+                          <button
+                            type="button"
+                            className="google-button full"
+                            disabled={busy || draftInProgress}
+                            onClick={() => googleLogin()}
+                          >
+                            <GoogleIcon size={18} />
+                            <span>{t.google_signin}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="account-secondary-btn"
+                            disabled={busy || draftInProgress}
+                            onClick={() => googleLogin(true)}
+                          >
+                            <span>{t.google_existing}</span>
+                          </button>
+                        </div>
+                        <p className="account-help-note">{t.google_existing_help}</p>
+                      </>
+                    )}
+                    <details className="recovery-details">
+                      <summary>
+                        {lang === "ko" ? "어떤 기록을 다시 볼 수 있나요?" : "Which recordings can be restored?"}
+                      </summary>
+                      <p>{t.recovery_limit}</p>
+                    </details>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {connection ? (
+              <div className="watch-status-group">
+                <span className="watch-label">
+                  <Watch size={15} /> {connection.watch_id}
+                </span>
+                <button
+                  className="icon-button"
+                  title={t.disconnect}
+                  aria-label={t.disconnect}
+                  disabled={busy}
+                  onClick={disconnect}
+                >
+                  <LogOut size={17} />
+                </button>
+              </div>
+            ) : (
               <span className="watch-label">
-                <Watch size={15} /> {connection.watch_id}
+                <Watch size={15} /> {t.wrist_promise}
               </span>
-              <button
-                className="icon-button"
-                title={t.disconnect}
-                aria-label={t.disconnect}
-                disabled={busy}
-                onClick={disconnect}
-              >
-                <LogOut size={17} />
-              </button>
-            </>
-          ) : (
-            <span className="watch-label">
-              <Watch size={15} /> {t.wrist_promise}
-            </span>
-          )}
+            )}
+          </div>
         </div>
       </header>
-      {supabase && <section className="account-bar" aria-label={t.account}>
-        <button onClick={() => setAccountOpen(!accountOpen)} aria-expanded={accountOpen}>{t.account}</button>
-        {!accountEmail && <button disabled={busy || draftInProgress} onClick={() => googleLogin()}>{t.google_signin}</button>}
-        {accountOpen && <div className="account-panel">
-          {accountEmail ? <>
-            <p>{t.signed_in_as}: {accountEmail}</p>
-            {connection && (accountWatches.some(w => w.owner_user_id === connection.owner_user_id)
-              ? <p role="status">{t.account_saved}</p>
-              : <button disabled={busy || draftInProgress} onClick={() => accountOperation("save")}>{t.save_account}</button>)}
-            {accountWatches.map(w => <div className="account-watch" key={w.owner_user_id}>
-              <button disabled={busy || draftInProgress} onClick={() => accountOperation("restore", w.owner_user_id)}>{w.watch_id}</button>
-              <button disabled={busy || draftInProgress} onClick={() => accountOperation("unlink", w.owner_user_id)} aria-label={`${t.unlink_watch} ${w.watch_id}`}>{t.unlink_watch}</button>
-            </div>)}
-            <button disabled={busy || draftInProgress} onClick={() => { setAddingWatch(true); setAccountOpen(false); }}>{t.add_watch}</button>
-            <button disabled={busy || draftInProgress} onClick={async () => {
-              if (!supabase) return;
-              const { error } = await supabase.auth.signOut({ scope: "local" });
-              if (error) setError(t.account_error);
-            }}>{t.sign_out}</button>
-            <p>{t.signout_help}</p>
-          </> : <>
-            <p>{t.recovery_help}</p>
-            <button disabled={busy || draftInProgress} onClick={() => googleLogin(true)}>{t.google_existing}</button>
-            <p>{t.google_existing_help}</p>
-          </>}
-          <p>{t.recovery_limit}</p>
-        </div>}
-      </section>}
       {error && (
         <div className="error-banner" role="alert">
           {error}
@@ -709,7 +881,6 @@ function App() {
           </div>
         </div>
       )}
-      {!mobile && connection && !accountEmail && <p className="recovery-notice">{t.recovery_help}</p>}
       {checking ? (
         <main className="loading">
           <LoaderCircle className="spin" /> {t.opening_space}
@@ -761,6 +932,22 @@ function App() {
             {addingWatch && connection && <button onClick={() => setAddingWatch(false)}>{t.cancel_pair}</button>}
             {accountEmail && <p>{t.account_pair_help}</p>}
             <p>{t.connect_desc}</p>
+            {!accountEmail && !addingWatch && supabase && (
+              <div className="pair-google-card">
+                <button
+                  type="button"
+                  className="google-button full"
+                  disabled={busy || draftInProgress}
+                  onClick={() => googleLogin()}
+                >
+                  <GoogleIcon size={18} />
+                  <span>{t.google_signin}</span>
+                </button>
+                <div className="pair-divider">
+                  <span>{lang === "ko" ? "또는 워치 코드로 연결" : "OR CONNECT WITH WATCH CODE"}</span>
+                </div>
+              </div>
+            )}
             {!supabase ? (
               <div className="setup-note">
                 <CircleHelp size={20} />
@@ -844,6 +1031,24 @@ function App() {
             lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
       ) : (
         <main className="workspace">
+          {!accountEmail && supabase && (
+            <div className="account-nudge-banner" role="region" aria-label="Account link prompt">
+              <div className="account-nudge-content">
+                <span className="account-status-badge unlinked">{lang === "ko" ? "계정 미연결" : "Account unlinked"}</span>
+                <span className="account-nudge-text">{t.recovery_help}</span>
+              </div>
+              <button
+                type="button"
+                className="account-nudge-btn"
+                disabled={busy || draftInProgress}
+                onClick={() => googleLogin()}
+              >
+                <GoogleIcon size={16} />
+                <span>{t.google_signin}</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
           {isDemo && (
             <div className="demo-mode-banner" role="status" aria-label="Demo mode notice">
               <div className="demo-banner-content">

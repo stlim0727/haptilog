@@ -422,6 +422,7 @@ body.light-mode .mobile-record-foot .mobile-amount {
     margin-left: auto;
     flex-wrap: wrap;
   }
+  .top-right .watch-status-group,
   .top-right .watch-label {
     display: none;
   }
