@@ -6,6 +6,7 @@ test('combined sync withdrawal explains audio scope and requires watch-side re-e
   const { state } = await staysFixture(page);
   Object.assign(state.data.state, { consent_scope: 'all_records' });
   const dialog = await openStays(page);
+  await dialog.getByText('Sync and stays', {exact:true}).click();
   await expect(dialog.getByRole('heading', { name: 'Cloud sync', exact: true })).toBeVisible();
   await expect(dialog.getByText('Shared with your watch.', { exact: false })).toContainText('recordings');
   await dialog.getByRole('button', { name: 'Turn off sync', exact: true }).click();

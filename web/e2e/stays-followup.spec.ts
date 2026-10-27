@@ -83,9 +83,11 @@ for (const action of ["delete", "revoke", "logout"] as const) {
     const dialog = await openStays(page);
     await page.evaluate(({ key, owner }) => localStorage.setItem(key, JSON.stringify([{ owner, latitude: 37.5, longitude: 127, radius_meters: 200, expires_at: Date.now() + 60_000 }])), { key: hiddenKey, owner: stayOwner });
     if (action === "delete") {
+      await dialog.getByText("Manage data", {exact:true}).click();
       await dialog.getByRole("button", { name: "Delete all server stays", exact: true }).click();
       await dialog.getByRole("button", { name: "Permanently delete stays", exact: true }).click();
     } else if (action === "revoke") {
+      await dialog.getByText("Sync and stays", {exact:true}).click();
       await dialog.getByRole("button", { name: "Turn off sync", exact: true }).click();
     } else {
       await dialog.getByRole("button", { name: "Close", exact: true }).click();
@@ -121,12 +123,15 @@ test("expired hidden areas are pruned and recommendations return while settings 
     { owner, latitude: 37.5, longitude: 127, radius_meters: 200, expires_at: Date.parse("2026-10-26T06:00:20Z") },
   ])), { key: hiddenKey, owner: stayOwner });
   await page.goto("/");
-  await page.getByRole("button", { name: "Place settings", exact: true }).click();
+  await page.getByRole("button", { name: "More options", exact: true }).click();
+  await page.getByRole("button", { name: "My places", exact: true }).click();
   const suggestions = page.getByRole("region", { name: "Frequent stay suggestions" });
   await expect(suggestions.getByRole("button", { name: "Save as a place", exact: true })).toHaveCount(0);
-  await page.getByRole("dialog", { name: "Place settings", exact: true }).getByRole("button", { name: "Close", exact: true }).click();
+  await page.getByRole("dialog", { name: "My places", exact: true }).getByRole("button", { name: "Close", exact: true }).click();
   await page.clock.runFor(30_001);
   await expect.poll(() => page.evaluate(key => localStorage.getItem(key), hiddenKey)).toBe(null);
-  await page.getByRole("button", { name: "Place settings", exact: true }).click();
+  await page.getByRole("button", { name: "More options", exact: true }).click();
+  await page.getByRole("button", { name: "My places", exact: true }).click();
+  await page.locator(".place-settings-section > summary").filter({hasText:"Frequently visited areas"}).click();
   await expect(suggestions.getByRole("button", { name: "Save as a place", exact: true })).toBeVisible();
 });

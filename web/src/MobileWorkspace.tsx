@@ -100,7 +100,7 @@ type Props = {
   emptyTrash: () => Promise<void>;
   isDemo?: boolean;
   onResetDemo?: () => void;
-  locationControl?: React.ReactNode;
+  locationControl?: (beforeOpen: () => HTMLElement | null) => React.ReactNode;
   renderInspector: (
     recording: Recording,
     onDirtyChange: (dirty: boolean) => void,
@@ -431,7 +431,6 @@ export function MobileWorkspace(p: Props) {
               <MoreHorizontal />
             </button>
           </div>
-          {p.locationControl}
           {isTrash
             ? (
               <div className="mobile-toolbar">
@@ -769,6 +768,11 @@ export function MobileWorkspace(p: Props) {
             <X />
           </button>
         </div>
+        {p.locationControl?.(() => {
+          menuReturn.current = "menu";
+          closeMenu();
+          return menuButton.current;
+        })}
         <button onClick={enterTrash}>
           <Trash2 size={18} />
           {t.trash} ({records.filter((r) => r.deleted_at).length})

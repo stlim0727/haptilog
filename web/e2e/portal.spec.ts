@@ -45,6 +45,7 @@ test("correction persists through refresh and changes totals and CSV", async ({ 
   await page.reload();
   await expect(page.getByLabel("Amount", { exact: true })).toHaveValue("4500");
   const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "More options", exact: true }).click();
   await page.getByRole("button", { name: "Voice CSV" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^haptilog-.*\.csv$/);

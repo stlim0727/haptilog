@@ -1,3 +1,4 @@
+import { Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 
@@ -17,7 +18,7 @@ export function LocationWorkspace({ owner, repository, journal, initialStay, lan
   owner: string; repository: LocationRepository; journal: LocationJournal; initialStay?: Stay | null; lang?: "ko" | "en";
 }) {
   const ko = lang === "ko", timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const { snapshot, replace: setSnapshot, now, checkedAt } = journal;
+  const { snapshot, replace: setSnapshot, now } = journal;
   const [error, setError] = useState(""), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
 
   const [backfill, setBackfill] = useState(false), [deleteConfirm, setDeleteConfirm] = useState<string[] | "all" | null>(null);
@@ -93,25 +94,55 @@ export function LocationWorkspace({ owner, repository, journal, initialStay, lan
         error === "UPDATE_REQUIRED" ? (ko ? "워치 설정에서 전체 클라우드 동기화를 켜 주세요." : "Enable combined cloud sync in watch settings.") :
         error === "CONSENT_REQUIRED" ? (ko ? "워치에서 클라우드 동기화를 켜 주세요." : "Enable cloud sync on your watch.") :
           (ko ? "위치 정보를 불러오거나 변경하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요." : "Could not load or update location data. Check your connection and retry.");
-  return <section className="location-workspace" aria-label={ko ? "장소 설정" : "Place settings"}>
-    <h2>{ko ? "장소 설정" : "Place settings"}</h2>
-    <p>{ko ? "체류는 음성과 함께 기록 목록에 표시됩니다. 수집은 워치에서 직접 시작하세요." : "Stays appear alongside voice recordings in your journal. Start collection on your watch."}</p>
-    <button type="button" disabled={busy} onClick={() => { setMessage(""); void load(); }}>{ko ? "새로고침" : "Refresh"}</button>
-    {checkedAt && <p>{ko ? "서버 확인" : "Server checked"}: {new Date(checkedAt).toLocaleString(ko ? "ko-KR" : "en-US", { timeZone })} · {ko ? "현재 워치 상태를 보장하지 않습니다." : "Does not confirm current watch presence."}</p>}
+  return <section className="location-workspace" aria-label={ko ? "내 장소" : "My places"}>
+    <div className="places-toolbar"><span>{ko ? '저장한 장소' : 'Saved places'} · {places.length}/20</span><button className="text-button" type="button" disabled={busy} onClick={() => { setMessage(""); void load(); }}>{ko ? "새로고침" : "Refresh"}</button></div>
     {error && <p role="alert">{errorText}</p>}
     {message && <p role="status">{message}</p>}
     {!snapshot && !error && <p role="status">{ko ? "위치 정보를 불러오는 중…" : "Loading location data…"}</p>}
     {snapshot && <>
+      <fieldset className="saved-places" disabled={busy}>
+        <legend className="sr-only">{ko ? "내 장소" : "My places"} ({places.length}/20)</legend>
+        {!places.length && <p className="location-secondary">{ko ? "체류 옆에서 이름을 정하면 여기에 저장됩니다." : "Name a stay in your journal to save it here."}</p>}
+        <ul>{places.map(place => <li className="saved-place-row" key={place.id}><strong>{place.name}</strong><div className="saved-place-actions">
+          <button className="secondary-button" type="button" aria-label={ko ? "편집" : "Edit"} title={ko ? "이름 수정" : "Edit place"} disabled={!snapshot.state.consent_enabled} onClick={() => setEditor({ initial: place, id: place.id, revision: snapshot.state.places_revision })}><Pencil size={14} /></button>
+          <button className="secondary-button" type="button" aria-label={ko ? "장소 삭제" : "Delete place"} title={ko ? "장소 삭제" : "Delete place"} disabled={!snapshot.state.consent_enabled} onClick={() => void perform(() => repository.deletePlace(place.id, snapshot.state.places_revision), ko ? "장소 정의를 삭제했습니다. 체류와 음성은 삭제하지 않았습니다." : "Place definition deleted. Stays and audio were retained.")}><Trash2 size={14} /></button></div>
+        </li>)}</ul>
+        <button className="secondary-button" type="button" disabled={!snapshot.state.consent_enabled || places.length >= 20} onClick={() => newPlace()}>{ko ? "지도에서 장소 추가" : "Add a place on the map"}</button>
+      </fieldset>
+      {editor && snapshot.state.consent_enabled && <PlaceEditor key={`${editor.id ?? "new"}:${editor.initial.latitude}:${editor.initial.longitude}`} initial={editor.initial} places={places} editingId={editor.id} expectedRevision={editor.revision} lang={lang} onCancel={() => setEditor(null)} onReloadForReview={async () => {
+        const next = await load();
+        if (!next) throw new LocationError("NETWORK");
+        return { revision: next.state.places_revision, place: next.places.find(place => place.id === editor.id) ?? null };
+      }} onSave={async (draft, revision) => {
+        try {
+          await mutate(() => repository.putPlace({ ...draft, id: editor.id ?? crypto.randomUUID() }, revision!));
+          if (mounted.current) { setEditor(null); setMessage(ko ? "장소를 저장했습니다. 과거 기록은 자동 변경되지 않습니다." : "Place saved. Past records were not changed automatically."); }
+          return { kind: "saved", pendingApplication: true };
+        } catch (e) { if (e instanceof LocationError && e.code === "REVISION_CONFLICT") return { kind: "conflict" }; throw e; }
+      }} />}
+      {snapshot.state.consent_enabled && suggestions.length > 0 && <details className="place-settings-section"><summary>{ko ? "자주 머문 곳" : "Frequently visited areas"} · {suggestions.length}</summary><section aria-label={ko ? "자주 머문 곳 추천" : "Frequent stay suggestions"}>
+        <ul>{suggestions.map(suggestion => <li key={`${suggestion.latitude}:${suggestion.longitude}`}>
+          {suggestion.visits}{ko ? "회" : " visits"} · {suggestion.distinctDays}{ko ? "일" : " days"} · {Math.floor(suggestion.observedMillis / 60_000)}{ko ? "분 관측" : " minutes observed"}
+          <button className="secondary-button" type="button" disabled={busy || places.length >= 20} onClick={() => newPlace(suggestion.latitude, suggestion.longitude)}>{ko ? "장소로 저장" : "Save as a place"}</button>
+          <button className="secondary-button" type="button" disabled={busy} onClick={() => {
+            const sourceExpiry = Math.min(...stays.filter(stay => suggestion.stayIds.includes(stay.id)).map(stay => Date.parse(stay.started_at) + RETENTION_MS));
+            const saved = saveDismissal(localStorage, owner, { latitude: suggestion.latitude, longitude: suggestion.longitude, radius_meters: 200 }, sourceExpiry);
+            if (saved) setDismissals(loadDismissals(localStorage, owner));
+            else setMessage(ko ? "이 브라우저에 추천 숨김을 저장하지 못했습니다." : "Could not save hidden suggestions in this browser.");
+          }}>{ko ? "추천 숨기기" : "Hide suggestion"}</button>
+        </li>)}</ul>
+      </section></details>}
+      <details className="place-settings-section"><summary>{ko ? "동기화 및 체류 설정" : "Sync and stays"}</summary>
       <section aria-label={ko ? "위치 동기화 설정" : "Location synchronization settings"}>
         <h3>{combined ? (ko ? "클라우드 동기화" : "Cloud sync") : (ko ? "웹에도 표시" : "Show on the web")}</h3>
         <p role="status">{snapshot.state.consent_enabled ? (ko ? "동기화 켜짐 · 워치가 연결되면 업로드합니다." : "Sync on · uploads when the watch connects.") : (ko ? "동기화 꺼짐" : "Sync off")}</p>
-        <p>{ko ? "저장한 장소와 체류 위치·시간·정확도를 서버에 보냅니다. 체류는 시작 후 7일간 보관합니다. 이동 경로는 워치에만 남습니다." : "Sends saved places and stay locations, times and accuracy to the server. Stays are kept for seven days from their start. Movement trails stay on your watch."}</p>
+        <p>{ko ? "저장한 장소와 체류 위치·시간·정확도를 서버에 보냅니다. 체류는 시작 후 7일간 보관합니다. 연속 위치 원본은 별도 동의한 경우에만 동기화됩니다." : "Sends saved places and stay locations, times and accuracy to the server. Stays are kept for seven days from their start. Continuous location originals sync only with separate consent."}</p>
         {combined && <p>{ko ? "워치의 공통 설정입니다. 끄면 녹음·첨부 위치·장소·체류의 이후 업로드를 함께 중단합니다. 다시 켜려면 워치 설정에서 동의하세요. 위치 수집은 별도입니다." : "Shared with your watch. Turning off stops future uploads of recordings, attached location, places and stays. Enable it again from watch settings. Collection is separate."}</p>}
-        {!combined && <details><summary>{ko ? "동기화 자세히 보기" : "About synchronization"}</summary><p>{ko ? "음성 클라우드 동의와 별개입니다. 저장한 장소와 체류 대표 좌표·시각·위치 정확도가 서버로 전송됩니다. 원시 이동 경로는 업로드하지 않습니다. 체류는 시작 후 7일 보존되며, 내 장소는 삭제할 때까지 유지됩니다. 위치 기록은 Gemini에 보내지 않습니다. 수집과 워치의 웹 동기화는 워치에서 직접 켜야 합니다." : "Separate from voice cloud consent. Saved places and stay summary coordinates, times and accuracy are sent to the server. Raw movement trails are not uploaded. Stays expire seven days after starting; saved places remain until deleted. Location journal data is not sent to Gemini. Enabling sync here does not start collection or activate a watch that has never opted in; enable web sync on the watch too."}</p></details>}
+        {!combined && <details><summary>{ko ? "동기화 자세히 보기" : "About synchronization"}</summary><p>{ko ? "음성 클라우드 동의와 별개입니다. 저장한 장소와 체류 대표 좌표·시각·위치 정확도가 서버로 전송됩니다. 이 설정만으로 위치 원본 업로드를 허용하지 않습니다. 체류는 시작 후 7일 보존되며, 내 장소는 삭제할 때까지 유지됩니다. 위치 기록은 Gemini에 보내지 않습니다. 수집과 워치의 웹 동기화는 워치에서 직접 켜야 합니다." : "Separate from voice cloud consent. Saved places and stay summary coordinates, times and accuracy are sent to the server. This setting alone does not authorize uploads of location originals. Stays expire seven days after starting; saved places remain until deleted. Location journal data is not sent to Gemini. Enabling sync here does not start collection or activate a watch that has never opted in; enable web sync on the watch too."}</p></details>}
         {!combined && !snapshot.state.consent_enabled && <label><input type="checkbox" checked={backfill} disabled={busy} onChange={e => setBackfill(e.target.checked)} />{ko ? "이전에 기록한 체류도 포함 · 워치에 남아 있는 최근 7일" : "Include previous stays · retained on the watch from the last seven days"}</label>}
         {!combined && !snapshot.state.consent_enabled && <p className="location-secondary">{ko ? "이미 시작한 체류도 표시하려면 이전 체류 포함을 켜세요." : "Include previous stays to show a stay that has already started."}</p>}
         {combined && !snapshot.state.consent_enabled && <p>{ko ? "워치 설정에서 클라우드 동기화를 켜 주세요." : "Enable cloud sync in watch settings."}</p>}
-        {(!combined || snapshot.state.consent_enabled) && <button type="button" disabled={busy} onClick={() => {
+        {(!combined || snapshot.state.consent_enabled) && <button className="secondary-button" type="button" disabled={busy} onClick={() => {
           const state = snapshot.state;
           void perform(async () => {
             await repository.consent(!state.consent_enabled, state.consent_revision, backfill);
@@ -127,45 +158,12 @@ export function LocationWorkspace({ owner, repository, journal, initialStay, lan
         </label>}
         <p>{snapshot.state.places_revision > snapshot.state.applied_places_revision ? (ko ? "워치 적용 대기 · 다음 위치 기록 세션에 적용" : "Pending watch application · applies at the next journal session") : (ko ? "워치에 설정 적용됨" : "Settings applied on the watch")}</p>
       </section>
-      <fieldset disabled={busy}>
-        <legend>{ko ? "내 장소" : "My places"} ({places.length}/20)</legend>
-        <ul>{places.map(place => <li key={place.id}>{place.name} · {place.radius_meters}m
-          <button type="button" disabled={!snapshot.state.consent_enabled} onClick={() => setEditor({ initial: place, id: place.id, revision: snapshot.state.places_revision })}>{ko ? "편집" : "Edit"}</button>
-          <button type="button" disabled={!snapshot.state.consent_enabled} onClick={() => void perform(() => repository.deletePlace(place.id, snapshot.state.places_revision), ko ? "장소 정의를 삭제했습니다. 체류와 음성은 삭제하지 않았습니다." : "Place definition deleted. Stays and audio were retained.")}>{ko ? "장소 삭제" : "Delete place"}</button>
-        </li>)}</ul>
-        <button type="button" disabled={!snapshot.state.consent_enabled || places.length >= 20} onClick={() => newPlace()}>{ko ? "지도에서 장소 추가" : "Add a place on the map"}</button>
-      </fieldset>
-      {editor && snapshot.state.consent_enabled && <PlaceEditor key={`${editor.id ?? "new"}:${editor.initial.latitude}:${editor.initial.longitude}`} initial={editor.initial} places={places} editingId={editor.id} expectedRevision={editor.revision} lang={lang} onCancel={() => setEditor(null)} onReloadForReview={async () => {
-        const next = await load();
-        if (!next) throw new LocationError("NETWORK");
-        return { revision: next.state.places_revision, place: next.places.find(place => place.id === editor.id) ?? null };
-      }} onSave={async (draft, revision) => {
-        try {
-          await mutate(() => repository.putPlace({ ...draft, id: editor.id ?? crypto.randomUUID() }, revision!));
-          if (mounted.current) { setEditor(null); setMessage(ko ? "장소를 저장했습니다. 과거 기록은 자동 변경되지 않습니다." : "Place saved. Past records were not changed automatically."); }
-          return { kind: "saved", pendingApplication: true };
-        } catch (e) { if (e instanceof LocationError && e.code === "REVISION_CONFLICT") return { kind: "conflict" }; throw e; }
-      }} />}
-      {snapshot.state.consent_enabled && <section aria-label={ko ? "자주 머문 곳 추천" : "Frequent stay suggestions"}>
-        <h3>{ko ? "자주 머문 곳" : "Frequently visited areas"}</h3>
-        <p>{ko ? "최근 7일 중 서로 다른 2일 이상, 3회 이상 체류한 곳입니다. 추천 조건은 초기 기준이며 실제 방문과 다를 수 있습니다." : "Areas with at least three stays on two different days in the last seven days. These provisional rules may differ from actual visits."}</p>
-        <p>{ko ? "숨긴 추천은 이 브라우저에서 관련 체류가 만료되기 전까지 최대 7일 유지됩니다. 체류 삭제·동의 철회·로그아웃 시 숨김 설정도 지웁니다." : "Hidden suggestions remain in this browser for up to seven days, ending when their source stays expire. Deleting stays, revoking consent or signing out also clears hidden suggestions."}</p>
-        {!suggestions.length && <p>{ko ? "추천할 만큼 확인된 체류가 없습니다." : "Not enough confirmed stays for suggestions."}</p>}
-        <ul>{suggestions.map(suggestion => <li key={`${suggestion.latitude}:${suggestion.longitude}`}>
-          {suggestion.visits}{ko ? "회" : " visits"} · {suggestion.distinctDays}{ko ? "일" : " days"} · {Math.floor(suggestion.observedMillis / 60_000)}{ko ? "분 관측" : " minutes observed"}
-          <button type="button" disabled={busy || places.length >= 20} onClick={() => newPlace(suggestion.latitude, suggestion.longitude)}>{ko ? "장소로 저장" : "Save as a place"}</button>
-          <button type="button" disabled={busy} onClick={() => {
-            const sourceExpiry = Math.min(...stays.filter(stay => suggestion.stayIds.includes(stay.id)).map(stay => Date.parse(stay.started_at) + RETENTION_MS));
-            const saved = saveDismissal(localStorage, owner, { latitude: suggestion.latitude, longitude: suggestion.longitude, radius_meters: 200 }, sourceExpiry);
-            if (saved) setDismissals(loadDismissals(localStorage, owner));
-            else setMessage(ko ? "이 브라우저에 추천 숨김을 저장하지 못했습니다." : "Could not save hidden suggestions in this browser.");
-          }}>{ko ? "추천 숨기기" : "Hide suggestion"}</button>
-        </li>)}</ul>
-      </section>}
-      <button type="button" disabled={busy || !stays.length} onClick={() => setDeleteConfirm("all")}>{ko ? "서버 체류 전체 삭제" : "Delete all server stays"}</button>
+      </details>
+      <details className="place-settings-section"><summary>{ko ? "데이터 관리" : "Manage data"}</summary>
+      <button className="secondary-button" type="button" disabled={busy || !stays.length} onClick={() => setDeleteConfirm("all")}>{ko ? "서버 체류 전체 삭제" : "Delete all server stays"}</button>
       {deleteConfirm && <section aria-label={ko ? "체류 삭제 확인" : "Confirm stay deletion"}>
         <p>{ko ? "선택한 체류를 서버에서 삭제할까요? 다시 동기화해도 복원되지 않습니다. 음성과 내 장소 정의는 유지됩니다." : "Delete the selected server stays? Synchronization will not restore them. Audio and saved place definitions are retained."}</p>
-        <button type="button" disabled={busy} onClick={() => {
+        <button className="secondary-button" type="button" disabled={busy} onClick={() => {
           const ids = deleteConfirm === "all" ? null : deleteConfirm;
           void perform(async () => {
             await repository.deleteStays(ids, snapshot.state.sync_epoch);
@@ -175,8 +173,9 @@ export function LocationWorkspace({ owner, repository, journal, initialStay, lan
             if (mounted.current) setDeleteConfirm(null);
           });
         }}>{ko ? "체류 영구 삭제" : "Permanently delete stays"}</button>
-        <button type="button" disabled={busy} onClick={() => setDeleteConfirm(null)}>{ko ? "취소" : "Cancel"}</button>
+        <button className="secondary-button" type="button" disabled={busy} onClick={() => setDeleteConfirm(null)}>{ko ? "취소" : "Cancel"}</button>
       </section>}
+      </details>
     </>}
   </section>;
 }

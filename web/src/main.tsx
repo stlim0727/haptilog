@@ -1052,7 +1052,7 @@ function App() {
           summary={summary} count={dateJournal.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
           isDemo={isDemo} onResetDemo={resetSampleData}
-          locationControl={<Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} /></Suspense>}
+          locationControl={(beforeOpen) => <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} beforeOpen={beforeOpen} /></Suspense>}
           renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
             onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
             lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
@@ -1116,7 +1116,6 @@ function App() {
               <p>{lang === "ko" ? "음성과 머문 장소를 한곳에서 돌아보세요." : "Your voice and the places you stayed, together."}</p>
             </div>
             <div className="heading-actions">
-              <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} /></Suspense>
               <label className="date-picker">
                 <CalendarDays size={16} />
                 <span className="sr-only">Date range</span>
@@ -1126,6 +1125,7 @@ function App() {
                   <option value="month">{t.this_month}</option>
                 </select>
               </label>
+              <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} moreActions={<>
               <button
                 className="secondary-button"
                 onClick={exportCsv}
@@ -1143,6 +1143,7 @@ function App() {
                 <ArrowDownToLine size={16} />
                 {lang === "ko" ? "음성을 Notion으로 내보내기" : "Export voice to Notion"}
               </button>}
+              </>} /></Suspense>
             </div>
           </div>
           {!isTrashView && <NotionExport key={connection.session_id} records={filtered} ko={lang === "ko"}

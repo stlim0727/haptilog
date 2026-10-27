@@ -176,7 +176,7 @@ for (const width of [1280, 390]) {
     await save.click();
     const form = inspector.getByRole('form', { name: 'Name this place' });
     await expect(form.getByLabel('Place name')).toHaveValue('Original cafe');
-    await expect(page.getByRole('dialog', { name: 'Place settings' })).not.toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'My places' })).not.toBeVisible();
     await expect(form.locator('input')).toHaveCount(1);
     await form.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(save).toBeFocused();
@@ -254,7 +254,7 @@ for (const width of [1280, 390]) {
     await expect.poll(async () => Math.round((await ribbon.boundingBox())!.height)).toBe(44);
     await timeline.getByRole('button', { name: '+ Save place', exact: true }).click();
     await expect(timeline.getByRole('form', { name: 'Name this place' }).getByLabel('Place name')).toBeFocused();
-    await expect(page.getByRole('dialog', { name: 'Place settings' })).not.toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'My places' })).not.toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }
