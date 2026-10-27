@@ -1,12 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { LocationWorkspace } from './LocationWorkspace.tsx';
 import type { LocationJournal } from './useLocationJournal.ts';
-import type { Stay } from './types.ts';
 
-export default function LocationLauncher({ journal, lang, isDemo = false, initialStay, request, onClose }: {
+export default function LocationLauncher({ journal, lang, isDemo = false }: {
   journal: LocationJournal; lang: 'ko' | 'en'; isDemo?: boolean;
-  initialStay?: Stay | null; request: number; onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -15,7 +13,6 @@ export default function LocationLauncher({ journal, lang, isDemo = false, initia
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : trigger.current;
     if (!dialog.current?.open) dialog.current?.showModal();
   };
-  useEffect(() => { if (request > 0) open(); }, [request]);
   const close = () => dialog.current?.close();
   return <>
     <button ref={trigger} className="secondary-button" type="button" aria-haspopup="dialog" onClick={open}>
@@ -24,7 +21,6 @@ export default function LocationLauncher({ journal, lang, isDemo = false, initia
     {createPortal(<dialog ref={dialog} className="location-dialog" aria-label={lang === 'ko' ? '장소 설정' : 'Place settings'}
       onCancel={event => { event.preventDefault(); close(); }}
       onClose={() => {
-        onClose();
         const target = returnFocus.current?.isConnected ? returnFocus.current : trigger.current;
         target?.focus();
       }}>
@@ -32,7 +28,7 @@ export default function LocationLauncher({ journal, lang, isDemo = false, initia
       {isDemo
         ? <p>{lang === 'ko' ? '샘플 모드에서는 위치 동기화를 사용하지 않습니다. 실제 워치를 연결해 주세요.' : 'Location synchronization is unavailable in sample mode. Connect a watch to use places.'}</p>
         : journal.repository && journal.owner
-          ? <LocationWorkspace owner={journal.owner} repository={journal.repository} journal={journal} initialStay={initialStay} lang={lang} />
+          ? <LocationWorkspace owner={journal.owner} repository={journal.repository} journal={journal} lang={lang} />
           : <p>{lang === 'ko' ? '서버 연결을 사용할 수 없습니다.' : 'Server connection unavailable.'}</p>}
     </dialog>, document.body)}
   </>;

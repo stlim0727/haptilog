@@ -166,19 +166,19 @@ for (const theme of ["light", "dark"] as const) {
 }
 
 for (const width of [1280, 390]) {
-  test(`save place uses the selected stay coordinates and returns focus at ${width}px`, async ({ page }) => {
+  test(`inline place name uses one input and returns focus at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await staysFixture(page);
     await page.goto("/");
     await page.locator(width < 700 ? `.ribbon-stay-open${stayCard}` : `.record-list ${stayCard}`).click();
-    const save = page.getByRole("button", { name: "Save as a place", exact: true });
+    const inspector = page.locator('.stay-inspector');
+    const save = inspector.getByRole("button", { name: "Rename place", exact: true });
     await save.click();
-    const settings = page.getByRole("dialog", { name: "Place settings", exact: true });
-    await expect(settings).toBeVisible();
-    await expect(settings.getByLabel("Name", { exact: true })).toHaveValue("");
-    await expect(settings.getByLabel("Latitude", { exact: true })).toHaveValue("37.5");
-    await expect(settings.getByLabel("Longitude", { exact: true })).toHaveValue("127");
-    await settings.getByRole("button", { name: "Close", exact: true }).click();
+    const form = inspector.getByRole('form', { name: 'Name this place' });
+    await expect(form.getByLabel('Place name')).toHaveValue('Original cafe');
+    await expect(page.getByRole('dialog', { name: 'Place settings' })).not.toBeVisible();
+    await expect(form.locator('input')).toHaveCount(1);
+    await form.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(save).toBeFocused();
   });
 }
@@ -253,7 +253,8 @@ for (const width of [1280, 390]) {
     await expect(timeline.getByRole('button', { name: '+ Save place', exact: true })).toBeVisible();
     await expect.poll(async () => Math.round((await ribbon.boundingBox())!.height)).toBe(64);
     await timeline.getByRole('button', { name: '+ Save place', exact: true }).click();
-    await expect(page.getByRole('dialog', { name: 'Place settings' }).locator('.place-editor')).toBeVisible();
+    await expect(timeline.getByRole('form', { name: 'Name this place' }).getByLabel('Place name')).toBeFocused();
+    await expect(page.getByRole('dialog', { name: 'Place settings' })).not.toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }

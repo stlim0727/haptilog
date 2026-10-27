@@ -161,3 +161,14 @@ A grouped label/ribbon expands its source list; each original stay remains selec
 for details and individual deletion. An empty group retains the 64px collapsed row.
 Saved-place IDs determine stable ribbon hues across days, filters and reloads;
 unknown places use their source IDs and are never inferred to be the same place.
+
+## Name a place without leaving the journal
+
+The ribbon and stay inspector use a shared inline name field with Save/Cancel.
+The captured representative coordinates and the existing default 200m place radius
+are supplied automatically; renames retain the saved place's ID and geometry.
+The settings dialog is no longer part of this naming path. Revision conflicts
+require an explicit refresh/review and keep the draft. Acknowledged names update
+shared journal state before refreshing, so a failed refresh does not discard the
+successful result. Cloud consent, owner/session isolation and the 20-place limit
+still apply. Sample mode remains read-only.

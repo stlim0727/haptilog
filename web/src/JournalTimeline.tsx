@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import type { JournalItem } from './journal.ts';
-import { journalDuration, journalTitle, placeCandidates } from './journal.ts';
+import { journalDuration, journalTitle } from './journal.ts';
 import { ribbonColor } from './ribbonGroups.ts';
 import { ribbonLayout } from './ribbons.ts';
 import './ribbons.css';
 
 /** Shared list geometry keeps voice chronology and gives stays a continuous time range. */
-export function JournalTimeline({ items, allItems, now, lang, renderVoice, onSelectStay, onSavePlace }: {
+export function JournalTimeline({ items, allItems, now, lang, renderVoice, onSelectStay, renderPlaceName }: {
   items: JournalItem[]; allItems: JournalItem[]; now: number; lang: 'ko' | 'en';
   renderVoice: (item: JournalItem) => ReactNode;
   onSelectStay: (item: Extract<JournalItem, { kind: 'stay' }>) => void;
-  onSavePlace?: (item: Extract<JournalItem, { kind: 'stay' }>) => void;
+  renderPlaceName?: (item: Extract<JournalItem, { kind: 'stay' }>, compact?: boolean) => ReactNode;
 }) {
   const { rows, ranges, lanes, groups } = ribbonLayout(items, allItems, now);
   const ko = lang === 'ko';
@@ -32,7 +32,7 @@ export function JournalTimeline({ items, allItems, now, lang, renderVoice, onSel
           <strong>{journalTitle(item, lang)}</strong>
           <span>{new Date(groups.get(item.id)!.summary.stay.started_at).toLocaleString(lang, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} – {new Date(item.stay.last_observed_at).toLocaleString(lang, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {journalDuration(groups.get(item.id)!.summary, lang)}</span>
         </button>
-        {placeCandidates(item).length !== 1 && onSavePlace && <button type="button" className="ribbon-place-save" onClick={() => onSavePlace(item)}>{ko ? '＋ 장소로 저장' : '+ Save place'}</button>}
+        {renderPlaceName?.(item, true)}
         {groups.get(item.id)!.members.length > 1 && <details className="ribbon-group-sources" open={expanded.has(item.id)} onToggle={event => expand(item.id, event.currentTarget.open)}>
           <summary>{ko ? `${groups.get(item.id)!.members.length}개 체류 묶음` : `${groups.get(item.id)!.members.length} stays grouped`}</summary>
           <p>{ko ? '3분 이내 공백으로 이어진 같은 장소입니다. 공백은 확인된 시간에 포함하지 않습니다.' : 'Same place with gaps up to 3 minutes. Gaps are excluded from observed time.'}</p>

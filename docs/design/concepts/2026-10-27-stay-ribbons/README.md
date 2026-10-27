@@ -57,7 +57,8 @@ order. Stays span their unambiguous voice candidates; empty stays use a 64px row
 against a minimum 128px voice card. Intervening unrelated voices break the ribbon.
 Filtered-out stays still participate in association ambiguity checks. Each mobile
 date keeps the original stay identity, including stays crossing midnight.
-Unnamed stays open the existing place editor directly, subject to consent; demo
-stays remain read-only. The editor uses “내 장소 추가” and “내 장소 수정”.
+Place naming uses an inline name field with Save/Cancel directly in the ribbon
+and inspector, subject to consent; demo stays remain read-only. The earlier
+modal prototype above is retained as design history.
 
 `implemented-mobile.png` and `implemented-desktop.png` show the main sample journal.
