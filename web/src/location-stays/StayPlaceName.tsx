@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pencil } from 'lucide-react';
 import type { JournalItem } from '../journal.ts';
+import { overlappingPlaces } from './domain.ts';
 import { placeCandidates } from '../journal.ts';
 import { LocationError, parseSnapshot } from './repository.ts';
 import type { SavedPlace } from './types.ts';
@@ -16,6 +17,7 @@ export function StayPlaceName({ item, journal, lang, compact = false }: {
   const [editing, setEditing] = useState(false), [name, setName] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [message, setMessage] = useState('');
   const [conflict, setConflict] = useState(false);
+  const [overlapAcknowledgement, setOverlapAcknowledgement] = useState('');
   const [target, setTarget] = useState<SavedPlace | null>(null), [id, setId] = useState(''), [revision, setRevision] = useState(0);
   const trigger = useRef<HTMLButtonElement>(null), input = useRef<HTMLInputElement>(null);
   const wasEditing = useRef(false);
@@ -24,10 +26,15 @@ export function StayPlaceName({ item, journal, lang, compact = false }: {
     else if (wasEditing.current) trigger.current?.focus({ preventScroll: true });
     wasEditing.current = editing;
   }, [editing]);
+  const geometry = { latitude: target?.latitude ?? item.stay.representative_latitude,
+    longitude: target?.longitude ?? item.stay.representative_longitude, radius_meters: target?.radius_meters ?? 200 };
+  const overlaps = overlappingPlaces(geometry, journal.snapshot?.places ?? [], target?.id);
+  const overlapKey = JSON.stringify([geometry, overlaps.map(place => [place.id, place.revision, place.latitude, place.longitude, place.radius_meters]).sort()]);
+  const needsAcknowledgement = overlaps.length > 0 && overlapAcknowledgement !== overlapKey;
   const allowed = !!journal.repository && !!journal.snapshot?.state.consent_enabled;
   const open = () => {
     setTarget(known); setId(known?.id ?? crypto.randomUUID()); setRevision(journal.snapshot!.state.places_revision);
-    setName(known?.name ?? ''); setError(''); setMessage(''); setConflict(false); setEditing(true);
+    setName(known?.name ?? ''); setOverlapAcknowledgement(''); setError(''); setMessage(''); setConflict(false); setEditing(true);
   };
   const reload = async () => {
     setBusy(true);
@@ -36,7 +43,7 @@ export function StayPlaceName({ item, journal, lang, compact = false }: {
       if (!next) throw new Error('refresh');
       const current = next.places.find(place => place.id === id) ?? null;
       if (target && !current) { setError(ko ? '이 장소가 삭제됐습니다. 이름을 복사한 뒤 취소하고 다시 시작해 주세요.' : 'This place was deleted. Copy your name, cancel and start again.'); return; }
-      setTarget(current); setRevision(next.state.places_revision); setConflict(false); setError('');
+      setOverlapAcknowledgement(''); setTarget(current); setRevision(next.state.places_revision); setConflict(false); setError('');
       setMessage(current ? (ko ? `현재 이름: ${current.name}. 변경 내용을 확인한 뒤 저장하세요.` : `Current name: ${current.name}. Review your change before saving.`) : (ko ? '최신 장소를 불러왔습니다. 이름을 확인한 뒤 저장하세요.' : 'Places refreshed. Review the name before saving.'));
     } catch { setError(ko ? '새로고침하지 못했습니다. 입력한 이름은 유지됩니다.' : 'Could not refresh. Your name is preserved.'); }
     finally { setBusy(false); }
@@ -48,7 +55,7 @@ export function StayPlaceName({ item, journal, lang, compact = false }: {
       {message && <p role="status" className={compact ? 'sr-only' : undefined}>{message}</p>}
     </> : <form aria-label={ko ? '장소 이름 정하기' : 'Name this place'} onSubmit={async event => {
       event.preventDefault();
-      if (busy || conflict || !name.trim() || name.trim().length > 40) return;
+      if (busy || conflict || needsAcknowledgement || !name.trim() || name.trim().length > 40) return;
       const snapshot = journal.snapshot!;
       if (!target && snapshot.places.length >= 20) { setError(ko ? '내 장소는 최대 20개까지 저장할 수 있습니다.' : 'You can save at most 20 places.'); return; }
       setBusy(true); setError(''); setMessage('');
@@ -74,7 +81,8 @@ export function StayPlaceName({ item, journal, lang, compact = false }: {
       } finally { setBusy(false); }
     }}>
       <label>{ko ? '장소 이름' : 'Place name'}<input ref={input} value={name} onChange={event => setName(event.target.value)} maxLength={40} required disabled={busy} placeholder={ko ? '집, 회사, 자주 가는 카페' : 'Home, work, favorite café'} /></label>
-      <div className="stay-name-actions"><button type="submit" className="primary-button" disabled={busy || conflict || !name.trim()}>{busy ? (ko ? '저장 중…' : 'Saving…') : (ko ? '저장' : 'Save')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => { setEditing(false); setError(''); setMessage(''); }}>{ko ? '취소' : 'Cancel'}</button></div>
+      {overlaps.length > 0 && <label className="stay-name-overlap"><input type="checkbox" checked={!needsAcknowledgement} disabled={busy} onChange={event => setOverlapAcknowledgement(event.target.checked ? overlapKey : '')} />{ko ? `${overlaps.map(place => place.name).join(', ')}와 영역이 겹치는 것을 확인했습니다.` : `I reviewed the overlapping places: ${overlaps.map(place => place.name).join(', ')}.`}</label>}
+      <div className="stay-name-actions"><button type="submit" className="primary-button" disabled={busy || conflict || needsAcknowledgement || !name.trim()}>{busy ? (ko ? '저장 중…' : 'Saving…') : (ko ? '저장' : 'Save')}</button><button type="button" className="secondary-button" disabled={busy} onClick={() => { setEditing(false); setError(''); setMessage(''); }}>{ko ? '취소' : 'Cancel'}</button></div>
       {error && <p role="alert">{error}</p>}
       {conflict && <button type="button" className="text-button" disabled={busy} onClick={() => void reload()}>{ko ? '최신 정보 확인' : 'Review latest places'}</button>}
       {message && <p role="status">{message}</p>}

@@ -631,7 +631,7 @@ function App() {
       setCategory("All"); setSearch(""); setDate("all"); setStripDateKey("ALL");
     }
   };
-  const renderPlaceName = (item: Extract<JournalItem, { kind: "stay" }>, compact = false) => !isDemo ? <StayPlaceName key={`${connection?.owner_user_id}:${connection?.session_id}:${item.id}`} item={item} journal={locationJournal} lang={lang} compact={compact} /> : null;
+  const renderPlaceName = (item: Extract<JournalItem, { kind: "stay" }>, compact = false, identity?: string) => !isDemo ? <StayPlaceName key={`${connection?.owner_user_id}:${connection?.session_id}:${identity ?? item.id}`} item={item} journal={locationJournal} lang={lang} compact={compact} /> : null;
   const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} readOnly={isDemo} records={records} onOpenRecording={onOpenRecording} lang={lang} renderPlaceName={renderPlaceName} />;
   const displayRecordings =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"

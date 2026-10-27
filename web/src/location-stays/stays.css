@@ -45,3 +45,5 @@
 .stay-name-actions { display: flex; gap: 8px; }
 .stay-place-name p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-secondary); }
 .ribbon-stay-row:has(.stay-place-name.is-editing) { height: auto; min-height: 64px; }
+.stay-place-name .stay-name-overlap { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; }
+.stay-name-overlap input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; padding: 0; margin: 2px 0 0; accent-color: var(--accent-rose); }

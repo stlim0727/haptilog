@@ -34,6 +34,6 @@ export function ribbonGroups(items: JournalItem[], allItems: JournalItem[]) {
       started_at: members.at(-1)!.stay.started_at,
       observed_duration_millis: members.reduce((total, member) => total + member.stay.observed_duration_millis, 0),
     } };
-    return [{ item, summary, members }];
+    return [{ key: group[0].id, item, summary, members }];
   });
 }

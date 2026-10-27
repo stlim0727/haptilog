@@ -71,7 +71,7 @@ type Props = {
   filteredItems: JournalItem[];
   stayEmptyMessage: string;
   locationLoaded: boolean;
-  renderPlaceName?: (item: Extract<JournalItem, { kind: "stay" }>, compact?: boolean) => React.ReactNode;
+  renderPlaceName?: (item: Extract<JournalItem, { kind: "stay" }>, compact?: boolean, identity?: string) => React.ReactNode;
   renderStay: (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording?: (recording: Recording) => void) => React.ReactNode;
   loaded: boolean;
   truncated: boolean;

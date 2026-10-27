@@ -51,3 +51,10 @@ test('clock-discontinuous sources cannot join a display group', () => {
   all[0].stay.clock_discontinuity=true;
   assert.equal(ribbonGroups(all,all).length,2);
 });
+test('group identity remains stable when a newer source becomes representative',()=>{
+  const before=make([stay('old','04:00','04:10')]);
+  const after=make([stay('old','04:00','04:10'),stay('new','04:13','04:23')]);
+  const [first]=ribbonGroups(before,before),[next]=ribbonGroups(after,after);
+  assert.equal(first.key,next.key);
+  assert.notEqual(first.item.id,next.item.id);
+});

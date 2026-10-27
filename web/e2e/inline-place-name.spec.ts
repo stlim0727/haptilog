@@ -81,3 +81,45 @@ test('acknowledged name remains visible if refreshing the journal fails',async({
   await expect(timeline.getByRole('form',{name:'Name this place'})).toHaveCount(0);
   expect(state.puts).toHaveLength(1);
 });
+test('overlapping place areas require explicit acknowledgement before inline save',async({page})=>{
+  const {state}=await staysFixture(page);
+  state.data.stays[0].representative_latitude=37.50135;
+  state.data.stays[0].accuracy_meters=80;
+  await page.goto('/',{waitUntil:'domcontentloaded'});
+  const timeline=page.locator('.journal-ribbons');
+  await timeline.getByRole('button',{name:'+ Save place',exact:true}).click();
+  const form=timeline.getByRole('form',{name:'Name this place'});
+  await form.getByLabel('Place name').fill('Nearby office');
+  const save=form.getByRole('button',{name:'Save',exact:true});
+  await expect(save).toBeDisabled();
+  expect(state.puts).toHaveLength(0);
+  const acknowledgement=form.getByRole('checkbox',{name:/I reviewed the overlapping places: Original cafe/});
+  await acknowledgement.check(); await expect(save).toBeEnabled();
+  state.data.places[0].revision=5;state.data.state.places_revision=5;
+  await page.clock.runFor(30001);
+  await expect(acknowledgement).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  await expect(form.getByLabel('Place name')).toHaveValue('Nearby office');
+});
+for(const width of [1280,390]) {
+  test(`newer grouped stay preserves an inline rename draft at ${width}px`,async({page})=>{
+    await page.setViewportSize({width,height:844});
+    const {state}=await staysFixture(page);
+    state.data.stays[0].last_observed_at='2026-10-26T05:40:00Z';
+    state.data.stays[0].observed_duration_millis=2400000;
+    await page.goto('/',{waitUntil:'domcontentloaded'});
+    const timeline=page.locator('.journal-ribbons');
+    await timeline.getByRole('button',{name:'Rename place',exact:true}).click();
+    const form=timeline.getByRole('form',{name:'Name this place'});
+    const input=form.getByLabel('Place name');
+    await input.fill('Draft while syncing');
+    state.data.stays.push({...state.data.stays[0],id:'66666666-6666-4666-8666-666666666666',started_at:'2026-10-26T05:42:00Z',qualified_at:'2026-10-26T05:52:00Z',last_observed_at:'2026-10-26T05:59:00Z',observed_duration_millis:1020000});
+    await page.clock.runFor(30001);
+    await expect(input).toHaveValue('Draft while syncing');
+    await expect(input).toBeFocused();
+    await expect(timeline.locator('.ribbon-stay-open')).toContainText('05:00–05:59');
+    await form.getByRole('button',{name:'Save',exact:true}).click();
+    await expect(timeline.locator('.ribbon-stay-open')).toContainText('Draft while syncing');
+    expect(state.puts).toHaveLength(1);
+  });
+}
