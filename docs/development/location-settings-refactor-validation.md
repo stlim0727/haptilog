@@ -32,3 +32,12 @@ Wear OS / Android 14, x86_64, 454×454 round display; APK includes matching nati
 ## Rollout boundary
 
 No production DB, Edge Function, website or Play Store deployment is included. Deploy the migration and compatible voice-enrich handler before the new watch build. The portal accepts legacy and combined server state. Real-device multi-hour battery/GPS validation remains separate from simulated elapsed-time tests.
+
+## Follow-up: Always scope and auto-resume
+
+The sentences above record the state that was validated at that time. Two parts were superseded after owner use, and the emulator evidence for them no longer describes the current build:
+
+- The third scope is labelled **Always** / **항상** instead of "Also when not recording", because selecting it is now meant to be the only action.
+- "Explicit restart returned to active collection" no longer applies. While the scope is Always, opening a HaptiLog screen resumes collection through `LocationTrackingService.ensureAlwaysSession`; the redundant start control was removed. The scope choice, `START_NOT_STICKY` and the notification Stop downgrade to Only when recording are unchanged, and no boot receiver was added, so collection after a reboot resumes on the next app open.
+
+See the decision request and its follow-up in [discussion #93](https://github.com/stlim0727/haptilog/discussions/93).

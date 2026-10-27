@@ -87,6 +87,34 @@ class LocationTrackingServiceTest {
         }
     }
 
+    @Test fun alwaysScopeResumesCollectionWhenAScreenOpens() {
+        for (scope in listOf(LocationCollection.OFF, LocationCollection.RECORDING_ONLY)) {
+            LocationCollection.save(application, scope)
+            LocationTrackingService.ensureAlwaysSession(application)
+            assertNull(shadowOf(application).peekNextStartedService())
+        }
+        LocationCollection.save(application, LocationCollection.INCLUDING_NON_RECORDING)
+        LocationTrackingService.ensureAlwaysSession(application)
+        val intent = shadowOf(application).peekNextStartedService()
+        assertEquals(LocationTrackingService::class.java.name, intent?.component?.className)
+        assertEquals(LocationTrackingService.ACTION_START, intent?.action)
+    }
+
+    @Test fun runningAlwaysSessionIsNotStartedAgainOnScreenEntry() {
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        val controller = controller()
+        controller.get().onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        LocationTrackingService.ensureAlwaysSession(application)
+        LocationTrackingService.ensureAlwaysSession(application)
+        assertNull(shadowOf(application).peekNextStartedService())
+        assertEquals(1, updates.requests)
+        controller.get().onStartCommand(Intent(application, LocationTrackingService::class.java)
+            .setAction(LocationTrackingService.ACTION_STOP), 0, 2)
+        await { !LocationTrackingService.isTracking.value }
+        controller.destroy()
+    }
+
     @Test fun permissionDeniedDoesNotStartOrRestartTracking() {
         val controller = controller()
         val service = controller.get()

@@ -62,7 +62,7 @@
             android:exported="false"
             android:foregroundServiceType="microphone|location" />
 
-        <!-- Explicitly started, visible location journal; never restarted automatically. -->
+        <!-- Visible location journal for the always scope; the platform never restarts it, a visible screen resumes it. -->
         <service
             android:name=".service.LocationTrackingService"
             android:exported="false"

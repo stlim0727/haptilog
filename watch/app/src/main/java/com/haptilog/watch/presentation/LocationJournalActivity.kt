@@ -229,24 +229,25 @@ class LocationJournalActivity : ComponentActivity() {
                                 if (limit < total) item { JournalAction(R.string.location_more) { limit += 30 } }
                                 item { JournalAction(R.string.location_back) { page = "home" } }
                             } else {
-                                item { JournalText(stringResource(if (active) R.string.location_running else R.string.location_stopped)) }
-                                item { JournalAction(R.string.location_scope_title, !busy) {
+                                item { FlexibleChip(enabled = !busy, onClick = {
                                     startActivity(Intent(this@LocationJournalActivity, LocationSettingsActivity::class.java))
-                                } }
-                                item { JournalText(stringResource(if (cloudManaged) R.string.location_sync_on else R.string.location_sync_off)) }
-                                item { JournalAction(R.string.cloud_sync_title, !busy) {
+                                }, label = { Text(stringResource(R.string.location_scope_title), maxLines = Int.MAX_VALUE) },
+                                    secondaryLabel = { Text(stringResource(if (active) R.string.location_running else R.string.location_stopped), maxLines = Int.MAX_VALUE) }) }
+                                item { FlexibleChip(enabled = !busy, onClick = {
                                     startActivity(Intent(this@LocationJournalActivity, SettingsActivity::class.java))
-                                } }
+                                }, label = { Text(stringResource(R.string.cloud_sync_title), maxLines = Int.MAX_VALUE) },
+                                    secondaryLabel = { Text(stringResource(if (cloudManaged) R.string.location_sync_on else R.string.location_sync_off), maxLines = Int.MAX_VALUE) }) }
                                 (notice ?: serviceNotice)?.let { item { JournalText(it) } }
+                                // Recovery is offered only for a reported failure, not for every stopped state.
+                                serviceNotice?.let { item { JournalAction(R.string.location_open_settings, !busy) {
+                                    startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        android.net.Uri.parse("package:$packageName")))
+                                } } }
                                 item { JournalText(stringResource(R.string.location_collection_summary)) }
                                 if (cloudManaged && active) item { JournalText(stringResource(R.string.location_sync_next_session)) }
                                 item { JournalText(stringResource(R.string.location_counts, history.points.size, history.stays.size)) }
                                 (history.latestSample ?: history.points.lastOrNull())?.let { point -> item { JournalText(stringResource(R.string.location_last_fix, journalTime(point.timestampMillis))) } }
                                 if (active && history.latestSample == null) item { JournalText(stringResource(R.string.location_waiting_fix)) }
-                                if (!active) item { JournalAction(R.string.location_open_settings, !busy) {
-                                    startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                        android.net.Uri.parse("package:$packageName")))
-                                } }
                                 item { JournalAction(R.string.location_events) { limit = 30; page = "events" } }
                                 item { DetailAction(onClick = { advanced = !advanced },
                                     label = { Text(stringResource(if (advanced) R.string.location_less_settings else R.string.location_more_settings)) }) }

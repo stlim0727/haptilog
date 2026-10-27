@@ -65,8 +65,6 @@ class LocationSettingsActivity : ComponentActivity() {
                         } }
                         if (selection == LocationCollection.INCLUDING_NON_RECORDING) {
                             item { Text(stringResource(if (active) R.string.location_running else R.string.location_scope_interrupted), textAlign = TextAlign.Center) }
-                            if (!active) item { DetailAction(onClick = { choose(selection) },
-                                label = { Text(stringResource(R.string.location_start)) }) }
                         }
                         listOf(R.string.location_scope_disclosure, R.string.location_scope_microphone,
                             R.string.location_scope_lifecycle).forEach { text -> item {
@@ -87,6 +85,7 @@ class LocationSettingsActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         selection = LocationCollection.load(this)
+        LocationTrackingService.ensureAlwaysSession(this)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
