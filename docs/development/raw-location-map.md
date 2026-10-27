@@ -125,3 +125,17 @@ continuous presence. Dashed orange circles and S pins show representative stay
 regions, distinct from raw GPS accuracy. Selecting a stay opens its original
 summary fields and full confirmed duration; overlap is not used to invent a
 partial duration or reconstruct hidden gaps.
+
+## Main journal sample stays
+
+Preview sample login also populates the ordinary main journal with four named
+stay summaries, alongside its existing voice recordings. No DEV panel is needed
+for list, type/search/date filters, shared map, calendar, related voice or stay
+inspection. The midnight stay appears on both observed local dates with one
+source identity. Sample stay details are read-only; reset recreates the synthetic
+journal, and no location RPC is used. Real connected owners keep the existing
+authorized stay snapshot and mutation path.
+
+The proposed main-list ribbon treatment is documented separately in
+`docs/design/concepts/2026-10-27-stay-ribbons/`. Those images/HTML are a design
+proposal and do not claim the production ribbon UI has been implemented.

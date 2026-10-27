@@ -163,7 +163,8 @@ function App() {
   }, [accountOpen]);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [checking, setChecking] = useState(true);
-  const locationJournal = useLocationJournal(connection?.owner_user_id, connection?.session_id, isDemoSessionActive());
+  const [sampleRevision, setSampleRevision] = useState(0);
+  const locationJournal = useLocationJournal(connection?.owner_user_id, connection?.session_id, isDemoSessionActive(), sampleRevision);
   const [placeRequest, setPlaceRequest] = useState(0);
   const [savePlaceStay, setSavePlaceStay] = useState<Stay | null>(null);
   const [savePlaceOwner, setSavePlaceOwner] = useState<string | undefined>();
@@ -434,6 +435,7 @@ function App() {
   }
 
   function resetSampleData() {
+    setSampleRevision(value => value + 1);
     const samples = generateSampleRecordings();
     saveStoredDemoRecords(samples);
     setRecords(samples);
@@ -442,7 +444,7 @@ function App() {
       message:
         lang === "ko"
           ? "샘플 데이터를 초기화했습니다."
-          : "Sample recordings reset.",
+          : "Sample journal reset.",
     });
   }
 
@@ -623,7 +625,7 @@ function App() {
       setCategory("All"); setSearch(""); setDate("all"); setStripDateKey("ALL");
     }
   };
-  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} records={records} onOpenRecording={onOpenRecording} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
+  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} readOnly={isDemo} records={records} onOpenRecording={onOpenRecording} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
   const displayRecordings =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
       ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)

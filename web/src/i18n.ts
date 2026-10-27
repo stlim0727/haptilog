@@ -45,11 +45,11 @@ export const translations = {
     preview_test_badge: "PR Preview / Demo",
     preview_divider_or: "OR TRY WITH SAMPLE DATA",
     preview_test_desc:
-      "Explore all features (review, timeline, map, calendar, mobile view, corrections) immediately with sample recordings—no watch required.",
+      "Explore the main journal with sample voice recordings and stays—no watch required.",
     preview_test_login_btn: "Explore with Sample Data (Test Login)",
     preview_banner_badge: "PR Preview Demo",
     preview_banner_text:
-      "Sample recordings loaded. All review, filter, and editing features are active.",
+      "Sample voice recordings and stays are shown together. Synthetic data only; nothing is uploaded.",
     preview_banner_reset: "Reset sample data",
     preview_banner_exit: "Exit demo",
     evening_review: "YOUR EVENING REVIEW",
@@ -233,11 +233,11 @@ export const translations = {
     preview_test_badge: "PR 프리뷰 / 데모",
     preview_divider_or: "또는 샘플 데이터로 둘러보기",
     preview_test_desc:
-      "워치 없이도 샘플 데이터(소비, 여행, 운동, 메모)로 웹 포털의 모든 기능(리뷰, 타임라인/지도, 캘린더, 모바일 뷰, 수정 등)을 즉시 둘러보세요.",
+      "워치 없이 샘플 음성·체류를 메인 기록 목록, 날짜 탐색, 지도와 상세 화면에서 함께 둘러보세요.",
     preview_test_login_btn: "샘플 데이터로 둘러보기 (테스트 로그인)",
     preview_banner_badge: "PR 프리뷰 데모",
     preview_banner_text:
-      "샘플 항목이 자동 생성되었습니다. 검토, 필터, 수정 등 모든 기능을 이용할 수 있습니다.",
+      "샘플 음성과 체류가 함께 표시됩니다. 실제 기록이 아닌 합성 데이터이며 서버로 전송하지 않습니다.",
     preview_banner_reset: "샘플 데이터 초기화",
     preview_banner_exit: "데모 종료",
     evening_review: "하루의 리뷰",

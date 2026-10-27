@@ -60,3 +60,17 @@ test("createDemoAudioBlob produces a valid WAV audio blob with RIFF header", asy
   assert.equal(header, "RIFF");
   assert.equal(wave, "WAVE");
 });
+
+test('main demo journal interleaves voice and named stay samples without cloud consent', async()=>{
+  const { sampleLocationJournal }=await import('./location-stays/demo.ts');
+  const { journalItems, relatedRecordings, journalDates }=await import('./journal.ts');
+  const { parseSnapshot }=await import('./location-stays/repository.ts');
+  const now=Date.now(), snapshot=sampleLocationJournal(now);
+  assert.equal(parseSnapshot(snapshot).stays.length,4);
+  assert.equal(snapshot.state.consent_enabled,false);
+  const records=generateSampleRecordings(), items=journalItems(records,snapshot.stays,snapshot.places,now);
+  assert.equal(items.filter(item=>item.kind==='stay').length,4);
+  assert.equal(items.filter(item=>item.kind==='voice').length,records.length);
+  assert.ok(relatedRecordings(records,snapshot.stays,'demo-stay-cafe',now).some(record=>record.id==='demo-rec-001'));
+  assert.ok(journalDates(items.find(item=>item.id==='demo-stay-overnight')).length===2);
+});

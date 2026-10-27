@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../client.ts';
+import { sampleLocationJournal } from './demo.ts';
 import { clearDismissals } from './dismissals.ts';
 import { createLocationRepository, LocationError } from './repository.ts';
 import type { Snapshot } from './repository.ts';
 
 /** A single owner/session-scoped source for the feed, inspector and settings. */
-export function useLocationJournal(owner: string | undefined, sessionId: string | undefined, isDemo: boolean) {
+export function useLocationJournal(owner: string | undefined, sessionId: string | undefined, isDemo: boolean, sampleRevision = 0) {
+  const sampleSnapshot = useMemo(() => isDemo && owner && sessionId ? sampleLocationJournal() : null, [isDemo, owner, sessionId, sampleRevision]);
   const key = owner && sessionId && !isDemo ? `${owner}:${sessionId}` : '';
   const repository = useMemo(() => key && supabase && owner ? createLocationRepository(owner, (name, args) => supabase!.rpc(name, args)) : null, [key, owner]);
   const [value, setValue] = useState<{ key: string; snapshot: Snapshot | null; error: string; checkedAt: number | null }>({ key: '', snapshot: null, error: '', checkedAt: null });
@@ -54,6 +56,6 @@ export function useLocationJournal(owner: string | undefined, sessionId: string 
     if (liveKey.current !== key || operationToken !== operationId.current) return;
     return load();
   }, [load, replace, owner, key]);
-  return { owner, repository, snapshot: value.key === key ? value.snapshot : null, error: value.key === key ? value.error : '', checkedAt: value.key === key ? value.checkedAt : null, now, load, replace, mutate };
+  return { owner, repository, snapshot: isDemo ? sampleSnapshot : value.key === key ? value.snapshot : null, error: value.key === key ? value.error : '', checkedAt: value.key === key ? value.checkedAt : null, now, load, replace, mutate };
 }
 export type LocationJournal = ReturnType<typeof useLocationJournal>;
