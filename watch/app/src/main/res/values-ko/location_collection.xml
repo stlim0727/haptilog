@@ -3,11 +3,11 @@
     <string name="location_scope_title">위치 기록</string>
     <string name="location_scope_off">끔</string>
     <string name="location_scope_recording">녹음할 때만</string>
-    <string name="location_scope_also">녹음하지 않을 때도</string>
+    <string name="location_scope_also">항상</string>
     <string name="location_scope_disclosure">녹음 밖에서는 직접 중지할 때까지 방문·체류를 기록하며 배터리를 사용합니다.</string>
     <string name="location_scope_microphone">마이크는 켜지지 않습니다. 클라우드 동기화는 별도 설정입니다.</string>
-    <string name="location_scope_lifecycle">앱 종료·재부팅·권한 변경으로 중지될 수 있습니다. 계속하려면 직접 다시 시작하세요.</string>
-    <string name="location_scope_interrupted">위치 기록 중지됨 · 계속하려면 다시 시작하세요</string>
+    <string name="location_scope_lifecycle">앱 종료·재부팅·권한 변경으로 중지될 수 있습니다. 앱을 다시 열면 자동으로 재개됩니다.</string>
+    <string name="location_scope_interrupted">위치 기록 중지됨 · 앱을 다시 열면 자동 재개</string>
     <string name="unified_cloud_scope">녹음·첨부 위치·장소·체류 기록</string>
     <string name="unified_cloud_disclosure">선택 기능 · 만 18세 이상. 기존 완료 녹음과 이후 녹음(음성·첨부 위치), 저장한 장소, 지난 7일의 남아 있는 체류를 Supabase에 동기화합니다. 원시 이동 점은 워치에만 남습니다. 음성과 녹음 시각은 Google Gemini에서 글로 변환하고 정리하며 위치는 Gemini에 보내지 않습니다. AI 결과는 틀릴 수 있습니다. 처음 켜면 워치 장소를 가져오고, 다시 켜면 클라우드 장소·체류 설정을 사용합니다. 체류는 7일 후 만료되고 장소는 삭제할 때까지 유지됩니다. 위치 수집을 자동으로 시작하지 않습니다.</string>
     <string name="unified_cloud_withdrawal">끄면 녹음과 위치 요약의 이후 전송을 중단하고 온라인에서 서버 동의를 철회합니다. 이미 보낸 요청은 완료될 수 있습니다. 기존 클라우드 사본은 별도로 삭제해야 합니다. 로컬 녹음은 계속 사용할 수 있습니다.</string>

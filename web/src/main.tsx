@@ -611,7 +611,7 @@ function App() {
     ? (lang === "ko" ? "조건에 맞는 체류가 없습니다." : "No stays match these filters.")
     : locationJournal.snapshot?.state.consent_enabled
       ? (lang === "ko" ? `아직 확인된 체류가 없어요. 한곳에 ${locationJournal.snapshot.state.threshold_minutes}분 이상 머무르면 기록돼요.` : `No stays confirmed yet. Stay in one area for at least ${locationJournal.snapshot.state.threshold_minutes} minutes.`)
-      : (lang === "ko" ? "워치에서 체류 기록을 시작하고 웹 동기화를 켜 주세요." : "Start stay recording on your watch and enable web sync to see places here.");
+      : (lang === "ko" ? "워치 설정에서 위치 기록을 켜고 클라우드 동기화를 허용하면 이곳에 표시됩니다." : "Turn on location recording in watch settings and allow cloud sync to see places here.");
   const filtered = filteredItems.flatMap(item => item.kind === "voice" ? [item.recording] : []);
   const activeItem = filteredItems.find(item => item.id === selected) ?? (selected ? undefined : filteredItems[0]);
   const active = activeItem?.kind === "voice" ? activeItem.recording : undefined;

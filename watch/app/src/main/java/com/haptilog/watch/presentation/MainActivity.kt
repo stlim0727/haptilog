@@ -32,6 +32,7 @@ import com.haptilog.watch.R
 import com.haptilog.watch.data.RecordingItem
 import com.haptilog.watch.data.RecordingRepository
 import com.haptilog.watch.presentation.audio.WatchAudioPlayer
+import com.haptilog.watch.service.LocationTrackingService
 import com.haptilog.watch.service.VoiceRecordingService
 import kotlinx.coroutines.launch
 
@@ -271,6 +272,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         entryState.resumed()
         cloudSyncEnabled = RecordingSyncWorker.enabled(this)
+        LocationTrackingService.ensureAlwaysSession(this)
         repository.refresh()
     }
 

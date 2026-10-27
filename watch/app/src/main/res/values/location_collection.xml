@@ -3,11 +3,11 @@
     <string name="location_scope_title">Location recording</string>
     <string name="location_scope_off">Off</string>
     <string name="location_scope_recording">Only when recording</string>
-    <string name="location_scope_also">Also when not recording</string>
+    <string name="location_scope_also">Always</string>
     <string name="location_scope_disclosure">Outside recordings, saves visits and stays until you stop it. Uses battery.</string>
     <string name="location_scope_microphone">The microphone stays off. Cloud sync is a separate choice.</string>
-    <string name="location_scope_lifecycle">System termination, reboot or permission changes may stop collection. Start it again explicitly.</string>
-    <string name="location_scope_interrupted">Location recording stopped · start again to continue</string>
+    <string name="location_scope_lifecycle">System termination, reboot or permission changes may stop collection. Opening the app resumes it.</string>
+    <string name="location_scope_interrupted">Location recording stopped · resumes when you open the app</string>
     <string name="unified_cloud_scope">Recordings, attached location, places and stays</string>
     <string name="unified_cloud_disclosure">Optional · Adults 18+. Syncs completed recordings (including existing audio and attached location), saved places and retained stays from the past 7 days to Supabase. Raw movement points stay on the watch. Audio and recording time go to Google Gemini for transcription and organization; location is not sent to Gemini. AI may be wrong. First enable imports local places; later enables use cloud places and stay settings. Stays expire after 7 days; places remain until deleted. This does not start location collection.</string>
     <string name="unified_cloud_withdrawal">Turning off stops future uploads of recordings and location summaries. Server withdrawal retries when online. Requests already sent may finish. Existing cloud copies remain until separately deleted. Local recording continues.</string>

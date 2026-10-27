@@ -53,6 +53,25 @@ class LocationTrackingService : Service() {
         val isTracking: StateFlow<Boolean> = mutableIsTracking
         private val mutableStatus = MutableStateFlow<String?>(null)
         val status: StateFlow<String?> = mutableStatus
+        /**
+         * The Always scope is a standing instruction, so a visible screen resumes collection
+         * after an interruption rather than asking for the same consent twice. startTracking
+         * re-checks permission, device location and notifications and refuses any other scope.
+         */
+        fun ensureAlwaysSession(context: Context) {
+            if (LocationCollection.load(context) != LocationCollection.INCLUDING_NON_RECORDING ||
+                isTracking.value) return
+            try {
+                // Plain startService, not startForegroundService: a refused start would never
+                // reach startForeground() and the system kills the process five seconds later.
+                // startTracking promotes itself, which is allowed because callers are visible.
+                context.startService(Intent(context, LocationTrackingService::class.java)
+                    .setAction(ACTION_START))
+            } catch (_: RuntimeException) {
+                // The platform can refuse the request outright; the screens then simply show
+                // the scope as not recording, as they did before this helper existed.
+            }
+        }
         // Accessed only on Main. A destroyed service may still be draining disk writes.
         private var owner: LocationTrackingService? = null
     }
