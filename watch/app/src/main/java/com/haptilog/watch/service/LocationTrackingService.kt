@@ -62,8 +62,11 @@ class LocationTrackingService : Service() {
             if (LocationCollection.load(context) != LocationCollection.INCLUDING_NON_RECORDING ||
                 isTracking.value) return
             try {
-                ContextCompat.startForegroundService(context,
-                    Intent(context, LocationTrackingService::class.java).setAction(ACTION_START))
+                // Plain startService, not startForegroundService: a refused start would never
+                // reach startForeground() and the system kills the process five seconds later.
+                // startTracking promotes itself, which is allowed because callers are visible.
+                context.startService(Intent(context, LocationTrackingService::class.java)
+                    .setAction(ACTION_START))
             } catch (_: RuntimeException) {
                 // A refused start leaves the failure reason in status for the caller to show.
             }

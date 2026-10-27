@@ -62,6 +62,9 @@ class LocationJournalActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         cloudManaged = LocationConsent.enabled(this)
+        // The journal is reachable from Settings without passing the main screen, so it
+        // re-affirms the Always scope itself rather than showing a stopped state.
+        LocationTrackingService.ensureAlwaysSession(this)
     }
 
     private val permissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {

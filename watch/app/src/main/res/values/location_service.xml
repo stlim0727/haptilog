@@ -5,10 +5,10 @@
     <string name="location_service_title">HaptiLog location journal</string>
     <string name="location_service_body">Recording places and stays until stopped</string>
     <string name="location_service_stop">Stop location recording</string>
-    <string name="location_service_permission_required">Location recording stopped. Allow precise location to start again.</string>
-    <string name="location_service_disabled">Location recording stopped. Turn on device location to start again.</string>
+    <string name="location_service_permission_required">Stopped · allow precise location. It resumes when you open the app.</string>
+    <string name="location_service_disabled">Stopped · turn on device location. It resumes when you open the app.</string>
     <string name="location_service_notifications_required">Location recording stopped. Enable HaptiLog notifications and the Location journal channel so the recording status and stop button stay visible.</string>
-    <string name="location_service_start_error">Could not start location recording. Open the journal and try again.</string>
-    <string name="location_service_provider_error">Location recording stopped because location updates are unavailable. Try again.</string>
+    <string name="location_service_start_error">Could not start location recording. Reopen the app to try again.</string>
+    <string name="location_service_provider_error">Location recording stopped because location updates are unavailable. It resumes when you open the app.</string>
     <string name="location_service_storage_error">Location recording stopped because the watch could not save the journal.</string>
 </resources>

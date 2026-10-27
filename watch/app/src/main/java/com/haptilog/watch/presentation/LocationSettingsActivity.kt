@@ -119,8 +119,7 @@ class LocationSettingsActivity : ComponentActivity() {
             LocationCollection.save(this, scope)
             selection = scope
             if (scope == LocationCollection.INCLUDING_NON_RECORDING) {
-                ContextCompat.startForegroundService(this, Intent(this, LocationTrackingService::class.java)
-                    .setAction(LocationTrackingService.ACTION_START))
+                LocationTrackingService.ensureAlwaysSession(this)
             } else if (LocationTrackingService.isTracking.value) {
                 startService(Intent(this, LocationTrackingService::class.java).setAction(LocationTrackingService.ACTION_STOP))
             }
