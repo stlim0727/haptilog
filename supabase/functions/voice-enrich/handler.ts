@@ -116,7 +116,7 @@ export function createHandler(deps: Dependencies) {
         const { data: consents, error } = await admin.from("cloud_consents")
           .select("user_id,enabled,policy_version,adult_attested_at").in("user_id", requiredUsers);
         if (error) return "CONSENT_UNAVAILABLE";
-        return requiredUsers.every((id) => consents?.some((c) => c.user_id === id && c.enabled && c.adult_attested_at && c.policy_version === "2026-10-18"))
+        return requiredUsers.every((id) => consents?.some((c) => c.user_id === id && c.enabled && c.adult_attested_at && ["2026-10-18", "2026-10-26-unified"].includes(c.policy_version)))
           ? null : "CONSENT_REQUIRED";
       };
       const consentFailure = await consentStatus();

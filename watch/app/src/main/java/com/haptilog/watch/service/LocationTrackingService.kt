@@ -28,7 +28,7 @@ import com.haptilog.watch.sync.LocationSyncWorker
 import com.haptilog.watch.R
 import com.haptilog.watch.data.location.LocationHistoryRepository
 import com.haptilog.watch.data.location.LocationStayEndReason
-import com.haptilog.watch.data.location.LocationSessionDuration
+import com.haptilog.watch.data.location.LocationCollection
 import com.haptilog.watch.data.location.LocationSample
 import com.haptilog.watch.presentation.LocationJournalActivity
 import kotlinx.coroutines.CoroutineScope
@@ -75,15 +75,11 @@ class LocationTrackingService : Service() {
     private var started = false
     private var stopping = false
     private var receiverRegistered = false
-    private var sessionDeadline = Long.MAX_VALUE
-    private var sessionDuration = LocationSessionDuration.EIGHT_HOURS
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
             if (!started || stopping) return
-            if (SystemClock.elapsedRealtime() >= sessionDeadline) {
-                stopTracking(getString(R.string.location_service_timeout), LocationStayEndReason.SESSION_TIMEOUT)
-            } else writes.trySend(Write.Samples(result.locations))
+            writes.trySend(Write.Samples(result.locations))
         }
     }
 
@@ -175,7 +171,12 @@ class LocationTrackingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> startTracking()
-            ACTION_STOP -> stopTracking()
+            ACTION_STOP -> {
+                if (LocationCollection.load(this) == LocationCollection.INCLUDING_NON_RECORDING) {
+                    LocationCollection.save(this, LocationCollection.RECORDING_ONLY)
+                }
+                stopTracking()
+            }
             else -> if (!started) stopSelf()
         }
         // Never resume location tracking after a process kill, reboot, or an OS restart.
@@ -184,6 +185,10 @@ class LocationTrackingService : Service() {
 
     private fun startTracking() {
         if (started || stopping) return
+        if (LocationCollection.load(this) != LocationCollection.INCLUDING_NON_RECORDING) {
+            stopTracking()
+            return
+        }
         if (owner != null && owner !== this) {
             stopSelf()
             return
@@ -200,7 +205,6 @@ class LocationTrackingService : Service() {
             stopTracking(getString(R.string.location_service_notifications_required), LocationStayEndReason.NOTIFICATIONS_DISABLED)
             return
         }
-        sessionDuration = LocationSessionDuration.load(applicationContext)
         try {
             startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
         } catch (_: RuntimeException) {
@@ -212,7 +216,6 @@ class LocationTrackingService : Service() {
         mutableIsTracking.value = true
         mutableStatus.value = null
         val sessionStartElapsed = SystemClock.elapsedRealtime()
-        sessionDeadline = sessionDuration.millis?.let { sessionStartElapsed + it } ?: Long.MAX_VALUE
         writes.trySend(Write.Start(sessionStartElapsed))
         mainScope.launch {
             while (started && !stopping) {
@@ -222,8 +225,6 @@ class LocationTrackingService : Service() {
                     !hasPreciseLocationPermission() -> stopTracking(getString(R.string.location_service_permission_required), LocationStayEndReason.PERMISSION_LOST)
                     !isLocationEnabled() -> stopTracking(getString(R.string.location_service_disabled), LocationStayEndReason.LOCATION_DISABLED)
                     !notificationsEnabled() -> stopTracking(getString(R.string.location_service_notifications_required), LocationStayEndReason.NOTIFICATIONS_DISABLED)
-                    SystemClock.elapsedRealtime() >= sessionDeadline ->
-                        stopTracking(getString(R.string.location_service_timeout), LocationStayEndReason.SESSION_TIMEOUT)
                 }
             }
         }
@@ -249,11 +250,6 @@ class LocationTrackingService : Service() {
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60_000L)
             .setMinUpdateIntervalMillis(30_000L)
             .setMaxUpdateAgeMillis(0L)
-            .apply {
-                if (sessionDuration.millis != null) {
-                    setDurationMillis((sessionDeadline - SystemClock.elapsedRealtime()).coerceAtLeast(1))
-                }
-            }
             .build()
         try {
             locationUpdates!!.request(request, locationCallback, registered = {
@@ -317,7 +313,7 @@ class LocationTrackingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_mylocation)
             .setContentTitle(getString(R.string.location_service_title))
-            .setContentText(getString(R.string.location_service_body, getString(sessionDuration.label)))
+            .setContentText(getString(R.string.location_service_body))
             .setContentIntent(open)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
             .setOngoing(true)

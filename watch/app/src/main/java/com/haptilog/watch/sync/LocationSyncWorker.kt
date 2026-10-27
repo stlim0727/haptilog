@@ -14,7 +14,7 @@ import org.json.JSONObject
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
-/** Separate scheduling: a watch with no audio consent or recordings still syncs places. */
+/** Independent scheduling: location sync must also run when there are no recordings. */
 class LocationSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     companion object {
         private val mutex = Mutex()
@@ -101,6 +101,7 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
 
     override suspend fun doWork(): Result = mutex.withLock { withContext(Dispatchers.IO) {
         val context = applicationContext
+        val consentGeneration = CloudConsent.generation(context)
         val prefs = LocationConsent.preferences(context)
         if (!CloudClient.configured || (!LocationConsent.enabled(context) && !prefs.getBoolean("revoke_pending", false)))
             return@withContext Result.success()
@@ -121,7 +122,8 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
             }
             if (!LocationConsent.enabled(context)) return@withContext Result.success()
             if (!state.getBoolean("consent_enabled")) {
-                check(prefs.edit().putBoolean("enabled", false).remove("checkpoint").remove("pending_places").commit())
+                CloudConsent.observeWithdrawal(context, consentGeneration)
+                check(prefs.edit().remove("checkpoint").remove("pending_places").commit())
                 return@withContext Result.success()
             }
             val epoch = state.getLong("sync_epoch")
@@ -180,7 +182,8 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
         catch (error: AuthSessionException) { Result.failure() }
         catch (error: LocationSyncException) {
             if (error.error == "CONSENT_REQUIRED") {
-                check(prefs.edit().putBoolean("enabled", false).remove("pending_places").commit())
+                CloudConsent.observeWithdrawal(context, consentGeneration)
+                check(prefs.edit().remove("pending_places").commit())
                 Result.success()
             } else if (error.error in setOf("INVALID_PAYLOAD", "FORBIDDEN")) Result.failure() else Result.retry()
         } catch (_: Exception) { Result.retry() }

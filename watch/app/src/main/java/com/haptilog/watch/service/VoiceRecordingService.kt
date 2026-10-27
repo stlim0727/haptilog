@@ -69,6 +69,12 @@ class VoiceRecordingService : Service() {
     private var elapsedStartMs: Long = 0L
     private var accumulatedElapsedMs: Long = 0L
     private var metadata = JSONObject()
+    private val collectionListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "scope" && !com.haptilog.watch.data.location.LocationCollection.load(this).includesRecordings) {
+            locationJob?.cancel()
+            locationJob = null
+        }
+    }
     private var locationJob: Job? = null
     private var timerJob: Job? = null
 
@@ -81,6 +87,7 @@ class VoiceRecordingService : Service() {
         super.onCreate()
         hapticManager = HapticHeartbeatManager(this)
         locationProvider = LocationSnapshotProvider(this)
+        getSharedPreferences("location_collection", MODE_PRIVATE).registerOnSharedPreferenceChangeListener(collectionListener)
         createNotificationChannel()
 
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -117,7 +124,8 @@ class VoiceRecordingService : Service() {
 
         try {
             val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                if (locationProvider.hasLocationPermission() && locationProvider.isLocationEnabled())
+                if (com.haptilog.watch.data.location.LocationCollection.load(this).includesRecordings &&
+                    locationProvider.hasLocationPermission() && locationProvider.isLocationEnabled())
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
             startForeground(NOTIFICATION_ID, buildForegroundNotification(), type)
             wakeLock?.acquire(MAX_RECORDING_MS + 5000L)
@@ -163,9 +171,10 @@ class VoiceRecordingService : Service() {
             startTimer()
 
             val sessionId = currentSessionId
-            locationJob = serviceScope.launch {
+            if (com.haptilog.watch.data.location.LocationCollection.load(this).includesRecordings) locationJob = serviceScope.launch {
                 locationProvider.capture { loc ->
-                    if (_isRecording.value && currentSessionId == sessionId) {
+                    if (_isRecording.value && currentSessionId == sessionId &&
+                        com.haptilog.watch.data.location.LocationCollection.load(this@VoiceRecordingService).includesRecordings) {
                         saveMetadataSnapshot(loc)
                     }
                 }
@@ -396,6 +405,7 @@ class VoiceRecordingService : Service() {
     }
 
     override fun onDestroy() {
+        getSharedPreferences("location_collection", MODE_PRIVATE).unregisterOnSharedPreferenceChangeListener(collectionListener)
         if (_isRecording.value) stopRecording()
         serviceScope.cancel()
         runCatching { mediaRecorder?.release() }

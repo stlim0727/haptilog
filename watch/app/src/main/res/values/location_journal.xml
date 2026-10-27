@@ -28,7 +28,7 @@
     <string name="location_more">Show more</string>
     <string name="location_running">Recording stays</string>
     <string name="location_stopped">Stay recording off</string>
-    <string name="location_disclosure">Saves places and time spent on this watch, even with the screen off. Uses battery; runs for your selected duration. Web sync is optional below.</string>
+    <string name="location_disclosure">Saves places and time spent on this watch, even with the screen off. Uses battery; records until stopped. Manage cloud sync in Settings.</string>
     <string name="location_stop">Stop stay recording</string>
     <string name="location_start">Start stay recording</string>
     <string name="location_counts">%1$d points · %2$d stays</string>
@@ -47,14 +47,8 @@
     <string name="location_stay_gap">Stay · location observations stopped</string>
     <string name="location_stay_interrupted">Stay · tracking interrupted</string>
     <string name="location_manage_on_web">Place and stay settings are managed on the web while location sync is enabled.</string>
-    <string name="location_disclosure_synced">Records places and time spent while running. Uses battery; runs for your selected duration. Stay summaries sync to the web; movement trails stay on this watch.</string>
+    <string name="location_disclosure_synced">Records places and time spent while running. Uses battery; records until stopped. Stay summaries sync to the web; movement trails stay on this watch.</string>
     <string name="location_more_settings">More settings</string>
     <string name="location_less_settings">Hide settings</string>
     <string name="location_collection_summary">Uses battery · stop at any time</string>
-    <string name="location_duration_title">Recording duration</string>
-    <string name="location_duration_setting">Duration · %1$s</string>
-    <string name="location_duration_eight">8 hours</string>
-    <string name="location_duration_day">24 hours</string>
-    <string name="location_duration_continuous">Continuous</string>
-    <string name="location_duration_hint">Continuous records until you stop. The system, reboot or permission changes may stop it; it will not restart automatically.</string>
 </resources>

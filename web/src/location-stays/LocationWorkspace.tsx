@@ -82,6 +82,7 @@ export function LocationWorkspace({ owner, repository, journal, initialStay, lan
   const stays = snapshot?.stays.filter(stay => visibleStay(stay, now)) ?? [];
   const places = snapshot?.places ?? [];
   const suggestions = useMemo(() => snapshot?.state.consent_enabled ? recommendPlaces({ owner, stays: snapshot.stays, places: snapshot.places, dismissed: dismissals, now, timeZone }) : [], [snapshot, owner, dismissals, now, timeZone]);
+  const combined = snapshot?.state.consent_scope === "all_records";
   const newPlace = (latitude = 37.5, longitude = 127) => {
     if (!snapshot) return;
     setEditor({ initial: { name: "", latitude, longitude, radius_meters: 200 }, revision: snapshot.state.places_revision });
@@ -89,7 +90,8 @@ export function LocationWorkspace({ owner, repository, journal, initialStay, lan
   const errorText = error === "UNAVAILABLE" ? (ko ? "장소 기능을 아직 사용할 수 없습니다. 음성 기록은 계속 사용할 수 있습니다." : "Places are not available on this server yet. Voice recordings remain available.") :
     error === "FORBIDDEN" ? (ko ? "위치 정보 접근 권한이 만료되었습니다. 워치를 다시 연결하세요." : "Location access expired. Reconnect your watch.") :
       error === "REVISION_CONFLICT" || error === "EPOCH_CONFLICT" ? (ko ? "다른 변경이 있습니다. 새로고침 후 내용을 확인하고 다시 시도하세요." : "Data changed elsewhere. Refresh, review and retry.") :
-        error === "CONSENT_REQUIRED" ? (ko ? "장소·체류 동기화에 별도 동의가 필요합니다." : "Separate location synchronization consent is required.") :
+        error === "UPDATE_REQUIRED" ? (ko ? "워치 설정에서 전체 클라우드 동기화를 켜 주세요." : "Enable combined cloud sync in watch settings.") :
+        error === "CONSENT_REQUIRED" ? (ko ? "워치에서 클라우드 동기화를 켜 주세요." : "Enable cloud sync on your watch.") :
           (ko ? "위치 정보를 불러오거나 변경하지 못했습니다. 연결 상태를 확인하고 다시 시도하세요." : "Could not load or update location data. Check your connection and retry.");
   return <section className="location-workspace" aria-label={ko ? "장소 설정" : "Place settings"}>
     <h2>{ko ? "장소 설정" : "Place settings"}</h2>
@@ -101,19 +103,21 @@ export function LocationWorkspace({ owner, repository, journal, initialStay, lan
     {!snapshot && !error && <p role="status">{ko ? "위치 정보를 불러오는 중…" : "Loading location data…"}</p>}
     {snapshot && <>
       <section aria-label={ko ? "위치 동기화 설정" : "Location synchronization settings"}>
-        <h3>{ko ? "웹에도 표시" : "Show on the web"}</h3>
+        <h3>{combined ? (ko ? "클라우드 동기화" : "Cloud sync") : (ko ? "웹에도 표시" : "Show on the web")}</h3>
         <p role="status">{snapshot.state.consent_enabled ? (ko ? "동기화 켜짐 · 워치가 연결되면 업로드합니다." : "Sync on · uploads when the watch connects.") : (ko ? "동기화 꺼짐" : "Sync off")}</p>
         <p>{ko ? "저장한 장소와 체류 위치·시간·정확도를 서버에 보냅니다. 체류는 시작 후 7일간 보관합니다. 이동 경로는 워치에만 남습니다." : "Sends saved places and stay locations, times and accuracy to the server. Stays are kept for seven days from their start. Movement trails stay on your watch."}</p>
-        <details><summary>{ko ? "동기화 자세히 보기" : "About synchronization"}</summary><p>{ko ? "음성 클라우드 동의와 별개입니다. 저장한 장소와 체류 대표 좌표·시각·위치 정확도가 서버로 전송됩니다. 원시 이동 경로는 업로드하지 않습니다. 체류는 시작 후 7일 보존되며, 내 장소는 삭제할 때까지 유지됩니다. 위치 기록은 Gemini에 보내지 않습니다. 수집과 워치의 웹 동기화는 워치에서 직접 켜야 합니다." : "Separate from voice cloud consent. Saved places and stay summary coordinates, times and accuracy are sent to the server. Raw movement trails are not uploaded. Stays expire seven days after starting; saved places remain until deleted. Location journal data is not sent to Gemini. Enabling sync here does not start collection or activate a watch that has never opted in; enable web sync on the watch too."}</p></details>
-        {!snapshot.state.consent_enabled && <label><input type="checkbox" checked={backfill} disabled={busy} onChange={e => setBackfill(e.target.checked)} />{ko ? "이전에 기록한 체류도 포함 · 워치에 남아 있는 최근 7일" : "Include previous stays · retained on the watch from the last seven days"}</label>}
-        {!snapshot.state.consent_enabled && <p className="location-secondary">{ko ? "이미 시작한 체류도 표시하려면 이전 체류 포함을 켜세요." : "Include previous stays to show a stay that has already started."}</p>}
-        <button type="button" disabled={busy} onClick={() => {
+        {combined && <p>{ko ? "워치의 공통 설정입니다. 끄면 녹음·첨부 위치·장소·체류의 이후 업로드를 함께 중단합니다. 다시 켜려면 워치 설정에서 동의하세요. 위치 수집은 별도입니다." : "Shared with your watch. Turning off stops future uploads of recordings, attached location, places and stays. Enable it again from watch settings. Collection is separate."}</p>}
+        {!combined && <details><summary>{ko ? "동기화 자세히 보기" : "About synchronization"}</summary><p>{ko ? "음성 클라우드 동의와 별개입니다. 저장한 장소와 체류 대표 좌표·시각·위치 정확도가 서버로 전송됩니다. 원시 이동 경로는 업로드하지 않습니다. 체류는 시작 후 7일 보존되며, 내 장소는 삭제할 때까지 유지됩니다. 위치 기록은 Gemini에 보내지 않습니다. 수집과 워치의 웹 동기화는 워치에서 직접 켜야 합니다." : "Separate from voice cloud consent. Saved places and stay summary coordinates, times and accuracy are sent to the server. Raw movement trails are not uploaded. Stays expire seven days after starting; saved places remain until deleted. Location journal data is not sent to Gemini. Enabling sync here does not start collection or activate a watch that has never opted in; enable web sync on the watch too."}</p></details>}
+        {!combined && !snapshot.state.consent_enabled && <label><input type="checkbox" checked={backfill} disabled={busy} onChange={e => setBackfill(e.target.checked)} />{ko ? "이전에 기록한 체류도 포함 · 워치에 남아 있는 최근 7일" : "Include previous stays · retained on the watch from the last seven days"}</label>}
+        {!combined && !snapshot.state.consent_enabled && <p className="location-secondary">{ko ? "이미 시작한 체류도 표시하려면 이전 체류 포함을 켜세요." : "Include previous stays to show a stay that has already started."}</p>}
+        {combined && !snapshot.state.consent_enabled && <p>{ko ? "워치 설정에서 클라우드 동기화를 켜 주세요." : "Enable cloud sync in watch settings."}</p>}
+        {(!combined || snapshot.state.consent_enabled) && <button type="button" disabled={busy} onClick={() => {
           const state = snapshot.state;
           void perform(async () => {
             await repository.consent(!state.consent_enabled, state.consent_revision, backfill);
             if (state.consent_enabled) { setEditor(null); clearDismissals(localStorage, owner); setDismissals([]); }
           }, state.consent_enabled ? (ko ? "앞으로의 업로드를 중단했어요. 이미 업로드한 기록은 남아 있어요. 오프라인 워치는 다음 연결 때 적용됩니다." : "Future uploads are stopped. Previously uploaded records remain. Offline watches receive the change on their next connection.") : (ko ? "설정을 저장했습니다. 워치에서도 웹 동기화를 켜 주세요." : "Saved. Enable web sync on the watch too."));
-        }}>{snapshot.state.consent_enabled ? (ko ? "동기화 끄기" : "Turn off sync") : (ko ? "동의하고 동기화 켜기" : "Agree and enable sync")}</button>
+        }}>{snapshot.state.consent_enabled ? (ko ? "동기화 끄기" : "Turn off sync") : (ko ? "동의하고 동기화 켜기" : "Agree and enable sync")}</button>}
         <p>{ko ? "동의 철회는 기존 서버 데이터를 삭제하지 않습니다. 아래 삭제 기능을 별도로 사용하세요. 오프라인 워치는 다음 연결 때 변경을 받습니다." : "Revoking consent does not delete existing server data. Use deletion separately below. Offline watches receive changes on their next connection."}</p>
         {snapshot.state.consent_enabled && <label>{ko ? "공통 체류 기준" : "Shared stay threshold"}
           <select disabled={busy} value={snapshot.state.threshold_minutes} onChange={e => {

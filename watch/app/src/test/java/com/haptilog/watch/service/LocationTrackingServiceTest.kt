@@ -14,7 +14,7 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.haptilog.watch.data.location.LocationHistoryRepository
 import com.haptilog.watch.data.location.LocationStayEndReason
-import com.haptilog.watch.data.location.LocationSessionDuration
+import com.haptilog.watch.data.location.LocationCollection
 import com.haptilog.watch.data.location.LocationSample
 import com.haptilog.watch.R
 import org.junit.Assert.*
@@ -37,6 +37,8 @@ class LocationTrackingServiceTest {
         application = RuntimeEnvironment.getApplication()
         updates = FakeUpdates()
         application.getSharedPreferences("location_collection", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        application.getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).edit().clear().commit()
+        LocationCollection.save(application, LocationCollection.INCLUDING_NON_RECORDING)
         // The WorkManager singleton can survive between Robolectric SDK variants.
         // Initialize only when the test application has no instance yet.
         try { androidx.work.WorkManager.getInstance(application) }
@@ -58,6 +60,31 @@ class LocationTrackingServiceTest {
         shadowOf(application).denyPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
         shadowOf(application.getSystemService(LocationManager::class.java)).setLocationEnabled(true)
         shadowOf(application.getSystemService(NotificationManager::class.java)).setNotificationsEnabled(true)
+    }
+
+    @Test fun collectionScopeAndCloudChoiceHaveSixIndependentCombinations() {
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        for (scope in LocationCollection.entries) for (cloud in listOf(false, true)) {
+            application.getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).edit()
+                .putBoolean("enabled", cloud).putString("consent_version", com.haptilog.watch.sync.CloudConsent.VERSION).commit()
+            LocationCollection.save(application, scope)
+            updates = FakeUpdates()
+            val controller = controller()
+            val service = controller.get()
+            service.onStartCommand(startIntent(), 0, 1)
+            if (scope == LocationCollection.INCLUDING_NON_RECORDING) {
+                await { updates.requests == 1 }
+                assertTrue(LocationTrackingService.isTracking.value)
+                service.onStartCommand(Intent(application, LocationTrackingService::class.java)
+                    .setAction(LocationTrackingService.ACTION_STOP), 0, 2)
+                await { !LocationTrackingService.isTracking.value }
+            } else {
+                assertFalse(LocationTrackingService.isTracking.value)
+                assertEquals(0, updates.requests)
+            }
+            assertEquals(cloud, com.haptilog.watch.sync.RecordingSyncWorker.enabled(application))
+            controller.destroy()
+        }
     }
 
     @Test fun permissionDeniedDoesNotStartOrRestartTracking() {
@@ -130,11 +157,12 @@ class LocationTrackingServiceTest {
         assertNotNull(shadowOf(service).lastForegroundNotification)
         service.onStartCommand(startIntent(), 0, 2)
         assertEquals(1, updates.requests)
-        assertTrue(updates.request!!.durationMillis in 1..LocationSessionDuration.EIGHT_HOURS.millis!!)
+        assertEquals(Long.MAX_VALUE, updates.request!!.durationMillis)
         service.onStartCommand(Intent(application, LocationTrackingService::class.java)
             .setAction(LocationTrackingService.ACTION_STOP), 0, 3)
         await { !LocationTrackingService.isTracking.value }
         assertTrue(updates.removals > 0)
+        assertEquals(LocationCollection.RECORDING_ONLY, LocationCollection.load(application))
         // Stopped is published only after the repository permits edits again.
         LocationHistoryRepository.get(application).setDwellMinutes(10)
         assertTrue(shadowOf(service).isStoppedBySelf)
@@ -193,8 +221,9 @@ class LocationTrackingServiceTest {
     @Test fun downloadedSettingsApplyBeforeNextSessionAndRecordAppliedRevision() {
         shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
         val prefs = application.getSharedPreferences("location_sync", android.content.Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("enabled", true)
-            .putString("policy_version", com.haptilog.watch.sync.LocationConsent.POLICY_VERSION)
+        application.getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).edit()
+            .putBoolean("enabled", true).putString("consent_version", com.haptilog.watch.sync.CloudConsent.VERSION).commit()
+        prefs.edit()
             .putString("pending_places", org.json.JSONObject().put("revision", 11).put("owner_user_id", "owner")
                 .put("threshold_minutes", 20).put("places", org.json.JSONArray().put(org.json.JSONObject()
                     .put("id", "33333333-3333-4333-8333-333333333333").put("name", "Office")
@@ -229,42 +258,7 @@ class LocationTrackingServiceTest {
         controller.destroy()
     }
 
-    @Test fun defaultEightHourSessionStopsAtItsDeadline() {
-        assertEquals(LocationSessionDuration.EIGHT_HOURS, LocationSessionDuration.load(application))
-        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
-        val controller = controller()
-        controller.get().onStartCommand(startIntent(), 0, 1)
-        await { updates.requests == 1 }
-        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofHours(8))
-        updates.callback!!.onLocationResult(com.google.android.gms.location.LocationResult.create(emptyList()))
-        await { !LocationTrackingService.isTracking.value }
-        assertEquals(application.getString(R.string.location_service_timeout), LocationTrackingService.status.value)
-        controller.destroy()
-    }
-
-    @Test fun daySessionSurvivesEightHoursAndStopsAtTwentyFour() {
-        LocationSessionDuration.save(application, LocationSessionDuration.TWENTY_FOUR_HOURS)
-        assertEquals(LocationSessionDuration.TWENTY_FOUR_HOURS, LocationSessionDuration.load(application))
-        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
-        val controller = controller()
-        controller.get().onStartCommand(startIntent(), 0, 1)
-        await { updates.requests == 1 }
-        assertTrue(updates.request!!.durationMillis > 23 * 60 * 60 * 1_000L)
-        // A later preference write must not mutate an already running session.
-        LocationSessionDuration.save(application, LocationSessionDuration.EIGHT_HOURS)
-        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofHours(8))
-        updates.callback!!.onLocationResult(com.google.android.gms.location.LocationResult.create(emptyList()))
-        shadowOf(Looper.getMainLooper()).idle()
-        assertTrue(LocationTrackingService.isTracking.value)
-        org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofHours(16))
-        updates.callback!!.onLocationResult(com.google.android.gms.location.LocationResult.create(emptyList()))
-        await { !LocationTrackingService.isTracking.value }
-        assertEquals(application.getString(R.string.location_service_timeout), LocationTrackingService.status.value)
-        controller.destroy()
-    }
-
     @Test fun continuousHasNoProviderLimitAndCanBeStoppedAfterMultipleDays() {
-        LocationSessionDuration.save(application, LocationSessionDuration.CONTINUOUS)
         shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
         val controller = controller()
         val service = controller.get()

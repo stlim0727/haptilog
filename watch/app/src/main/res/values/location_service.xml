@@ -3,7 +3,7 @@
     <string name="location_service_channel">Location journal</string>
     <string name="location_service_channel_description">Shows when a location journal session is active</string>
     <string name="location_service_title">HaptiLog location journal</string>
-    <string name="location_service_body">Recording places and stays · %1$s</string>
+    <string name="location_service_body">Recording places and stays until stopped</string>
     <string name="location_service_stop">Stop location recording</string>
     <string name="location_service_permission_required">Location recording stopped. Allow precise location to start again.</string>
     <string name="location_service_disabled">Location recording stopped. Turn on device location to start again.</string>
@@ -11,5 +11,4 @@
     <string name="location_service_start_error">Could not start location recording. Open the journal and try again.</string>
     <string name="location_service_provider_error">Location recording stopped because location updates are unavailable. Try again.</string>
     <string name="location_service_storage_error">Location recording stopped because the watch could not save the journal.</string>
-    <string name="location_service_timeout">Location recording stopped after the selected duration. Start a new session to continue.</string>
 </resources>
