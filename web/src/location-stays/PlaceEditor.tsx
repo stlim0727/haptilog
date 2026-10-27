@@ -18,6 +18,7 @@ export function PlaceEditor({ initial, places, editingId, expectedRevision, onSa
   const [conflict, setConflict] = useState(false);
   const [review, setReview] = useState<{ revision: number; place: SavedPlace | null } | null>(null);
   const [reviewed, setReviewed] = useState(false);
+  const [geometryOpen, setGeometryOpen] = useState(!editingId);
   const ko = lang === "ko";
   const errors = validatePlace(draft, places, editingId);
   const overlaps = errors.length ? [] : overlappingPlaces(draft, places, editingId);
@@ -34,17 +35,22 @@ export function PlaceEditor({ initial, places, editingId, expectedRevision, onSa
     } catch { setStatus(ko ? "저장하지 못했습니다. 변경 내용을 유지했습니다. 다시 시도하세요." : "Could not save. Your draft is preserved; retry when connected."); }
     finally { setBusy(false); }
   }}>
-    <fieldset disabled={busy}><legend>{editingId ? (ko ? "내 장소 수정" : "Edit my place") : (ko ? "내 장소 추가" : "Add to my places")}</legend>
+    <fieldset disabled={busy}><legend className="sr-only">{editingId ? (ko ? "내 장소 수정" : "Edit my place") : (ko ? "내 장소 추가" : "Add to my places")}</legend>
+      <label>{ko ? "이름" : "Name"}<input maxLength={40} autoFocus value={draft.name} onChange={e => update({ name: e.target.value })} required /></label>
+      <details className="place-geometry" open={geometryOpen} onToggle={event => setGeometryOpen(event.currentTarget.open)}><summary>{ko ? "위치 조정" : "Adjust location"}</summary>
+      {geometryOpen && <>
       <PlaceMap latitude={draft.latitude} longitude={draft.longitude} radius={draft.radius_meters} lang={lang} onSelect={(latitude, longitude) => update({ latitude, longitude })} />
-      <label>{ko ? "이름" : "Name"}<input value={draft.name} onChange={e => update({ name: e.target.value })} required /></label>
+
       <label>{ko ? "위도" : "Latitude"}<input type="number" step="any" min="-90" max="90" value={Number.isFinite(draft.latitude) ? draft.latitude : ""} onChange={e => update({ latitude: e.target.valueAsNumber })} required /></label>
       <label>{ko ? "경도" : "Longitude"}<input type="number" step="any" min="-180" max="180" value={Number.isFinite(draft.longitude) ? draft.longitude : ""} onChange={e => update({ longitude: e.target.valueAsNumber })} required /></label>
       <label>{ko ? "반경 (m)" : "Radius (m)"}<input type="number" min="150" max="2000" value={Number.isFinite(draft.radius_meters) ? draft.radius_meters : ""} onChange={e => update({ radius_meters: e.target.valueAsNumber })} required /></label>
+      </>}
+      </details>
       {errors.length > 0 && <p role="alert">{ko ? "이름은 1–40자, 반경은 150–2,000m여야 하며 장소는 최대 20개입니다. 유효한 좌표를 입력하세요." : "Use a name of 1–40 characters, a 150–2,000m radius and valid coordinates. At most 20 places are allowed."}</p>}
       {overlaps.length > 0 && <label><input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)} />{ko ? "겹치는 장소를 확인했습니다. 과거 기록의 장소는 자동 변경되지 않습니다." : "I reviewed overlapping places. Past associations will not change automatically."} ({overlaps.map(p => p.name).join(", ")})</label>}
       {conflict && <section aria-label={ko ? "최신 장소 변경 검토" : "Review latest place changes"}>
         <p>{ko ? "입력한 초안은 유지했습니다. 최신 정보를 불러와 비교한 뒤 명시적으로 재적용하세요." : "Your draft is preserved. Load the latest information, compare it, then explicitly reapply your draft."}</p>
-        {onReloadForReview && <button type="button" onClick={async () => {
+        {onReloadForReview && <button className="secondary-button" type="button" onClick={async () => {
           setBusy(true); setReviewed(false);
           try { setReview(await onReloadForReview()); setStatus(""); }
           catch { setStatus(ko ? "최신 정보를 불러오지 못했습니다. 초안은 유지했습니다." : "Could not load the latest information. Your draft is preserved."); }
@@ -56,8 +62,8 @@ export function PlaceEditor({ initial, places, editingId, expectedRevision, onSa
           {(!editingId || review.place) && <label><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />{ko ? "최신 정보를 검토했고 내 초안을 재적용합니다." : "I reviewed the latest information and want to reapply my draft."}</label>}
         </>}
       </section>}
-      <button disabled={errors.length > 0 || overlaps.length > 0 && !acknowledged || conflict && (!review || !reviewed || !!editingId && !review.place)} type="submit">{conflict ? (ko ? "내 초안 재적용" : "Reapply my draft") : (ko ? "저장" : "Save")}</button>
-      <button type="button" onClick={onCancel}>{ko ? "취소" : "Cancel"}</button>
+      <div className="place-editor-actions"><button className="primary-button" disabled={errors.length > 0 || overlaps.length > 0 && !acknowledged || conflict && (!review || !reviewed || !!editingId && !review.place)} type="submit">{conflict ? (ko ? "내 초안 재적용" : "Reapply my draft") : (ko ? "저장" : "Save")}</button>
+      <button className="secondary-button" type="button" onClick={onCancel}>{ko ? "취소" : "Cancel"}</button></div>
     </fieldset>
     <p role="status">{status}</p>
   </form>;

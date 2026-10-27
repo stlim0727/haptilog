@@ -135,13 +135,16 @@ test("select, batch export, partial failure, explicit retry, reload and disconne
   const state = await setup(page);
   await page.goto("/");
   const panel = page.getByRole("region", { name: "Notion export" });
-  const exportButton = page.locator(".heading-actions").getByRole("button", { name: "Export voice to Notion", exact: true });
+  await page.getByRole("button", { name: "More options", exact: true }).click();
+  const exportButton = page.getByRole("button", { name: "Export voice to Notion", exact: true });
   await expect(exportButton).toHaveAttribute("aria-expanded", "false");
   await expect(panel).toBeHidden();
   await exportButton.click();
   await expect(panel).toBeVisible();
+  await page.getByRole("button", { name: "More options", exact: true }).click();
   await exportButton.click();
   await expect(panel).toBeHidden();
+  await page.getByRole("button", { name: "More options", exact: true }).click();
   await page.getByRole("button", { name: "Export voice to Notion", exact: true })
     .click();
   await expect(
@@ -165,6 +168,7 @@ test("select, batch export, partial failure, explicit retry, reload and disconne
     state.calls.filter((x) => x.action === "export").map((x) => x.recording_id),
   ).toEqual([first, second, second]);
   await page.reload();
+  await page.getByRole("button", { name: "More options", exact: true }).click();
   await page.getByRole("button", { name: "Export voice to Notion", exact: true })
     .click();
   await expect(panel.getByText(/^Sent ·/)).toHaveCount(2);
@@ -201,6 +205,7 @@ test("unconfigured integration and grant revocation leave recordings independent
   const state = await setup(page, { configured: false });
   await page.goto("/");
   const panel = page.getByRole("region", { name: "Notion export" });
+  await page.getByRole("button", { name: "More options", exact: true }).click();
   await page.getByRole("button", { name: "Export voice to Notion", exact: true })
     .click();
   await expect(panel.getByText("Notion is not configured on this server yet."))
