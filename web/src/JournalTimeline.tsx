@@ -38,7 +38,7 @@ export function JournalTimeline({ items, allItems, now, lang, renderVoice, onSel
     if (groups.get(item.id)!.members.length > 1) expand(identity(item), !expanded.has(identity(item)));
     else onSelectStay(item);
   };
-  return <div className="journal-ribbons" style={{ gridTemplateColumns: `repeat(${lanes}, 10px) minmax(0, 1fr)` }}>
+  return <div className="journal-ribbons" style={{ gridTemplateColumns: lanes > 0 ? `repeat(${lanes}, 10px) minmax(0, 1fr)` : 'minmax(0, 1fr)' }}>
     {ranges.flatMap(({ item, lane, segments }) => segments.map(({ first, last }) => <button key={`ribbon:${item.id}:${first}`} type="button" className="stay-ribbon" style={{ color: ribbonColor(item), gridColumn: lane + 1, gridRow: `${first + 1} / ${last + 2}` }} onClick={() => select(item)} aria-expanded={groups.get(item.id)!.members.length > 1 ? expanded.has(identity(item)) : undefined} aria-label={`${journalTitle(item, lang)} · ${journalDuration(groups.get(item.id)!.summary, lang)}`} />))}
     {rows.map((item, index) => <div key={`${item.kind}:${identity(item)}`} className={item.kind === 'stay' ? `ribbon-stay-row${expanded.has(identity(item)) ? ' is-expanded' : ''}` : 'ribbon-voice-row'} style={{ gridColumn: lanes + 1, gridRow: index + 1 }}>
       {item.kind === 'voice' ? renderVoice(item) : <div className="ribbon-stay-label">
