@@ -12,4 +12,8 @@
     <string name="unified_cloud_disclosure">Optional · Adults 18+. Syncs completed recordings (including existing audio and attached location), saved places and retained stays from the past 7 days to Supabase. Raw movement points stay on the watch. Audio and recording time go to Google Gemini for transcription and organization; location is not sent to Gemini. AI may be wrong. First enable imports local places; later enables use cloud places and stay settings. Stays expire after 7 days; places remain until deleted. This does not start location collection.</string>
     <string name="unified_cloud_withdrawal">Turning off stops future uploads of recordings and location summaries. Server withdrawal retries when online. Requests already sent may finish. Existing cloud copies remain until separately deleted. Local recording continues.</string>
     <string name="unified_cloud_enabled">Sync enabled for recordings, places and retained stays.</string>
+    <string name="location_permission_needed">Allow precise location in app permissions to record location.</string>
+    <string name="location_start_failed">Could not start. Open this screen and try again.</string>
+    <string name="location_running">Recording stays</string>
+    <string name="location_open_settings">Permissions and notifications</string>
 </resources>

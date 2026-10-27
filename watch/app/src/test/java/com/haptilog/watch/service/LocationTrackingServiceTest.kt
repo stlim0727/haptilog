@@ -17,6 +17,7 @@ import com.haptilog.watch.data.location.LocationStayEndReason
 import com.haptilog.watch.data.location.LocationCollection
 import com.haptilog.watch.data.location.LocationSample
 import com.haptilog.watch.R
+import com.haptilog.watch.presentation.LocationSettingsActivity
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -183,6 +184,11 @@ class LocationTrackingServiceTest {
         await { updates.requests == 1 }
         assertTrue(LocationTrackingService.isTracking.value)
         assertNotNull(shadowOf(service).lastForegroundNotification)
+        val notification = shadowOf(service).lastForegroundNotification
+        assertEquals(LocationSettingsActivity::class.java.name,
+            shadowOf(notification.contentIntent).savedIntent.component?.className)
+        assertEquals(LocationTrackingService.ACTION_STOP,
+            shadowOf(notification.actions.single().actionIntent).savedIntent.action)
         service.onStartCommand(startIntent(), 0, 2)
         assertEquals(1, updates.requests)
         assertEquals(Long.MAX_VALUE, updates.request!!.durationMillis)

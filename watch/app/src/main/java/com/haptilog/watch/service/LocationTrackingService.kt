@@ -30,7 +30,7 @@ import com.haptilog.watch.data.location.LocationHistoryRepository
 import com.haptilog.watch.data.location.LocationStayEndReason
 import com.haptilog.watch.data.location.LocationCollection
 import com.haptilog.watch.data.location.LocationSample
-import com.haptilog.watch.presentation.LocationJournalActivity
+import com.haptilog.watch.presentation.LocationSettingsActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -322,7 +322,7 @@ class LocationTrackingService : Service() {
 
     private fun notification(): Notification {
         val open = PendingIntent.getActivity(
-            this, NOTIFICATION_ID, Intent(this, LocationJournalActivity::class.java),
+            this, NOTIFICATION_ID, Intent(this, LocationSettingsActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val stop = PendingIntent.getService(
