@@ -17,8 +17,22 @@ for (const width of [1280, 390]) {
     await expect(timeline.locator('.ribbon-stay-open')).toHaveCount(2);
     const company = timeline.locator('.ribbon-stay-open').filter({ hasText: 'Original cafe' });
     await expect(company).toContainText('30m observed');
-    const colors = await timeline.locator('.stay-ribbon').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor));
+    const colors = await timeline.locator('.stay-ribbon').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).color));
     expect(new Set(colors).size).toBe(2);
+    for (const ribbon of await timeline.locator('.stay-ribbon').all()) {
+      const shape = await ribbon.evaluate(node => {
+        const stroke = getComputedStyle(node);
+        const top = getComputedStyle(node, '::before'), bottom = getComputedStyle(node, '::after');
+        return { color: stroke.color, image: stroke.backgroundImage, size: stroke.backgroundSize, width: stroke.width,
+          top: [top.width, top.height, top.top, top.backgroundColor],
+          bottom: [bottom.width, bottom.height, bottom.bottom, bottom.backgroundColor] };
+      });
+      expect(shape.width).toBe('10px');
+      expect(shape.size).toBe('4px 100%');
+      expect(shape.image).toContain(shape.color);
+      expect(shape.top).toEqual(['10px', '3px', '0px', shape.color]);
+      expect(shape.bottom).toEqual(['10px', '3px', '0px', shape.color]);
+    }
     const group = timeline.locator('.ribbon-group-sources');
     await expect(group).toHaveCount(0);
     expect(await company.evaluate(node => (node.closest('.ribbon-stay-row') as HTMLElement).getBoundingClientRect().height)).toBe(44);
@@ -34,7 +48,7 @@ for (const width of [1280, 390]) {
     if (width < 700) await page.getByRole('button', { name: 'Back to journal' }).click();
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(timeline.locator('.stay-ribbon')).toHaveCount(2);
-    expect(await timeline.locator('.stay-ribbon').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).backgroundColor))).toEqual(colors);
+    expect(await timeline.locator('.stay-ribbon').evaluateAll(nodes => nodes.map(node => getComputedStyle(node).color))).toEqual(colors);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   });
 }

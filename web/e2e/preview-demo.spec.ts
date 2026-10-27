@@ -1,7 +1,7 @@
-import { onlyCategory } from "./category-picker";
 import { expect } from "@playwright/test";
 import { test } from "./fixtures";
 import { fixture } from "./portal-fixture";
+import { onlyCategory } from "./category-picker";
 
 test("preview test login button appears in preview environment and launches demo mode with sample recordings", async ({ page }) => {
   await fixture(page, { connected: false });
