@@ -1,3 +1,4 @@
+import { onlyCategory } from "./category-picker";
 import { expect } from "@playwright/test";
 import { test } from "./fixtures";
 import { fixture } from "./portal-fixture";
@@ -18,12 +19,12 @@ test("preview test login button appears in preview environment and launches demo
   await expect(page.locator(".record-card").filter({ hasText: "경복궁 향원정" })).toBeVisible();
 
   // Check metrics and categories
-  await page.locator(".tabs button", { hasText: "Expense" }).click();
+  await onlyCategory(page, "Expense");
   await expect(page.locator(".record-card").filter({ hasText: "블루보틀 성수" })).toBeVisible();
   await expect(page.locator(".record-card").filter({ hasText: "경복궁 향원정" })).toHaveCount(0);
 
   // Check Travel
-  await page.locator(".tabs button", { hasText: "Travel" }).click();
+  await onlyCategory(page, "Travel");
   await expect(page.locator(".record-card").filter({ hasText: "경복궁 향원정" })).toBeVisible();
 
   // Check Trash tab
