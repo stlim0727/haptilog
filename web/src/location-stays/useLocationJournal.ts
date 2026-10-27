@@ -12,23 +12,31 @@ export function useLocationJournal(owner: string | undefined, sessionId: string 
   const repository = useMemo(() => key && supabase && owner ? createLocationRepository(owner, (name, args) => supabase!.rpc(name, args)) : null, [key, owner]);
   const [value, setValue] = useState<{ key: string; snapshot: Snapshot | null; error: string; checkedAt: number | null }>({ key: '', snapshot: null, error: '', checkedAt: null });
   const [now, setNow] = useState(Date.now());
-  const sequence = useRef(0), liveKey = useRef(key), blocked = useRef(false), operationId = useRef(0);
+  const sequence = useRef(0), liveKey = useRef(key), blocked = useRef(false), operationId = useRef(0), newest = useRef<{ key: string; request: number; done: Promise<Snapshot | undefined> } | null>(null);
   liveKey.current = key;
   const load = useCallback(async () => {
     if (!repository || !key || blocked.current || liveKey.current !== key) return;
     const request = ++sequence.current;
-    try {
-      const snapshot = await repository.snapshot();
-      if (liveKey.current !== key || request !== sequence.current) return;
-      setValue({ key, snapshot, error: '', checkedAt: Date.now() });
-      if (!snapshot.state.consent_enabled && owner) clearDismissals(localStorage, owner);
-      return snapshot;
-    } catch (e) {
-      if (liveKey.current !== key || request !== sequence.current) return;
-      const error = e instanceof LocationError ? e.code : 'NETWORK';
-      if (error === 'FORBIDDEN' && owner) clearDismissals(localStorage, owner);
-      setValue(previous => ({ key, snapshot: error === 'FORBIDDEN' ? null : previous.key === key ? previous.snapshot : null, error, checkedAt: previous.key === key ? previous.checkedAt : null }));
-    }
+    // Callers awaiting an explicit refresh must not lose it to a newer background load, so hand off to that request's result.
+    const handoff = () => newest.current && newest.current.key === key && newest.current.request > request ? newest.current.done : undefined;
+    const done = (async () => {
+      try {
+        const snapshot = await repository.snapshot();
+        if (liveKey.current !== key) return;
+        if (request !== sequence.current) return handoff();
+        setValue({ key, snapshot, error: '', checkedAt: Date.now() });
+        if (!snapshot.state.consent_enabled && owner) clearDismissals(localStorage, owner);
+        return snapshot;
+      } catch (e) {
+        if (liveKey.current !== key) return;
+        if (request !== sequence.current) return handoff();
+        const error = e instanceof LocationError ? e.code : 'NETWORK';
+        if (error === 'FORBIDDEN' && owner) clearDismissals(localStorage, owner);
+        setValue(previous => ({ key, snapshot: error === 'FORBIDDEN' ? null : previous.key === key ? previous.snapshot : null, error, checkedAt: previous.key === key ? previous.checkedAt : null }));
+      }
+    })();
+    newest.current = { key, request, done };
+    return done;
   }, [repository, key, owner]);
   useEffect(() => {
     sequence.current++; operationId.current++; blocked.current = false;
