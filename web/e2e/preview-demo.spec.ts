@@ -1,3 +1,4 @@
+import { onlyCategory } from "./category-picker";
 import { expect } from "@playwright/test";
 import { test } from "./fixtures";
 import { fixture } from "./portal-fixture";
