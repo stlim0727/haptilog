@@ -48,3 +48,10 @@ Location collection has no app-imposed time limit. Choosing Always starts the vi
 The web target places sync, saved-place management, suggestions and cloud-data deletion in **장소 설정 / Place settings**, rather than a second stay timeline. Voice export controls identify their voice-only scope. Stay deletion is a separately confirmed permanent operation; audio trash behavior remains distinct. Location failures must leave voice records usable.
 
 These decisions were reviewed twice by UX and product marketing before implementation. They describe the intended revision, not a deployment claim. See [the review and acceptance scenarios](2026-10-26-unified-journal-review.md) for scope and validation boundaries.
+
+
+## 6. Watch simplification and location pipeline transition (2026-10-27)
+
+The watch offers location scope and common cloud sync in Settings. It no longer offers a separate stay browser, coordinate list or place editor; cloud-backed history and place management are in the portal. Notification taps open the existing location settings and the notification Stop action remains available. Without cloud sync, existing local capture and bounded retention continue, but there is no on-watch history/management UI.
+
+Raw upload and cloud stay inference are the next stages of [issue #98](https://github.com/stlim0727/haptilog/issues/98), specified in the [v2 contract](../architecture/location-capture-v2.md). They require a new explicit consent and compatibility/deletion validation before activation. This navigation increment does not change the currently shipped raw-local/summary-cloud behavior or implement remote collection/upload cadence.

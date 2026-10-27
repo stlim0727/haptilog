@@ -4,11 +4,11 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 
-/** Compatibility entry: collection and synchronization now share one screen. */
+/** Compatibility entry for old sync links; cloud consent lives in Settings. */
 class LocationSyncActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startActivity(Intent(this, LocationJournalActivity::class.java))
+        startActivity(Intent(this, SettingsActivity::class.java))
         finish()
     }
 }
