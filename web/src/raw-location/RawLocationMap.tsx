@@ -7,6 +7,8 @@ export default function RawLocationMap({ samples, selected, onSelect, ko, fitKey
   fitKey: string; samples: RawSample[]; selected: string; onSelect: (id: string) => void; ko: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null), map = useRef<L.Map | null>(null);
+  const lines = useRef<L.LayerGroup | null>(null);
+  const [showLine, setShowLine] = useState(true);
   const layer = useRef<L.LayerGroup | null>(null), accuracy = useRef<L.LayerGroup | null>(null);
   const callback = useRef(onSelect); callback.current = onSelect;
   const [tileError, setTileError] = useState(false);
@@ -18,16 +20,14 @@ export default function RawLocationMap({ samples, selected, onSelect, ko, fitKey
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, referrerPolicy: 'origin', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).on('tileerror', () => setTileError(true)).addTo(instance);
+    lines.current = L.layerGroup().addTo(instance);
     layer.current = L.layerGroup().addTo(instance); accuracy.current = L.layerGroup().addTo(instance);
     const resize = new ResizeObserver(() => instance.invalidateSize({ animate: false })); resize.observe(container.current);
-    return () => { resize.disconnect(); instance.stop(); instance.remove(); map.current = null; layer.current = null; accuracy.current = null; };
+    return () => { resize.disconnect(); instance.stop(); instance.remove(); map.current = null; lines.current = null; layer.current = null; accuracy.current = null; };
   }, [samples.length > 0]);
   useEffect(() => {
     const instance = map.current, group = layer.current; if (!instance || !group) return;
     group.clearLayers();
-    rawSegments(samples).forEach(segment => {
-      if (segment.length > 1) L.polyline(segment.map(s => [s.latitude, s.longitude]), { color: '#2563eb', weight: 2, opacity: 0.7 }).addTo(group);
-    });
     samples.forEach((s, index) => {
       const tooltip = document.createElement('span'); tooltip.textContent = `#${index + 1} · ${s.observed_at}`;
       L.circleMarker([s.latitude, s.longitude], { radius: 5, color: '#1d4ed8', fillOpacity: 0.8, weight: 1 })
@@ -38,6 +38,17 @@ export default function RawLocationMap({ samples, selected, onSelect, ko, fitKey
     fittedRange.current = fitKey;
   }, [signature, fitKey]);
   useEffect(() => {
+    const group = lines.current;
+    if (!group) return;
+    group.clearLayers();
+    if (!showLine) return;
+    rawSegments(samples).forEach(segment => {
+      if (segment.length > 1) L.polyline(segment.map(s => [s.latitude, s.longitude]), {
+        color: '#2563eb', weight: 2, opacity: 0.7, interactive: false, className: 'raw-connection-line',
+      }).addTo(group).bringToBack();
+    });
+  }, [signature, showLine]);
+  useEffect(() => {
     const instance = map.current, group = accuracy.current; if (!instance || !group) return;
     group.clearLayers(); const s = samples.find(s => s.id === selected); if (!s) return;
     L.circle([s.latitude, s.longitude], { radius: s.accuracy_meters, color: '#f43f5e', weight: 2, fillOpacity: 0.08, interactive: false }).addTo(group);
@@ -45,7 +56,11 @@ export default function RawLocationMap({ samples, selected, onSelect, ko, fitKey
     if (!instance.getBounds().contains([s.latitude, s.longitude])) instance.panInside([s.latitude, s.longitude], { animate: false });
   }, [selected, signature]);
   return <>
+    <div className="raw-toolbar">
+    <button type="button" aria-label={ko ? '시점순 위치 연결선' : 'Chronological connection line'} aria-pressed={showLine}
+      onClick={() => setShowLine(value => !value)}>{ko ? '시점순 연결선' : 'Chronological line'} · {showLine ? 'ON' : 'OFF'}</button>
     <button type="button" disabled={!samples.length} onClick={() => map.current?.fitBounds(L.latLngBounds(samples.map(s => [s.latitude, s.longitude])), { maxZoom: 16, padding: [24, 24], animate: false })}>{ko ? '전체 위치 보기' : 'Show all fixes'}</button>
+    </div>
     {samples.length > 0 && <div ref={container} className="recording-map raw-location-map" role="region" aria-label={ko ? '연속 위치 원본 지도' : 'Continuous raw location map'} />}
     {tileError && <p role="status">{ko ? '지도 배경을 불러오지 못했습니다. 관측값 선택과 검사는 계속 사용할 수 있습니다.' : 'Map tiles unavailable. Fix selection and inspection remain available.'}</p>}
   </>;

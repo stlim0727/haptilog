@@ -93,3 +93,9 @@ no database or watch change. Timeline unit checks cover boundaries, empty ranges
 23/25-hour days and repeated-hour labels. Desktop/mobile E2E checks cover day and
 hour ranges, keyboard selection, pointer brushing, map/inspector counts, empty
 states and horizontal containment.
+
+
+The map toolbar has **Chronological line · ON/OFF** (default ON). It changes only
+connection lines; selected fixes, accuracy circles, time ranges and the current
+map view are retained. Turning lines on still respects session/sequence gaps and
+clock discontinuities. The control supports pointer and keyboard activation.

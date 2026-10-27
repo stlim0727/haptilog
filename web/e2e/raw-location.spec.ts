@@ -22,6 +22,18 @@ for (const width of [1280,390]) {
     await expect(dialog.getByRole('status').filter({ hasText: 'fixes ·' })).toContainText('3 / 3 fixes · 2 segments');
     await expect(dialog.getByRole('region',{name:'Continuous raw location map'})).toBeVisible();
     await expect(dialog.locator('.leaflet-overlay-pane path')).toHaveCount(6); // line + three fixes + selected circle/highlight
+    const lineToggle=dialog.getByRole('button',{name:'Chronological connection line'});
+    await expect(lineToggle).toHaveAttribute('aria-pressed','true');
+    await expect(dialog.locator('.raw-connection-line')).toHaveCount(1);
+    const chosen=await dialog.getByLabel('Select fix').inputValue();
+    await lineToggle.click();
+    await expect(lineToggle).toHaveAttribute('aria-pressed','false');
+    await expect(dialog.locator('.raw-connection-line')).toHaveCount(0);
+    await expect(dialog.locator('.leaflet-overlay-pane path')).toHaveCount(5);
+    await expect(dialog.getByLabel('Select fix')).toHaveValue(chosen);
+    await lineToggle.focus();await page.keyboard.press('Enter');
+    await expect(lineToggle).toHaveAttribute('aria-pressed','true');
+    await expect(dialog.locator('.raw-connection-line')).toHaveCount(1);
     const inspector=dialog.getByRole('region',{name:'Raw fix inspector'});
     await expect(inspector).toContainText('800');await expect(inspector).toContainText('Not collected');
     await dialog.getByRole('button',{name:'Next fix'}).click();await expect(dialog.getByLabel('Select fix')).toHaveValue('fix-1');
