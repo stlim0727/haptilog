@@ -41,6 +41,7 @@ import {
 } from "./domain";
 import type { Recording } from "./domain";
 import { JournalStayCard } from "./JournalStayCard";
+import { JOURNAL_CATEGORIES, categoryPressed, toggleCategory } from "./categoryFilter";
 import { JournalTimeline } from "./JournalTimeline";
 import { journalDates, journalLocated, voiceItem } from "./journal";
 import type { JournalItem } from "./journal";
@@ -77,6 +78,8 @@ type Props = {
   date: string;
   setDate: (value: string) => void;
   category: string;
+  selectedCategories: string[];
+  applyCategories: (selected: string[]) => void;
   setCategory: (value: string) => void;
   search: string;
   setSearch: (value: string) => void;
@@ -115,7 +118,7 @@ export function MobileWorkspace(p: Props) {
   const [selectedPlace, setSelectedPlace] = useState<string | null>(null);
   const [mapSelected, setMapSelected] = useState<string | null>(null);
   const [filterDraft, setFilterDraft] = useState(
-    p.category === "Trash" ? "All" : p.category,
+    p.selectedCategories,
   );
   const [notionOpen, setNotionOpen] = useState(false);
   const menu = useRef<HTMLDialogElement>(null);
@@ -299,7 +302,7 @@ export function MobileWorkspace(p: Props) {
     menu.current?.showModal();
   }
   function showFilter() {
-    setFilterDraft(isTrash ? "All" : p.category);
+    setFilterDraft([...p.selectedCategories]);
     filter.current?.showModal();
   }
   function closeMenu() {
@@ -536,13 +539,13 @@ export function MobileWorkspace(p: Props) {
               >
                 <SlidersHorizontal size={16} />
                 {ko ? "필터" : "Filter"}
-                {p.category !== "All" && " · 1"}
+                {p.selectedCategories.length !== JOURNAL_CATEGORIES.length && ` · ${JOURNAL_CATEGORIES.length - p.selectedCategories.length}`}
               </button>
             )}
           </div>
-          {!isTrash && p.category !== "All" && (
+          {!isTrash && p.selectedCategories.length !== JOURNAL_CATEGORIES.length && (
             <div className="mobile-active-filter">
-              <span>{categories.find(([key]) => key === p.category)?.[1]}</span>
+              <span>{p.selectedCategories.length ? categories.filter(([key]) => key !== "All" && p.selectedCategories.includes(key)).map(([key, label]) => key === "Voice" ? (ko ? "미분류 음성" : "Uncategorized voice") : label).join(" · ") : (ko ? "선택한 유형 없음" : "No types selected")}</span>
               <button
                 onClick={() => {
                   p.setCategory("All");
@@ -822,20 +825,14 @@ export function MobileWorkspace(p: Props) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            p.setCategory(filterDraft);
+            p.applyCategories(filterDraft);
             filter.current?.close();
           }}
         >
-          <label htmlFor="mobile-category">{t.category}</label>
-          <select
-            id="mobile-category"
-            value={filterDraft}
-            onChange={(e) => setFilterDraft(e.target.value)}
-          >
-            {categories.map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
+          <fieldset className="category-chip-picker">
+            <legend>{t.category}</legend>
+            {categories.map(([key, label]) => <button key={key} type="button" aria-pressed={categoryPressed(filterDraft, key)} className={categoryPressed(filterDraft, key) === true ? "active" : ""} onClick={() => setFilterDraft(toggleCategory(filterDraft, key))}>{label}</button>)}
+          </fieldset>
           <button className="primary-button" type="submit">
             {ko ? "필터 적용" : "Apply filter"}
           </button>

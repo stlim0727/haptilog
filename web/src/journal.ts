@@ -30,11 +30,16 @@ export function journalDuration(item: JournalItem, lang: string = 'en') {
 export function journalDates(item: JournalItem): string[] {
   return item.kind === 'voice' ? [localDate(item.recorded_at)] : [...new Set(splitStayByDate(item.stay, Intl.DateTimeFormat().resolvedOptions().timeZone).map(s => s.date))];
 }
-export function matchesJournal(item: JournalItem, { category = 'All', date = 'all', search = '', today = localDate(new Date().toISOString()) } = {}) {
+export function matchesJournal(item: JournalItem, { category = 'All', categories, date = 'all', search = '', today = localDate(new Date().toISOString()) }: { category?: string; categories?: readonly string[]; date?: string; search?: string; today?: string } = {}) {
   if (item.kind === 'stay' && category !== 'All' && category !== 'Stay') return false;
   if (item.kind === 'voice') {
     if (!!item.recording.deleted_at !== (category === 'Trash')) return false;
     if (!['All', 'Voice', 'Trash'].includes(category) && journalIntent(item) !== category.toUpperCase()) return false;
+  }
+  if (categories && category !== 'Trash') {
+    const intent = journalIntent(item)?.toUpperCase();
+    const type = item.kind === 'stay' ? 'Stay' : ['EXPENSE', 'TRAVEL', 'WORKOUT', 'MEMO'].includes(intent ?? '') ? intent![0] + intent!.slice(1).toLowerCase() : 'Voice';
+    if (!categories.includes(type)) return false;
   }
   if (!journalDates(item).some(day => date === 'all' || (date === 'today' ? day === today : day.slice(0, 7) === today.slice(0, 7)))) return false;
   const text = item.kind === 'voice' ? `${journalTitle(item)} ${transcript(item.recording)}` : `${journalTitle(item)} ${journalTitle(item, 'ko')} ${item.places.filter(p => placeCandidates(item).includes(p)).map(p => p.name).join(' ')} stay 체류`;

@@ -3304,3 +3304,12 @@ audio {
   overflow-wrap: anywhere;
   white-space: normal;
 }
+.tabs button[aria-pressed="mixed"], .category-chip-picker button[aria-pressed="mixed"] { box-shadow: inset 0 -3px 0 var(--accent-rose); }
+.category-chip-picker { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0 0 16px; }
+.category-chip-picker legend { margin-bottom: 10px; }
+.category-chip-picker button { border: 1px solid var(--border); border-radius: 20px; padding: 8px 12px; background: var(--bg-surface); color: var(--text-primary); cursor: pointer; }
+.category-chip-picker button.active { background: var(--accent-rose); color: #171717; }
+
+.mobile-active-filter { gap: 10px; }
+.mobile-active-filter > span { min-width: 0; }
+.mobile-active-filter button { flex-shrink: 0; }

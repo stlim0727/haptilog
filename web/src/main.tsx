@@ -36,6 +36,7 @@ import { supabase, authCallbackFailed } from "./client";
 import { journalItems, matchesJournal, journalDates } from "./journal";
 import type { JournalItem } from "./journal";
 import { useLocationJournal } from "./location-stays/useLocationJournal";
+import { JOURNAL_CATEGORIES, categorySelection, categoryPressed, toggleCategory } from "./categoryFilter";
 import { JournalTimeline } from "./JournalTimeline";
 import { StayInspector } from "./location-stays/StayInspector";
 import type { Stay } from "./location-stays/types";
@@ -178,7 +179,16 @@ function App() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("all");
-  const [category, setCategory] = useState("All");
+  const [category, setCategoryState] = useState("All");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([...JOURNAL_CATEGORIES]);
+  const setCategory = (next: string) => {
+    setCategoryState(next);
+    if (next !== "Trash") setSelectedCategories(categorySelection(next));
+  };
+  const applyCategories = (next: string[]) => {
+    setSelectedCategories(next);
+    setCategoryState(next.length === 1 && next[0] === "Stay" ? "Stay" : "All");
+  };
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording") ?? new URL(window.location.href).searchParams.get("stay"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
@@ -609,7 +619,7 @@ function App() {
   const activeRecords = records.filter((r) => !r.deleted_at);
 
   const allItems = journalItems(records, locationJournal.snapshot?.stays ?? [], locationJournal.snapshot?.places ?? [], locationJournal.now);
-  const filteredItems = allItems.filter(item => matchesJournal(item, { category, date, search }));
+  const filteredItems = allItems.filter(item => matchesJournal(item, { category: isTrashView ? "Trash" : "All", categories: selectedCategories, date, search }));
   const stayEmptyMessage = search || date !== "all"
     ? (lang === "ko" ? "조건에 맞는 체류가 없습니다." : "No stays match these filters.")
     : locationJournal.snapshot?.state.consent_enabled
@@ -1041,7 +1051,7 @@ function App() {
         </main>
       ) : mobile ? (
         <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} onSavePlace={!isDemo && locationJournal.snapshot?.state.consent_enabled ? item => requestPlace(item.stay) : undefined} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
-          date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
+          date={date} setDate={setDate} category={category} setCategory={setCategory} selectedCategories={selectedCategories} applyCategories={applyCategories} search={search} setSearch={setSearch}
           summary={summary} count={dateJournal.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
           isDemo={isDemo} onResetDemo={resetSampleData}
@@ -1272,8 +1282,9 @@ function App() {
               ).map(([c, label, Icon]) => (
                 <button
                   key={c}
-                  className={category === c ? "active" : ""}
-                  onClick={() => setCategory(c)}
+                  className={!isTrashView && categoryPressed(selectedCategories, c) === true ? "active" : ""}
+                  aria-pressed={!isTrashView && categoryPressed(selectedCategories, c)}
+                  onClick={() => applyCategories(toggleCategory(isTrashView ? [] : selectedCategories, c))}
                 >
                   {Icon && <Icon size={12} />} {label}
                 </button>

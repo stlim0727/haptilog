@@ -1,3 +1,4 @@
+import { onlyCategory } from "./category-picker";
 import { expect } from "@playwright/test";
 import { test } from "./fixtures";
 import { staysFixture, hiddenKey, stayOwner } from "./stays-fixture";
@@ -15,7 +16,7 @@ test("voice and stays share the chronological feed, search and type filters", as
   await expect(feed.locator(stayCard)).toHaveCount(1);
   await expect(feed.locator(voiceCard).first()).toContainText("Coffee on the corner");
   await page.screenshot({ path: "test-results/unified-journal-desktop.png", fullPage: true });
-  await page.getByRole("button", { name: "Stays", exact: true }).click();
+  await onlyCategory(page, "Stays");
   await expect(feed.locator(stayCard)).toHaveCount(1);
   await expect(feed.locator(voiceCard)).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Search journal" }).fill("Original cafe");
@@ -23,7 +24,7 @@ test("voice and stays share the chronological feed, search and type filters", as
   await page.getByRole("searchbox", { name: "Search journal" }).fill("no matching place");
   await expect(feed.locator(stayCard)).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Search journal" }).fill("");
-  await page.getByRole("button", { name: "Voice", exact: true }).click();
+  await onlyCategory(page, "Voice");
   await expect(feed.locator(voiceCard)).toHaveCount(1);
   await expect(feed.locator(stayCard)).toHaveCount(0);
 });
@@ -220,7 +221,7 @@ test("opening a related voice clears desktop filters that would hide its detail"
   portal.recording.recorded_at = "2026-10-26T05:30:00Z";
   portal.recording.latitude = 37.5; portal.recording.longitude = 127;
   await page.goto("/");
-  await page.getByRole("button", { name: "Stays", exact: true }).click();
+  await onlyCategory(page, "Stays");
   await page.getByRole("searchbox", { name: "Search journal" }).fill("Original cafe");
   await page.locator(`.record-list ${stayCard}`).click();
   await page.getByRole("region", { name: "Voice candidates during this stay" }).getByRole("button", { name: "Coffee on the corner", exact: true }).click();

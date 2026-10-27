@@ -1,3 +1,4 @@
+import { onlyCategory } from "./category-picker";
 import { expect, type Page } from "@playwright/test";
 import { test } from "./fixtures";
 import { baseRecording, fixture } from "./portal-fixture";
@@ -72,7 +73,7 @@ test("mobile views fit narrow screens in both languages and put records first", 
 test("mobile detail restores filters, nonzero scroll, and focus with browser Back", async ({ page }) => {
   await mobile(page, 20);
   await page.getByRole("button", { name: "Filter", exact: true }).click();
-  await page.getByLabel("Category", { exact: true }).selectOption("Expense");
+  await onlyCategory(page, "Expense", true);
   await page.getByRole("button", { name: "Apply filter" }).click();
   await page.getByRole("searchbox", { name: "Search journal" }).fill(
     "Coffee",
@@ -372,15 +373,15 @@ test("mobile map follows category filters and handles a selection without GPS", 
   await page.getByRole("button", { name: "Refresh recordings" }).click();
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await page.getByRole("button", { name: "Filter", exact: true }).click();
-  await page.getByLabel("Category", { exact: true }).selectOption("Travel");
+  await onlyCategory(page, "Travel", true);
   await page.getByRole("button", { name: "Apply filter" }).click();
   await expect(page.locator(".mobile-record")).toHaveCount(1);
   await expect(page.locator(".mobile-record")).toContainText(
     "Travel recording",
   );
   await expect(page.getByText("1 located recordings · 1 places")).toBeVisible();
-  await page.getByRole("button", { name: "Filter · 1", exact: true }).click();
-  await page.getByLabel("Category", { exact: true }).selectOption("Workout");
+  await page.getByRole("button", { name: "Filter · 5", exact: true }).click();
+  await onlyCategory(page, "Workout", true);
   await page.getByRole("button", { name: "Apply filter" }).click();
   await expect(page.locator(".map-empty")).toBeVisible();
   await expect(page.locator(".mobile-record")).toHaveCount(0);
