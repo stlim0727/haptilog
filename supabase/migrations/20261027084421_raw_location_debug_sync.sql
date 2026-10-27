@@ -19,6 +19,16 @@ create table private.location_raw_exclusions (
 alter table private.location_raw_exclusions enable row level security;
 revoke all on private.location_raw_samples,private.location_raw_exclusions from public,anon,authenticated;
 
+-- Coordinate-free tombstones cover accepted IDs even when the watch clock is ahead.
+create table private.location_raw_deletions (
+  owner_user_id uuid not null references auth.users(id) on delete cascade,
+  id uuid not null, expires_at timestamptz not null,
+  primary key(owner_user_id,id)
+);
+alter table private.location_raw_deletions enable row level security;
+create index location_raw_deletions_expiry on private.location_raw_deletions(expires_at);
+revoke all on private.location_raw_deletions from public,anon,authenticated;
+
 -- Common withdrawal clears the raw grant too. A legacy re-enable cannot restore it.
 create function private.raw_location_withdrawal() returns trigger
 language plpgsql security definer set search_path='' as $$
@@ -30,11 +40,13 @@ revoke all on function private.raw_location_withdrawal() from public,anon,authen
 create trigger raw_location_withdrawal before update on public.location_sync_state
 for each row execute function private.raw_location_withdrawal();
 
--- A stay deletion suppresses its source interval, including not-yet-uploaded fixes.
+-- Only explicit stay deletion suppresses sources. Retention cleanup has no stay
+-- tombstone and must leave younger raw observations on their own retention clock.
 create function private.raw_location_stay_delete() returns trigger
 language plpgsql security definer set search_path='' as $$
 begin
-  if old.summary ?& array['session_id','started_at','last_observed_at'] then
+  if exists(select 1 from public.location_stay_deletions d where d.owner_user_id=old.owner_user_id and d.id=old.id) and
+    old.summary ?& array['session_id','started_at','last_observed_at'] then
     insert into private.location_raw_exclusions values(old.owner_user_id,(old.summary->>'session_id')::uuid,
       (old.summary->>'started_at')::timestamptz,(old.summary->>'last_observed_at')::timestamptz) on conflict do nothing;
     delete from private.location_raw_samples where owner_user_id=old.owner_user_id
@@ -87,6 +99,9 @@ begin
       'has_more',jsonb_array_length(ids)>1000,'sync_epoch',s.sync_epoch,'consent_enabled',s.raw_consent_id is not null and s.consent_enabled);
   elsif p_action='delete_all' then
     if (p_payload->>'expected_epoch')::bigint is distinct from s.sync_epoch then return jsonb_build_object('error','EPOCH_CONFLICT'); end if;
+    insert into private.location_raw_deletions(owner_user_id,id,expires_at)
+      select owner_user_id,id,observed_at+interval '7 days' from private.location_raw_samples where owner_user_id=p_owner
+      on conflict(owner_user_id,id) do update set expires_at=greatest(location_raw_deletions.expires_at,excluded.expires_at);
     delete from private.location_raw_samples where owner_user_id=p_owner;
     update public.location_sync_state set raw_purged_before=clock_timestamp(),sync_epoch=sync_epoch+1 where owner_user_id=p_owner returning * into s;
     return jsonb_build_object('sync_epoch',s.sync_epoch);
@@ -128,7 +143,8 @@ begin
       outcome := 'accepted';
       if t<s.raw_upload_cutoff then outcome := 'consent_excluded';
       elsif t<=now()-interval '7 days' then outcome := 'expired';
-      elsif (s.purged_before is not null and t<=s.purged_before) or (s.raw_purged_before is not null and t<=s.raw_purged_before) or exists(select 1 from private.location_raw_exclusions e
+      elsif exists(select 1 from private.location_raw_deletions d where d.owner_user_id=p_owner and d.id=sample_id and d.expires_at>now()) or
+        (s.purged_before is not null and t<=s.purged_before) or (s.raw_purged_before is not null and t<=s.raw_purged_before) or exists(select 1 from private.location_raw_exclusions e
         where e.owner_user_id=p_owner and e.session_id=sid and t between e.started_at and e.ended_at) then outcome := 'deleted';
       else
         select sample into old from private.location_raw_samples where owner_user_id=p_owner and id=sample_id;
@@ -166,6 +182,7 @@ begin
   delete from public.location_stays where expires_at<=now(); get diagnostics n=row_count;
   delete from private.location_raw_samples where observed_at<=now()-interval '7 days'; get diagnostics m=row_count;
   delete from private.location_raw_exclusions where ended_at<=now()-interval '7 days';
+  delete from private.location_raw_deletions where expires_at<=now();
   return n+m;
 end; $$;
 revoke all on function public.cleanup_location_stays() from public,anon,authenticated;

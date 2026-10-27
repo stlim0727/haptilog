@@ -53,7 +53,11 @@ pipeline proposed in `location-capture-v2.md`. Existing v1 stay processing remai
   UI rejects a deletion-epoch change across pages and clears unauthorized data.
   No raw data is persisted in browser storage or forwarded to Gemini.
 - All-source raw deletion has a persistent time barrier against unknown offline
-  samples. A stay deletion also removes/suppresses that session's source interval.
+  samples. Coordinate-free tombstones additionally remember already accepted
+  deleted IDs through each source's seven-day deadline, including permitted
+  future-clock observations with a lost ACK. An explicit stay deletion also
+  removes/suppresses that session's source interval. Automatic stay expiry creates
+  no source exclusions and leaves younger raw fixes until their own deadline.
   Existing all-stay deletion's owner barrier applies to raw ingestion and reads.
 - Lines show adjacent observations only: session changes, missing sequences,
   >180-second gaps, reversed monotonic clocks, and >5-second UTC discontinuities

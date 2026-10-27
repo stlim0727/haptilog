@@ -52,3 +52,23 @@ dot rails. The daily overview scrolls the selected day into view; the hourly
 rail shows its observations and selected brush interval. Capture/sync guidance
 is collapsed so the timeline appears before setup detail. No backend/watch or
 production deployment changes are part of this follow-up.
+
+
+## PR #101 review fixes
+
+Both reported deletion/retention regressions were reproduced against the original
+migration before fixing them. Added SQL regressions verify:
+
+- A two-hour stay can expire while a later raw fix remains younger than seven
+  days. Daily cleanup removes the summary and preserves the raw fix; retrying the
+  fix is idempotent and creates no source exclusion. Explicit stay deletion still
+  suppresses its source interval through the existing deletion tests.
+- A fix accepted with a watch clock 60 seconds ahead is deleted and retried after
+  a lost ACK at the refreshed epoch. It remains deleted by its owner-scoped ID.
+  A distinct post-deletion fix with the same timestamp remains accepted, and a
+  different owner can use the same UUID independently.
+- Deleted-ID metadata is client-inaccessible and contains no coordinates. Its
+  expiry equals the source observation time plus seven days. Daily cleanup drops
+  expired markers while preserving live deletion protection.
+
+Validation: full `npm --prefix supabase/tests test` migration/RLS suites.

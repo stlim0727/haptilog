@@ -101,5 +101,53 @@ await as(owner);
 await stayRpc('delete_stays',{expected_epoch:1,ids:['cccccccc-cccc-4ccc-8ccc-cccccccccccc']});
 assert.equal((await raw('read',range)).samples.length,0);
 assert.equal((await ingest([sample],{consent_id:second.consent_id,sync_epoch:2})).results[0].outcome,'deleted');
+// Lost ACK + a fast watch clock: a deleted accepted ID must stay deleted at the new epoch.
+const skewed={...sample,id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',session_id:'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  sequence:1,observed_at:iso(Date.now()+60000)};
+assert.equal((await ingest([skewed],{consent_id:second.consent_id,sync_epoch:2})).results[0].outcome,'accepted');
+assert.equal((await raw('delete_all',{expected_epoch:2})).sync_epoch,3);
+assert.equal((await ingest([skewed],{consent_id:second.consent_id,sync_epoch:3})).results[0].outcome,'deleted',
+  'lost-ACK retry cannot resurrect a deleted sample within the permitted future clock skew');
+const subsequent={...skewed,id:'dddddddd-dddd-4ddd-8ddd-ddddddddddde',sequence:2};
+assert.equal((await ingest([subsequent],{consent_id:second.consent_id,sync_epoch:3})).results[0].outcome,'accepted',
+  'deleting known IDs must not widen the time barrier over legitimate post-deletion observations');
+
+// Independent watch with an old consent window and a two-hour stay straddling expiry.
+await as(stranger);
+await db.query("select public.set_unified_cloud_consent(true,true,'2026-10-26-unified')");
+const historicalGrant=await raw('consent',{policy_version:'2026-10-27-raw-location',adult:true},stranger);
+await db.exec(`reset role;update public.location_sync_state set raw_upload_cutoff=now()-interval '8 days' where owner_user_id='${stranger}';`);
+const stayStart=Date.now()-7*86400000-3600000, laterTime=stayStart+2*3600000;
+const later={...sample,id:'ffffffff-ffff-4fff-8fff-ffffffffffff',observed_at:iso(laterTime)};
+await as(stranger);
+const historicalIngest=samples=>raw('ingest',{protocol_version:1,consent_id:historicalGrant.consent_id,sync_epoch:0,samples},stranger);
+assert.equal((await historicalIngest([later])).results[0].outcome,'accepted');
+// Reusing a different owner's deleted UUID remains permitted.
+assert.equal((await historicalIngest([skewed])).results[0].outcome,'accepted');
+await db.exec(`reset role;insert into public.location_stays(owner_user_id,id,source_revision,started_at,expires_at,summary)
+ values('${stranger}','abababab-abab-4bab-8bab-abababababab',1,'${iso(stayStart)}','${iso(stayStart+7*86400000)}',
+ '${JSON.stringify({session_id:later.session_id,started_at:iso(stayStart),last_observed_at:later.observed_at})}'::jsonb);
+set role service_role;select public.cleanup_location_stays();`);
+await as(stranger);
+const historicalRange={from:iso(laterTime-1000),to:iso(laterTime+1000)};
+assert.equal((await raw('read',historicalRange,stranger)).samples.length,1,
+  'automatic stay expiry must preserve later raw fixes until their individual seven-day deadline');
+assert.equal((await historicalIngest([later])).results[0].outcome,'idempotent',
+  'automatic stay expiry must not tombstone the raw interval');
+// Tombstones contain no coordinates, are inaccessible to clients, and expire on
+// the deleted source's retention deadline rather than the deletion/receipt time.
+await assert.rejects(db.query('select * from private.location_raw_deletions'),/permission denied/);
+await db.exec('reset role');
+const deletedMarker=(await db.query('select expires_at from private.location_raw_deletions where owner_user_id=$1 and id=$2',[owner,skewed.id])).rows[0];
+assert.equal(new Date(deletedMarker.expires_at).getTime(),Date.parse(skewed.observed_at)+7*86400000);
+assert.equal((await db.query('select count(*)::int n from private.location_raw_exclusions where owner_user_id=$1',[stranger])).rows[0].n,0,
+  'automatic expiry does not create source exclusions');
+assert.equal((await db.query('select count(*)::int n from public.location_stays where owner_user_id=$1',[stranger])).rows[0].n,0,
+  'the expired stay itself was cleaned up');
+await db.exec(`insert into private.location_raw_deletions values('${owner}','12121212-1212-4212-8212-121212121212',now()-interval '1 second');
+set role service_role;select public.cleanup_location_stays();reset role;`);
+assert.equal((await db.query("select count(*)::int n from private.location_raw_deletions where id='12121212-1212-4212-8212-121212121212'")).rows[0].n,0);
+assert.equal((await db.query('select count(*)::int n from private.location_raw_deletions where owner_user_id=$1 and id=$2',[owner,skewed.id])).rows[0].n,1,
+  'cleanup retains unexpired deleted-ID protection');
 await db.close();
 console.log('Raw location: scoped consent, owner-only writes, atomic retry/conflict, bounded pagination, withdrawal, retention, deletion and source suppression passed');
