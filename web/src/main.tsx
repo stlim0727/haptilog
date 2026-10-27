@@ -36,9 +36,10 @@ import { supabase, authCallbackFailed } from "./client";
 import { journalItems, matchesJournal, journalDates } from "./journal";
 import type { JournalItem } from "./journal";
 import { useLocationJournal } from "./location-stays/useLocationJournal";
+import { JOURNAL_CATEGORIES, categorySelection, categoryPressed, toggleCategory } from "./categoryFilter";
 import { JournalTimeline } from "./JournalTimeline";
 import { StayInspector } from "./location-stays/StayInspector";
-import type { Stay } from "./location-stays/types";
+import { StayPlaceName } from "./location-stays/StayPlaceName";
 import { clearAllDismissals } from "./location-stays/dismissals";
 import {
   DEMO_MODE_STORAGE_KEY,
@@ -165,10 +166,6 @@ function App() {
   const [checking, setChecking] = useState(true);
   const [sampleRevision, setSampleRevision] = useState(0);
   const locationJournal = useLocationJournal(connection?.owner_user_id, connection?.session_id, isDemoSessionActive(), sampleRevision);
-  const [placeRequest, setPlaceRequest] = useState(0);
-  const [savePlaceStay, setSavePlaceStay] = useState<Stay | null>(null);
-  const [savePlaceOwner, setSavePlaceOwner] = useState<string | undefined>();
-  const requestPlace = (stay: Stay) => { setSavePlaceOwner(connection?.owner_user_id); setSavePlaceStay(stay); setPlaceRequest(n => n + 1); };
   const [error, setError] = useState(authCallbackFailed
     ? translations[getInitialLanguage()].google_error : "");
   const [records, setRecords] = useState<Recording[]>([]);
@@ -178,7 +175,16 @@ function App() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("all");
-  const [category, setCategory] = useState("All");
+  const [category, setCategoryState] = useState("All");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([...JOURNAL_CATEGORIES]);
+  const setCategory = (next: string) => {
+    setCategoryState(next);
+    if (next !== "Trash") setSelectedCategories(categorySelection(next));
+  };
+  const applyCategories = (next: string[]) => {
+    setSelectedCategories(next);
+    setCategoryState(next.length === 1 && next[0] === "Stay" ? "Stay" : "All");
+  };
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording") ?? new URL(window.location.href).searchParams.get("stay"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
@@ -609,7 +615,7 @@ function App() {
   const activeRecords = records.filter((r) => !r.deleted_at);
 
   const allItems = journalItems(records, locationJournal.snapshot?.stays ?? [], locationJournal.snapshot?.places ?? [], locationJournal.now);
-  const filteredItems = allItems.filter(item => matchesJournal(item, { category, date, search }));
+  const filteredItems = allItems.filter(item => matchesJournal(item, { category: isTrashView ? "Trash" : "All", categories: selectedCategories, date, search }));
   const stayEmptyMessage = search || date !== "all"
     ? (lang === "ko" ? "조건에 맞는 체류가 없습니다." : "No stays match these filters.")
     : locationJournal.snapshot?.state.consent_enabled
@@ -625,7 +631,8 @@ function App() {
       setCategory("All"); setSearch(""); setDate("all"); setStripDateKey("ALL");
     }
   };
-  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} readOnly={isDemo} records={records} onOpenRecording={onOpenRecording} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
+  const renderPlaceName = (item: Extract<JournalItem, { kind: "stay" }>, compact = false, identity?: string) => !isDemo ? <StayPlaceName key={`${connection?.owner_user_id}:${connection?.session_id}:${identity ?? item.id}`} item={item} journal={locationJournal} lang={lang} compact={compact} /> : null;
+  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} readOnly={isDemo} records={records} onOpenRecording={onOpenRecording} lang={lang} renderPlaceName={renderPlaceName} />;
   const displayRecordings =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
       ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)
@@ -1040,12 +1047,12 @@ function App() {
           </section>
         </main>
       ) : mobile ? (
-        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} onSavePlace={!isDemo && locationJournal.snapshot?.state.consent_enabled ? item => requestPlace(item.stay) : undefined} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
-          date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
+        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} renderPlaceName={renderPlaceName} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
+          date={date} setDate={setDate} category={category} setCategory={setCategory} selectedCategories={selectedCategories} applyCategories={applyCategories} search={search} setSearch={setSearch}
           summary={summary} count={dateJournal.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
           isDemo={isDemo} onResetDemo={resetSampleData}
-          locationControl={<Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} request={savePlaceOwner === connection.owner_user_id && savePlaceStay ? placeRequest : 0} initialStay={savePlaceOwner === connection.owner_user_id ? savePlaceStay : null} onClose={() => setSavePlaceStay(null)} /></Suspense>}
+          locationControl={<Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} /></Suspense>}
           renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
             onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
             lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
@@ -1109,7 +1116,7 @@ function App() {
               <p>{lang === "ko" ? "음성과 머문 장소를 한곳에서 돌아보세요." : "Your voice and the places you stayed, together."}</p>
             </div>
             <div className="heading-actions">
-              <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} request={savePlaceOwner === connection.owner_user_id && savePlaceStay ? placeRequest : 0} initialStay={savePlaceOwner === connection.owner_user_id ? savePlaceStay : null} onClose={() => setSavePlaceStay(null)} /></Suspense>
+              <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} /></Suspense>
               <label className="date-picker">
                 <CalendarDays size={16} />
                 <span className="sr-only">Date range</span>
@@ -1272,8 +1279,9 @@ function App() {
               ).map(([c, label, Icon]) => (
                 <button
                   key={c}
-                  className={category === c ? "active" : ""}
-                  onClick={() => setCategory(c)}
+                  className={!isTrashView && categoryPressed(selectedCategories, c) === true ? "active" : ""}
+                  aria-pressed={!isTrashView && categoryPressed(selectedCategories, c)}
+                  onClick={() => applyCategories(toggleCategory(isTrashView ? [] : selectedCategories, c))}
                 >
                   {Icon && <Icon size={12} />} {label}
                 </button>
@@ -1483,7 +1491,7 @@ function App() {
                     </div>
                   ) : (
                     <div className="record-list">
-                      <JournalTimeline items={displayItems} allItems={allItems} now={locationJournal.now} lang={lang} onSelectStay={item => setSelected(item.id)} onSavePlace={!isDemo && locationJournal.snapshot?.state.consent_enabled ? item => requestPlace(item.stay) : undefined} renderVoice={(item) => {
+                      <JournalTimeline items={displayItems} allItems={allItems} now={locationJournal.now} lang={lang} onSelectStay={item => setSelected(item.id)} renderPlaceName={renderPlaceName} renderVoice={(item) => {
                     if (item.kind !== "voice") return null;
                     const r = item.recording;
                     const e = latest(r),

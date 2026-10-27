@@ -146,3 +146,35 @@ authorized stay snapshot and mutation path.
 The proposed main-list ribbon treatment is documented separately in
 `docs/design/concepts/2026-10-27-stay-ribbons/`. Those images/HTML are a design
 proposal and do not claim the production ribbon UI has been implemented.
+
+## Main journal ribbon grouping
+
+The main list groups consecutive stays assigned to the same single saved-place ID
+when the next observation starts no more than three minutes after the previous
+one ends. This is a display projection: original stay IDs, times, coordinates,
+deletion and voice associations remain unchanged. Confirmed duration sums source
+durations and never includes the gaps. Unknown/ambiguous places, overlapping stays,
+clock discontinuities and intervening stays at another place do not join a group.
+Filters and mobile day slices only summarize visible source stays.
+
+A grouped label/ribbon expands its source list; each original stay remains selectable
+for details and individual deletion. An empty group uses a compact 44px minimum row.
+Saved-place IDs determine stable ribbon hues across days, filters and reloads;
+unknown places use their source IDs and are never inferred to be the same place.
+
+## Name a place without leaving the journal
+
+The ribbon and stay inspector use a shared inline name field with Save/Cancel.
+The captured representative coordinates and the existing default 200m place radius
+are supplied automatically; renames retain the saved place's ID and geometry.
+The settings dialog is no longer part of this naming path. Revision conflicts
+require an explicit refresh/review and keep the draft. Acknowledged names update
+shared journal state before refreshing, so a failed refresh does not discard the
+successful result. Cloud consent, owner/session isolation and the 20-place limit
+still apply. Sample mode remains read-only.
+
+
+The compact ribbon shows the place name and a short time range with observed
+minutes. Day-grouped mobile lists omit repeated dates; mixed-date desktop lists
+keep a short date prefix. A chevron reveals original source stays, and a pencil
+opens inline renaming. Group counts and gap explanations do not occupy feed rows.

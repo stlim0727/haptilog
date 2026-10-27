@@ -1,3 +1,4 @@
+import { onlyCategory } from "./category-picker";
 import { expect } from '@playwright/test';
 import { test } from './fixtures';
 import { fixture } from './portal-fixture';
@@ -24,7 +25,7 @@ for(const width of [1280,390]) {
     } else {
       await page.getByRole('button',{name:'Show map',exact:true}).click();
       await expect(page.getByRole('region',{name:'Map of voice and stay locations'})).toBeVisible();
-      await page.getByRole('button',{name:'Stays',exact:true}).click();
+      await onlyCategory(page, 'Stays');
       await expect(cards).toHaveCount(stayRows);
       await expect(page.locator('.record-list [data-journal-kind="voice"]')).toHaveCount(0);
     }
