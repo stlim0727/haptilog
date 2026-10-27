@@ -41,6 +41,7 @@ import {
 } from "./domain";
 import type { Recording } from "./domain";
 import { JournalStayCard } from "./JournalStayCard";
+import { JournalTimeline } from "./JournalTimeline";
 import { journalDates, journalLocated, voiceItem } from "./journal";
 import type { JournalItem } from "./journal";
 import type { Language, TranslationKeys } from "./i18n";
@@ -69,6 +70,7 @@ type Props = {
   filteredItems: JournalItem[];
   stayEmptyMessage: string;
   locationLoaded: boolean;
+  onSavePlace?: (item: Extract<JournalItem, { kind: "stay" }>) => void;
   renderStay: (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording?: (recording: Recording) => void) => React.ReactNode;
   loaded: boolean;
   truncated: boolean;
@@ -569,8 +571,7 @@ export function MobileWorkspace(p: Props) {
                         {ko ? "개" : " records"}
                       </span>
                     </h2>
-                    {entries.filter((r) => journalDates(r).includes(day))
-                      .map(card)}
+                    <JournalTimeline items={entries.filter(r => journalDates(r).includes(day))} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} onSavePlace={p.onSavePlace} />
                   </section>
                 ))
                 : (

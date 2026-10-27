@@ -25,24 +25,23 @@ cases; `mobile.png` shows them at 390px. Rendering checked 128px/64px sizing,
 mobile horizontal containment and keyboard-accessible empty-stay disclosure.
 All recordings and locations in this design are synthetic.
 
-## Unnamed stay → known place (beacon)
+## Unnamed stay → My places
 
-An unnamed ribbon exposes **＋ 비콘으로 저장** directly beside its place label,
+An unnamed ribbon exposes **＋ 장소로 저장** directly beside its place label,
 including the 64px empty-stay slot. Known ribbons use their current place name
 and offer editing instead of creating a duplicate. The prototype's unnamed
 example is case B; the same entry applies to case A when it is unnamed.
 
 The save sheet starts at the stay's representative observation position, asks for
 a 1–40-character name and a 150–2,000m radius (200m preview default), and distinguishes
-GPS accuracy from the user's chosen place radius. Nearby existing beacons can be
-reused. This is the existing SavedPlace concept with a user-facing beacon label,
-not a Bluetooth device or new background behavior. The existing 20-place limit,
+GPS accuracy from the user's chosen place radius. Nearby existing places can be
+reused. This is the existing SavedPlace concept with the user-facing label “내 장소”. The existing 20-place limit,
 owner authorization and conflict/draft-preservation rules remain implementation
 requirements.
 
 Save updates the prototype's displayed ribbon name and changes its entry to
-**비콘 수정**. Original coordinates, observation times and confirmed duration are
-not changed; naming is qualified as the current beacon setting. Cancel returns to
+**장소 수정**. Original coordinates, observation times and confirmed duration are
+not changed; naming is qualified as the current place setting. Cancel returns to
 the ribbon. The HTML mockup makes no network writes and explicitly labels the
 save as prototype-only.
 
@@ -50,3 +49,15 @@ save as prototype-only.
 `beacon-saved-mobile.png` shows the renamed half-row ribbon. Pointer entry,
 name/save/edit/cancel, retained 64px height and mobile horizontal containment
 were verified in the project Chrome session. The map is a schematic preview.
+
+## Main journal implementation
+
+The mobile and desktop list now use `JournalTimeline`. Voice cards stay in newest-first
+order. Stays span their unambiguous voice candidates; empty stays use a 64px row
+against a minimum 128px voice card. Intervening unrelated voices break the ribbon.
+Filtered-out stays still participate in association ambiguity checks. Each mobile
+date keeps the original stay identity, including stays crossing midnight.
+Unnamed stays open the existing place editor directly, subject to consent; demo
+stays remain read-only. The editor uses “내 장소 추가” and “내 장소 수정”.
+
+`implemented-mobile.png` and `implemented-desktop.png` show the main sample journal.

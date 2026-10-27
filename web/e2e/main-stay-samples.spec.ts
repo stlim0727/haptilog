@@ -11,7 +11,7 @@ for(const width of [1280,390]) {
     await page.goto('/');await page.getByTestId('preview-test-login-button').click();
     const stayRows=width<700?5:4; // the midnight stay appears on both observed dates
     // Use visible main cards; neither the developer dialog nor its selector is opened.
-    const cards=page.locator(width<700?'.mobile-record[data-journal-kind="stay"]':'.record-list [data-journal-kind="stay"]');
+    const cards=page.locator(width<700?'.ribbon-stay-open[data-journal-kind="stay"]':'.record-list [data-journal-kind="stay"]');
     await expect(cards).toHaveCount(stayRows);
     await expect(page.locator(width<700?'.mobile-record[data-journal-kind="voice"]':'.record-list [data-journal-kind="voice"]')).toHaveCount(9);
     await expect(cards.filter({hasText:'Sample café'})).toHaveCount(1);

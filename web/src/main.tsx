@@ -36,7 +36,7 @@ import { supabase, authCallbackFailed } from "./client";
 import { journalItems, matchesJournal, journalDates } from "./journal";
 import type { JournalItem } from "./journal";
 import { useLocationJournal } from "./location-stays/useLocationJournal";
-import { JournalStayCard } from "./JournalStayCard";
+import { JournalTimeline } from "./JournalTimeline";
 import { StayInspector } from "./location-stays/StayInspector";
 import type { Stay } from "./location-stays/types";
 import { clearAllDismissals } from "./location-stays/dismissals";
@@ -1040,7 +1040,7 @@ function App() {
           </section>
         </main>
       ) : mobile ? (
-        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
+        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} onSavePlace={!isDemo && locationJournal.snapshot?.state.consent_enabled ? item => requestPlace(item.stay) : undefined} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
           date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
           summary={summary} count={dateJournal.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
@@ -1483,8 +1483,8 @@ function App() {
                     </div>
                   ) : (
                     <div className="record-list">
-                      {displayItems.map((item) => {
-                    if (item.kind === "stay") return <JournalStayCard key={`stay:${item.id}`} item={item} lang={lang} now={locationJournal.now} selected={activeItem?.id === item.id} onSelect={() => setSelected(item.id)} />;
+                      <JournalTimeline items={displayItems} allItems={allItems} now={locationJournal.now} lang={lang} onSelectStay={item => setSelected(item.id)} onSavePlace={!isDemo && locationJournal.snapshot?.state.consent_enabled ? item => requestPlace(item.stay) : undefined} renderVoice={(item) => {
+                    if (item.kind !== "voice") return null;
                     const r = item.recording;
                     const e = latest(r),
                       state = processingState(r),
@@ -1531,7 +1531,7 @@ function App() {
                         </span>
                       </button>
                     );
-                  })}
+                  }} />
                 </div>
               )}
             </section>
