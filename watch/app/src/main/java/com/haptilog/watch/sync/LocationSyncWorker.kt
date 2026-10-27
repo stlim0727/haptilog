@@ -21,6 +21,7 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
         @Volatile private var active: CloudClient? = null
         fun cancelActive() { active?.cancelRequests() }
         fun schedule(context: Context) {
+            RawLocationSyncWorker.schedule(context)
             val prefs = LocationConsent.preferences(context)
             if ((!LocationConsent.enabled(context) && !prefs.getBoolean("revoke_pending", false)) || !CloudClient.configured) return
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED)

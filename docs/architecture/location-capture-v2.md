@@ -6,6 +6,15 @@ increments, not an implemented or deployed API. Step 1 only removes watch
 history/editing UI; the [v1 summary protocol](location-stays-sync.md) remains in
 use until steps 2 and 3 pass their activation gates.
 
+## Developer raw-map increment (2026-10-27)
+
+The complementary [developer raw-map lane](../development/raw-location-map.md)
+adds pre-filter local originals, an explicit future-only precise-location consent,
+owner-only idempotent batch ingest and scoped developer reads. It uses the separate
+`raw_locations` protocol 1 endpoint while existing v1 stay inference/upload remains
+unchanged. It does **not** activate protocol 2 server inference, end-marker jobs,
+remote cadence or historical recomputation described below. Those gates remain.
+
 ## Product boundary
 
 The watch owns collection consent, durable capture and upload. The server owns

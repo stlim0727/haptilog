@@ -81,6 +81,7 @@ import "./style.css";
 import "./mobile.css";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
+const RawLocationLauncher = lazy(() => import("./raw-location/RawLocationLauncher"));
 const LocationLauncher = lazy(() => import("./location-stays/LocationLauncher"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -666,6 +667,7 @@ function App() {
             <span className="top-label">{t.brand_slogan}</span>
           </div>
           <div className="top-right">
+            {connection && <Suspense fallback={null}><RawLocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} lang={lang} isDemo={isDemo} /></Suspense>}
             <button
               className="theme-switch-btn"
               onClick={toggleTheme}

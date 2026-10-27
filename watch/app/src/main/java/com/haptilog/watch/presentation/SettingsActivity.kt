@@ -22,6 +22,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import com.haptilog.watch.R
@@ -59,6 +60,8 @@ class SettingsActivity : ComponentActivity() {
                 var crashes by remember { mutableStateOf(AppReports.crashReportsEnabled(this)) }
                 var hapticIntensity by remember { mutableStateOf(HapticPreferences.getIntensity(this)) }
                 val hapticManager = remember { HapticHeartbeatManager(this) }
+                var rawConsenting by rememberSaveable { mutableStateOf(false) }
+                var rawAccepted by remember { mutableStateOf(com.haptilog.watch.sync.RawLocationConsent.grant(this) != null) }
                 var consenting by rememberSaveable { mutableStateOf(false) }
                 var reporting by rememberSaveable { mutableStateOf(false) }
                 var description by rememberSaveable { mutableStateOf("") }
@@ -70,14 +73,16 @@ class SettingsActivity : ComponentActivity() {
                         if (event == Lifecycle.Event.ON_RESUME) {
                             queued = AppReports.pending(this@SettingsActivity)
                             cloud = RecordingSyncWorker.enabled(this@SettingsActivity)
+                            rawAccepted = com.haptilog.watch.sync.RawLocationConsent.grant(this@SettingsActivity) != null
                             collectionScope = com.haptilog.watch.data.location.LocationCollection.load(this@SettingsActivity)
                         }
                     }
                     lifecycle.addObserver(observer)
                     onDispose { lifecycle.removeObserver(observer) }
                 }
-                BackHandler(enabled = (reporting || consenting) && !busy) { reporting = false; consenting = false; notice = null }
-                LaunchedEffect(reporting, consenting) { list.scrollToItem(0); focus.requestFocus() }
+                BackHandler(enabled = (reporting || consenting || rawConsenting) && !busy) { reporting = false; consenting = false; rawConsenting = false; notice = null }
+                LaunchedEffect(reporting, consenting, rawConsenting) { list.scrollToItem(0); focus.requestFocus() }
+                val rawDisclosure = stringArrayResource(R.array.raw_location_disclosure_steps)
                 Scaffold(positionIndicator = { PositionIndicator(scalingLazyListState = list) }) {
                     ScalingLazyColumn(
                         state = list,
@@ -89,9 +94,23 @@ class SettingsActivity : ComponentActivity() {
                                 scope.launch { list.scrollBy(event.verticalScrollPixels) }; true
                             }
                     ) {
-                        item { Text(stringResource(when { consenting -> R.string.cloud_consent_title; reporting -> R.string.report_action; else -> R.string.settings_title }), fontSize = 18.sp, textAlign = TextAlign.Center) }
+                        item { Text(stringResource(when { rawConsenting -> R.string.raw_location_title; consenting -> R.string.cloud_consent_title; reporting -> R.string.report_action; else -> R.string.settings_title }), fontSize = 18.sp, textAlign = TextAlign.Center) }
                         notice?.let { message -> item { Text(message, fontSize = 12.sp, textAlign = TextAlign.Center) } }
-                        if (consenting) {
+                        if (rawConsenting) {
+                            if (!cloud) item { Text(stringResource(R.string.raw_location_requires_cloud), fontSize = 12.sp, textAlign = TextAlign.Center) }
+                            rawDisclosure.forEach { paragraph -> item { Text(paragraph, fontSize = 12.sp, textAlign = TextAlign.Center) } }
+                            item { FlexibleChip(enabled = !busy && cloud, label = { Text(stringResource(R.string.raw_location_agree), maxLines = Int.MAX_VALUE) }, onClick = {
+                                busy = true
+                                scope.launch {
+                                    try {
+                                        withContext(Dispatchers.IO) { com.haptilog.watch.sync.RawLocationConsent.enable(this@SettingsActivity) }
+                                        rawAccepted = true; rawConsenting = false
+                                    } catch (_: Exception) { notice = getString(R.string.raw_location_unavailable) }
+                                    finally { busy = false }
+                                }
+                            }) }
+                            item { FlexibleChip(enabled = !busy, label = { Text(stringResource(R.string.cancel_action)) }, onClick = { rawConsenting = false }) }
+                        } else if (consenting) {
 
                             item { Text(stringResource(R.string.unified_cloud_disclosure), fontSize = 12.sp, textAlign = TextAlign.Center) }
                             item { Text(stringResource(R.string.unified_cloud_withdrawal), fontSize = 12.sp, textAlign = TextAlign.Center) }
@@ -163,6 +182,7 @@ class SettingsActivity : ComponentActivity() {
                                         if (enabled) consenting = true else {
                                             CloudConsent.disable(this@SettingsActivity)
                                             cloud = false
+                                            rawAccepted = false
                                             notice = "Sync stopped. Server withdrawal will be sent when online. Cloud copies remain until deleted."
                                         }
                                     }, label = { Text(stringResource(R.string.cloud_sync_title), maxLines = Int.MAX_VALUE) },
@@ -175,6 +195,9 @@ class SettingsActivity : ComponentActivity() {
                                         uncheckedEndBackgroundColor = WatchColors.Surface),
                                     toggleControl = { Switch(checked = cloud) })
                             }
+                            item { FlexibleChip(enabled = !busy && !rawAccepted,
+                                label = { Text(stringResource(if (rawAccepted) R.string.raw_location_accepted else R.string.raw_location_title), maxLines = Int.MAX_VALUE) },
+                                onClick = { rawConsenting = true; notice = null }) }
                             if (!cloud) item { Text(stringResource(R.string.cloud_off_notice), fontSize = 12.sp,
                                 color = WatchColors.Muted, modifier = Modifier.fillMaxWidth()) }
                             item {

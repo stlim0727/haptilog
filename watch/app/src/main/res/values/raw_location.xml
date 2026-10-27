@@ -1,0 +1,15 @@
+<resources>
+    <string name="raw_location_title">Sync continuous location originals</string>
+    <string name="raw_location_agree">I am 18+ and agree to raw location sync</string>
+    <string name="raw_location_accepted">Continuous location sync approved</string>
+    <string name="raw_location_unavailable">Could not enable original location sync. Check cloud sync and the server version, then retry.</string>
+    <string name="raw_location_requires_cloud">First enable Cloud sync in Settings. Raw approval does not enable cloud or collection.</string>
+    <string-array name="raw_location_disclosure_steps">
+        <item>Optional · Adults 18+. Adds future precise location observations, timestamps, accuracy and available altitude/speed to Supabase cloud sync.</item>
+        <item>These originals can reconstruct your route. Retained for 7 days from observation.</item>
+        <item>Your connected browser can read them in the developer map. They are not sent to Gemini.</item>
+        <item>Previously collected points are never uploaded. Approval does not start location collection.</item>
+        <item>Cloud sync off stops uploads. Server copies remain until deleted or expired.</item>
+        <item>Set Location recording to Always to collect a continuous trail.</item>
+    </string-array>
+</resources>

@@ -51,6 +51,12 @@ The location journal is a separate capture path from voice recording. Users star
 Journal data is local by default. Legacy audio-only consent never uploads it. The explicit combined cloud policy covers recordings, attached location, saved places and stay summaries; an independent location worker sends the latter to Supabase; filtered movement points and legacy events remain local, and journal data is not sent to Gemini. Settings downloaded during tracking apply before the next explicit session, with a separate server acknowledgement. Cloud summaries expire seven days after their observed start; saved places persist until deleted. A scheduled daily job removes expired summaries from storage, so physical removal can trail the expiry moment by up to a day while reads already exclude them. Stopping or deleting journal data must not modify audio files. See [Location Journal](../design/location-journal.md) and the [stay synchronization contract](location-stays-sync.md) for capture, consent, deletion, and release boundaries.
 
 
+The additional precise-originals scope upgrade is separate from existing combined
+consent. After approval, new pre-filter observations can sync to a private Supabase
+raw store and the portal DEV map; pre-approval observations never backfill. Raw
+sources have seven-day server retention and are not sent to Gemini. This developer
+lane leaves v1 stay inference intact. See [raw location developer map](../development/raw-location-map.md).
+
 ## 5. Unified journal presentation target (2026-10-26)
 
 The approved UX revision presents voice and stay records through a discriminated journal-item model, preserving their separate capture, consent, synchronization and deletion contracts. Do not create fake recording rows or audio metadata for stays. Journal queries and UI state are scoped to the current authorized owner and portal session; stale asynchronous results must not carry place or stay data into another session. Location RPC failure must not prevent voice browsing.

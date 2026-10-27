@@ -1,0 +1,19 @@
+.raw-location-dialog { width: min(960px, calc(100vw - 24px)); max-height: 92dvh; overflow: auto; box-sizing: border-box; border: 1px solid #64748b; border-radius: 12px; background: var(--bg-surface); color: var(--text-primary); padding: 16px; }
+.raw-location-dialog::backdrop { background: #0009; }
+.raw-workspace { min-width: 0; }
+.raw-workspace p { font-size: 13px; line-height: 1.6; }
+.raw-workspace h2 { font-size: 20px; }
+.raw-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 12px 0; }
+.raw-workspace label { display: block; font-size: 13px; }
+.raw-workspace input, .raw-workspace select { display: block; max-width: 100%; box-sizing: border-box; margin-top: 5px; padding: 8px; }
+.raw-workspace select { width: 100%; }
+.raw-workspace button { min-height: 40px; }
+.raw-workspace dl > div { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 5px 0; font-size: 12px; }
+.raw-workspace dt { min-width: 165px; }
+.raw-workspace dd { margin: 0; overflow-wrap: anywhere; }
+.raw-location-map { height: 420px; margin: 12px 0; }
+@media(max-width: 700px) { .raw-location-map { height: 320px; } }
+
+.raw-location-dialog > button { position: sticky; top: 0; z-index: 1100; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--text-muted); border-radius: 8px; padding: 8px 16px; min-height: 40px; }
+.raw-workspace button { background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--text-muted); border-radius: 8px; padding: 8px 12px; }
+.raw-workspace button:disabled { opacity: .5; }

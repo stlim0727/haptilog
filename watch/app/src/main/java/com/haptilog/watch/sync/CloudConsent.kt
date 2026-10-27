@@ -43,6 +43,8 @@ object CloudConsent {
     @Synchronized internal fun observeWithdrawal(context: Context, observedGeneration: Long) {
         if (generation(context) != observedGeneration) return
         RecordingSyncWorker.disable(context)
+        RawLocationSyncWorker.cancel(context)
+        RawLocationConsent.clear(context)
         check(context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).edit()
             .remove("consent_version").putLong("generation", observedGeneration + 1).commit())
     }
@@ -55,6 +57,8 @@ object CloudConsent {
     }
     @Synchronized fun disable(context: Context) {
         RecordingSyncWorker.disable(context)
+        RawLocationSyncWorker.cancel(context)
+        RawLocationConsent.clear(context)
         LocationSyncWorker.cancelActive()
         context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).edit()
             .remove("consent_version").putLong("generation", generation(context) + 1).commit()

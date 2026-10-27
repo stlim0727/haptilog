@@ -15,6 +15,8 @@ class LocationHistoryRepository internal constructor(private val directory: File
     private var needsMigration = false
     private val mutableState = MutableStateFlow(load())
     val state: StateFlow<LocationHistorySnapshot> = mutableState.asStateFlow()
+    var captureSessionId: String? = null
+        private set
     private var detector: LocationEventDetector? = null
     private var stayDetector: LocationStayDetector? = null
     // A failed disk commit must not strand a live detector or lose its terminal revision.
@@ -40,7 +42,8 @@ class LocationHistoryRepository internal constructor(private val directory: File
         check(detector == null) { "Location session already active" }
         prune()
         detector = LocationEventDetector(state.value.places, state.value.dwellMinutes, sessionStartElapsedMillis)
-        stayDetector = LocationStayDetector(state.value.dwellMinutes)
+        captureSessionId = java.util.UUID.randomUUID().toString()
+        stayDetector = LocationStayDetector(state.value.dwellMinutes, captureSessionId!!)
         mutableState.value = state.value.copy(latestSample = null)
     }
 
