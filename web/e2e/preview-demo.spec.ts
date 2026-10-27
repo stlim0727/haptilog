@@ -17,13 +17,21 @@ test("preview test login button appears in preview environment and launches demo
   await expect(page.locator(".record-card").filter({ hasText: "블루보틀 성수" })).toBeVisible();
   await expect(page.locator(".record-card").filter({ hasText: "경복궁 향원정" })).toBeVisible();
 
-  // Check metrics and categories
-  await page.locator(".tabs button", { hasText: "Expense" }).click();
-  await expect(page.locator(".record-card").filter({ hasText: "블루보틀 성수" })).toBeVisible();
-  await expect(page.locator(".record-card").filter({ hasText: "경복궁 향원정" })).toHaveCount(0);
+  // Chips start with every category selected, so the first click excludes that type.
+  const chip = (name: string) => page.locator(".tabs button", { hasText: name });
+  await chip("Expense").click();
+  await expect(chip("Expense")).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".record-card").filter({ hasText: "블루보틀 성수" })).toHaveCount(0);
+  await expect(page.locator(".record-card").filter({ hasText: "경복궁 향원정" })).toBeVisible();
 
-  // Check Travel
-  await page.locator(".tabs button", { hasText: "Travel" }).click();
+  // Excluding Travel hides it, re-including Expense brings it back.
+  await chip("Travel").click();
+  await expect(page.locator(".record-card").filter({ hasText: "경복궁 향원정" })).toHaveCount(0);
+  await chip("Expense").click();
+  await expect(page.locator(".record-card").filter({ hasText: "블루보틀 성수" })).toBeVisible();
+
+  // "All" restores every category.
+  await chip("All").click();
   await expect(page.locator(".record-card").filter({ hasText: "경복궁 향원정" })).toBeVisible();
 
   // Check Trash tab

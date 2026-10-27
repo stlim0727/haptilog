@@ -32,7 +32,9 @@ test("the unified journal settings and stay details render in Korean", async ({ 
   const detail = page.locator(".inspector");
   await expect(detail).toContainText("확인된 체류 59분");
   await expect(detail).toContainText("현재 장소 설정 기준");
-  await expect(detail.getByRole("button", { name: "장소로 저장", exact: true })).toBeVisible();
+  // Naming happens inline in the journal, and this stay already resolves to a saved place.
+  await expect(detail.getByRole("button", { name: "이름 수정", exact: true })).toBeVisible();
+  await expect(detail.getByRole("button", { name: "장소로 저장", exact: true })).toHaveCount(0);
   await expect(detail.getByRole("button", { name: "이 체류 삭제", exact: true })).toBeVisible();
   await expect(detail.getByText(/First observed|Last confirmed|No unambiguous voice candidates/)).toHaveCount(0);
   await page.screenshot({ path: "test-results/stays-korean-workspace.png" });
