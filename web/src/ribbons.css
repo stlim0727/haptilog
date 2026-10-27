@@ -11,3 +11,11 @@
 .ribbon-voice-row { min-width: 0; }
 .journal-ribbons .record-card, .journal-ribbons .mobile-record { width: 100%; min-height: 128px; margin: 0; box-sizing: border-box; }
 @media (max-width: 480px) { .ribbon-stay-label { flex-wrap: wrap; gap: 0 6px; } .ribbon-stay-open { flex-basis: 65%; } .ribbon-place-save { font-size: 10px; } }
+
+.ribbon-stay-label { flex-wrap: wrap; }
+.ribbon-group-sources { flex-basis: 100%; font-size: 10px; color: inherit; }
+.ribbon-group-sources summary { cursor: pointer; opacity: .75; padding: 2px 0; }
+.ribbon-stay-row:has(.ribbon-group-sources[open]) { height: auto; min-height: 64px; }
+.ribbon-group-sources p { line-height: 1.5; margin: 6px 0; }
+.ribbon-group-sources button { display: block; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; padding: 6px 0; }
+.stay-ribbon:hover { filter: brightness(1.12); }

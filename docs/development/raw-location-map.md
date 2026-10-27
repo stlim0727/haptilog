@@ -146,3 +146,18 @@ authorized stay snapshot and mutation path.
 The proposed main-list ribbon treatment is documented separately in
 `docs/design/concepts/2026-10-27-stay-ribbons/`. Those images/HTML are a design
 proposal and do not claim the production ribbon UI has been implemented.
+
+## Main journal ribbon grouping
+
+The main list groups consecutive stays assigned to the same single saved-place ID
+when the next observation starts no more than three minutes after the previous
+one ends. This is a display projection: original stay IDs, times, coordinates,
+deletion and voice associations remain unchanged. Confirmed duration sums source
+durations and never includes the gaps. Unknown/ambiguous places, overlapping stays,
+clock discontinuities and intervening stays at another place do not join a group.
+Filters and mobile day slices only summarize visible source stays.
+
+A grouped label/ribbon expands its source list; each original stay remains selectable
+for details and individual deletion. An empty group retains the 64px collapsed row.
+Saved-place IDs determine stable ribbon hues across days, filters and reloads;
+unknown places use their source IDs and are never inferred to be the same place.

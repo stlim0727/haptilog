@@ -1,17 +1,22 @@
 import type { JournalItem } from './journal.ts';
+import { ribbonGroups } from './ribbonGroups.ts';
 import { recordingAssociation } from './location-stays/domain.ts';
 type StayItem = Extract<JournalItem, { kind: 'stay' }>;
 export function ribbonLayout(items: JournalItem[], allItems: JournalItem[], now: number) {
   const stays = allItems.filter((item): item is StayItem => item.kind === 'stay');
   const observations = stays.map(item => item.stay);
+  const groups = ribbonGroups(items, allItems);
+  const groupById = new Map(groups.map(group => [group.item.id, group]));
+  const representative = new Map(groups.flatMap(group => group.members.map(member => [member.id, group.item.id] as const)));
+  const displayItems = items.filter(item => item.kind === 'voice' || representative.get(item.id) === item.id);
   const linked = new Map<string, string>();
   for (const item of items) if (item.kind === 'voice') {
     const match = recordingAssociation(item.recording, observations, now);
-    if (match.kind === 'candidate') linked.set(item.id, match.stayIds[0]);
+    if (match.kind === 'candidate') linked.set(item.id, representative.get(match.stayIds[0]) ?? match.stayIds[0]);
   }
   const anchor = (item: JournalItem) => item.kind === 'voice' ? Date.parse(item.recorded_at)
     : Math.max(Date.parse(item.recorded_at), ...items.filter(v => v.kind === 'voice' && linked.get(v.id) === item.id).map(v => Date.parse(v.recorded_at)));
-  const rows = [...items].sort((a, b) => anchor(b) - anchor(a) || (a.kind === b.kind ? a.id.localeCompare(b.id) : a.kind === 'stay' ? -1 : 1));
+  const rows = [...displayItems].sort((a, b) => anchor(b) - anchor(a) || (a.kind === b.kind ? a.id.localeCompare(b.id) : a.kind === 'stay' ? -1 : 1));
   const ends: number[] = [];
   const ranges = rows.flatMap((item, first) => {
     if (item.kind !== 'stay') return [];
@@ -31,5 +36,5 @@ export function ribbonLayout(items: JournalItem[], allItems: JournalItem[], now:
     }
     return [{ item, first, last, lane, segments }];
   });
-  return { rows, ranges, lanes: ends.length };
+  return { rows, ranges, lanes: ends.length, groups: groupById };
 }
