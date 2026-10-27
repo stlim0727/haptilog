@@ -33,3 +33,10 @@
 .raw-range-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
 .raw-range-controls input { width: 100%; accent-color: #3b82f6; min-height: 32px; padding: 0; }
 .raw-selected-range { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.raw-sample-notice { padding: 10px; border: 1px solid #f59e0b; border-radius: 8px; }
+.raw-stay-samples { border-top: 1px solid var(--text-muted); margin-top: 12px; padding-top: 12px; }
+.raw-stay-samples > button { display: block; width: 100%; text-align: start; margin: 6px 0; }
+.raw-stay-samples > button[aria-pressed="true"] { border-color: #f59e0b; }
+.raw-stay-dot { fill: #f59e0b; pointer-events: none; }
+.raw-stay-legend { color: var(--text-secondary); }
+.raw-stay-marker { background: #f59e0b; color: #171717; border: 2px solid white; border-radius: 50%; font: bold 12px/20px system-ui; text-align: center; box-sizing: border-box; }

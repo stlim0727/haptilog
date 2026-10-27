@@ -72,3 +72,18 @@ migration before fixing them. Added SQL regressions verify:
   expired markers while preserving live deletion protection.
 
 Validation: full `npm --prefix supabase/tests test` migration/RLS suites.
+
+## Developer GPS + stay sample follow-up
+
+- Web build and 59 unit tests passed. Fixture tests validate source values,
+  linked capture sessions, non-future observations (including just after midnight),
+  observation-gap segmentation and half-open stay overlap.
+- Ten desktop/mobile E2E tests passed across sample login, raw map, timeline and
+  developer stay scenarios. Samples and server data switch independently; raw
+  ingestion being unavailable still permits separately synchronized stay display.
+- Sample-mode checks verify four stay summaries and regions, orange boundary
+  dots, source inspection, range exclusion, absence of server deletion controls,
+  zero raw-location RPC requests, and narrow-screen containment.
+- Final stay/map layout was rechecked with the three stay-specific E2E tests.
+  `web-developer-stays-*.png` and `web-developer-stay-map-*.png` show synthetic UI
+  evidence. No sample data is uploaded to Supabase.

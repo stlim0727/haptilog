@@ -667,7 +667,7 @@ function App() {
             <span className="top-label">{t.brand_slogan}</span>
           </div>
           <div className="top-right">
-            {connection && <Suspense fallback={null}><RawLocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} lang={lang} isDemo={isDemo} /></Suspense>}
+            {connection && <Suspense fallback={null}><RawLocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} lang={lang} isDemo={isDemo} stays={locationJournal.snapshot?.stays ?? []} /></Suspense>}
             <button
               className="theme-switch-btn"
               onClick={toggleTheme}

@@ -57,3 +57,20 @@ test('timeline calendar days and repeated hours survive DST transitions',async()
     assert.notEqual(repeated[0].detail,repeated[1].detail);
   } finally { if(previous===undefined)delete process.env.TZ;else process.env.TZ=previous; }
 });
+test('developer GPS/stay samples are valid, linked and never future observations',async()=>{
+  const { developerSamples }=await import('./raw-location/samples.ts');
+  const { visibleStay }=await import('./location-stays/domain.ts');
+  const { staysInRange }=await import('./raw-location/timeline.ts');
+  for(const now of [Date.parse('2026-10-27T18:00:00Z'),Date.parse('2026-10-27T00:01:00Z')]) {
+    const data=developerSamples(now);assert.equal(data.stays.length,4);assert.ok(data.samples.length>100);
+    assert.ok(data.stays.every(stay=>visibleStay(stay,now)));
+    assert.ok(data.samples.every(fix=>parseRawSample(fix)&&Date.parse(fix.observed_at)<=now));
+    assert.ok(data.stays.every(stay=>data.samples.some(fix=>fix.session_id===stay.session_id)));
+    const gap=data.stays.find(stay=>stay.end_reason==='observation_gap');
+    assert.equal(gap.observed_duration_millis,11*60000);
+    assert.ok(rawSegments(data.samples.filter(fix=>fix.session_id===gap.session_id)).length>1);
+    const start=Date.parse(gap.started_at),end=Date.parse(gap.last_observed_at);
+    assert.ok(staysInRange(data.stays,{start,end}).some(stay=>stay.id===gap.id));
+    assert.ok(!staysInRange(data.stays,{start:start-1000,end:start}).some(stay=>stay.id===gap.id));
+  }
+});

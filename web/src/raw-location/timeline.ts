@@ -43,3 +43,8 @@ export function timelineDots(samples: RawSample[], bins: TimeBin[], aggregate: b
   }
   return aggregate ? [...grouped.values()] : dots;
 }
+
+/** Stay summaries expose an observed span, not the exact positions of any gaps. */
+export function staysInRange(stays: import('../location-stays/types.ts').Stay[], range: TimeRange) {
+  return stays.filter(stay => Date.parse(stay.started_at) < range.end && Date.parse(stay.last_observed_at) >= range.start);
+}

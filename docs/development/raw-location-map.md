@@ -103,3 +103,25 @@ The map toolbar has **Chronological line · ON/OFF** (default ON). It changes on
 connection lines; selected fixes, accuracy circles, time ranges and the current
 map view are retained. Turning lines on still respects session/sequence gaps and
 clock discontinuities. The control supports pointer and keyboard activation.
+
+## Developer stay samples and server stays
+
+DEV → Developer data → **Sample GPS + stays** provides four in-memory synthetic
+scenarios with matching raw fixes and derived summaries: a completed visit,
+observation-gap termination, a recent completed visit, and a midnight-crossing
+visit. Preview sample login opens this dataset directly, so a real watch and raw
+backend deployment are unnecessary for inspecting the developer UI. The visible
+synthetic notice distinguishes this dataset from captured history. Sampling does
+not invoke the raw RPC, persist sources or expose server deletion controls.
+
+Switching to **Server data** restores the connected owner's raw sources and
+already authorized stay snapshot. The two datasets are never merged. Raw API
+failure does not hide separately synchronized stays. Existing access, expiry and
+source separation remain in force; this UI does not create or modify cloud stays.
+
+Both datasets use the same date/hour range. Blue dots show raw fixes; orange dots
+mark a stay summary's first/last observation, without filling its span as proven
+continuous presence. Dashed orange circles and S pins show representative stay
+regions, distinct from raw GPS accuracy. Selecting a stay opens its original
+summary fields and full confirmed duration; overlap is not used to invent a
+partial duration or reconstruct hidden gaps.
