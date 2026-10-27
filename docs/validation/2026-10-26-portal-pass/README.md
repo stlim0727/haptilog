@@ -64,7 +64,7 @@ PR #84 kept the four scenarios and retargeted them at Place settings and the sta
 
 - No assistive technology was used. Screen-reader announcement order, landmarks and live-region behaviour on `role="alert"`/`role="status"` remain unverified; this is a keyboard, focus, name and contrast pass.
 - Recording-to-stay association has no live evidence: the emulator watch had no uploaded recordings, so the linked-recordings list inside a stay was only exercised by mock tests.
-- The collapsed stay summary always reads "Unnamed stay"/"이름 없는 체류" even when the expanded body reports a named place candidate. Consistent with the no-auto-assignment rule, but a UX follow-up rather than a defect.
+- The collapsed stay summary always reads "Unnamed stay"/"이름 없는 체류" even when the expanded body reports a named place candidate. Consistent with the no-auto-assignment rule, but a UX follow-up rather than a defect. That wording moved with the redesign: `journalTitle` in `web/src/journal.ts` now reads "Unnamed place"/"이름 없는 장소" whenever the saved areas do not resolve to exactly one candidate, so the follow-up carries over and has to be re-checked there.
 - Physical expiry cleanup still awaits the first `pg_cron` run on 2026-10-27 04:15 UTC; read exclusion is not deletion.
 - Battery, GNSS accuracy and ambient watch operation are tracked separately in the [follow-up checklist](../../design/location-stays-followup.md).
 

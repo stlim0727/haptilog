@@ -240,7 +240,7 @@ class LocationJournalActivity : ComponentActivity() {
                                 (notice ?: serviceNotice)?.let { item { JournalText(it) } }
                                 item { JournalText(stringResource(R.string.location_collection_summary)) }
                                 if (cloudManaged && active) item { JournalText(stringResource(R.string.location_sync_next_session)) }
-                                item { JournalText(stringResource(R.string.location_counts, history.points.size, history.events.size)) }
+                                item { JournalText(stringResource(R.string.location_counts, history.points.size, history.stays.size)) }
                                 (history.latestSample ?: history.points.lastOrNull())?.let { point -> item { JournalText(stringResource(R.string.location_last_fix, journalTime(point.timestampMillis))) } }
                                 if (active && history.latestSample == null) item { JournalText(stringResource(R.string.location_waiting_fix)) }
                                 if (!active) item { JournalAction(R.string.location_open_settings, !busy) {

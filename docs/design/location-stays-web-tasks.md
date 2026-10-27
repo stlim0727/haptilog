@@ -1,6 +1,6 @@
 # Discussion #66: 웹 체류·내 장소·추천 작업 분할
 
-상태: 구현 전 작업 명세. 2026-10-26. [Discussion #66](https://github.com/stlim0727/haptilog/discussions/66)의 체류 중심 계획을 구현 단위로 나눈다. 제품 코드를 변경하거나 원격 데이터를 쓰는 작업은 이 문서 작성 범위에 포함하지 않는다.
+상태: **폐기됨(역사 기록용).** 2026-10-26. [Discussion #66](https://github.com/stlim0727/haptilog/discussions/66)의 체류 중심 계획을 구현 단위로 나눈다. 제품 코드를 변경하거나 원격 데이터를 쓰는 작업은 이 문서 작성 범위에 포함하지 않는다. 아래 "현재 구조"와 파일 목록은 통합 이전 화면을 가리키므로 참고하지 말 것. 현재 구현은 PR #84로 merge된 통합 저널이며 진입점은 `web/src/journal.ts`(`JournalItem`), `web/src/JournalStayCard.tsx`, `web/src/location-stays/StayInspector.tsx`, `web/src/location-stays/useLocationJournal.ts`, `web/src/location-stays/LocationLauncher.tsx`("장소 설정")이다.
 
 ## 확인한 현재 구조
 
