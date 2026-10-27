@@ -55,3 +55,17 @@ These decisions were reviewed twice by UX and product marketing before implement
 The watch offers location scope and common cloud sync in Settings. It no longer offers a separate stay browser, coordinate list or place editor; cloud-backed history and place management are in the portal. Notification taps open the existing location settings and the notification Stop action remains available. Without cloud sync, existing local capture and bounded retention continue, but there is no on-watch history/management UI.
 
 Raw upload and cloud stay inference are the next stages of [issue #98](https://github.com/stlim0727/haptilog/issues/98), specified in the [v2 contract](../architecture/location-capture-v2.md). They require a new explicit consent and compatibility/deletion validation before activation. This navigation increment does not change the currently shipped raw-local/summary-cloud behavior or implement remote collection/upload cadence.
+
+
+## 6. Continuous location originals for developer inspection
+
+An explicit additional adult scope upgrade on the watch enables automatic upload
+of future precise sensor observations, including time, accuracy, capture-time fix
+age and available altitude/speed. Existing combined consent never authorizes this
+raw scope. The normal Always setting still controls collection; developer mode
+cannot remotely turn it on. A connected browser can inspect the last seven days
+through DEV → observation date → map/fix inspector. Gaps and session or clock
+changes split the line. Common cloud withdrawal stops this worker too. Source
+retention, idempotent retry and deletion barriers are specified in
+[the implementation contract](../development/raw-location-map.md). This feature
+retains the existing stay-inference pipeline and sends no raw locations to Gemini.

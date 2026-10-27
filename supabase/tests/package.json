@@ -1,1 +1,1 @@
-{"private":true,"type":"module","scripts":{"test":"node rls.test.mjs && node notion.test.mjs && node account-recovery.test.mjs && node location-stays.test.mjs"},"devDependencies":{"@electric-sql/pglite":"0.3.7"}}
+{"private":true,"type":"module","scripts":{"test":"node rls.test.mjs && node notion.test.mjs && node account-recovery.test.mjs && node location-stays.test.mjs && node raw-locations.test.mjs"},"devDependencies":{"@electric-sql/pglite":"0.3.7"}}

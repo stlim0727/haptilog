@@ -1,0 +1,35 @@
+import type { JournalItem } from './journal.ts';
+import { recordingAssociation } from './location-stays/domain.ts';
+type StayItem = Extract<JournalItem, { kind: 'stay' }>;
+export function ribbonLayout(items: JournalItem[], allItems: JournalItem[], now: number) {
+  const stays = allItems.filter((item): item is StayItem => item.kind === 'stay');
+  const observations = stays.map(item => item.stay);
+  const linked = new Map<string, string>();
+  for (const item of items) if (item.kind === 'voice') {
+    const match = recordingAssociation(item.recording, observations, now);
+    if (match.kind === 'candidate') linked.set(item.id, match.stayIds[0]);
+  }
+  const anchor = (item: JournalItem) => item.kind === 'voice' ? Date.parse(item.recorded_at)
+    : Math.max(Date.parse(item.recorded_at), ...items.filter(v => v.kind === 'voice' && linked.get(v.id) === item.id).map(v => Date.parse(v.recorded_at)));
+  const rows = [...items].sort((a, b) => anchor(b) - anchor(a) || (a.kind === b.kind ? a.id.localeCompare(b.id) : a.kind === 'stay' ? -1 : 1));
+  const ends: number[] = [];
+  const ranges = rows.flatMap((item, first) => {
+    if (item.kind !== 'stay') return [];
+    let last = first;
+    rows.forEach((row, index) => { if (row.kind === 'voice' && linked.get(row.id) === item.id) last = Math.max(last, index); });
+    let lane = ends.findIndex(end => end < first);
+    if (lane < 0) lane = ends.length;
+    ends[lane] = last;
+    // Do not visually enclose an unrelated voice merely because it lies between candidates.
+    const segments: { first: number; last: number }[] = [];
+    for (let index = first; index <= last; index++) {
+      const row = rows[index];
+      if (index !== first && !(row.kind === 'voice' && linked.get(row.id) === item.id)) continue;
+      const previous = segments.at(-1);
+      if (previous && previous.last === index - 1) previous.last = index;
+      else segments.push({ first: index, last: index });
+    }
+    return [{ item, first, last, lane, segments }];
+  });
+  return { rows, ranges, lanes: ends.length };
+}

@@ -36,7 +36,7 @@ import { supabase, authCallbackFailed } from "./client";
 import { journalItems, matchesJournal, journalDates } from "./journal";
 import type { JournalItem } from "./journal";
 import { useLocationJournal } from "./location-stays/useLocationJournal";
-import { JournalStayCard } from "./JournalStayCard";
+import { JournalTimeline } from "./JournalTimeline";
 import { StayInspector } from "./location-stays/StayInspector";
 import type { Stay } from "./location-stays/types";
 import { clearAllDismissals } from "./location-stays/dismissals";
@@ -81,6 +81,7 @@ import "./style.css";
 import "./mobile.css";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
+const RawLocationLauncher = lazy(() => import("./raw-location/RawLocationLauncher"));
 const LocationLauncher = lazy(() => import("./location-stays/LocationLauncher"));
 class MapBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -162,7 +163,8 @@ function App() {
   }, [accountOpen]);
   const [connection, setConnection] = useState<Connection | null>(null);
   const [checking, setChecking] = useState(true);
-  const locationJournal = useLocationJournal(connection?.owner_user_id, connection?.session_id, isDemoSessionActive());
+  const [sampleRevision, setSampleRevision] = useState(0);
+  const locationJournal = useLocationJournal(connection?.owner_user_id, connection?.session_id, isDemoSessionActive(), sampleRevision);
   const [placeRequest, setPlaceRequest] = useState(0);
   const [savePlaceStay, setSavePlaceStay] = useState<Stay | null>(null);
   const [savePlaceOwner, setSavePlaceOwner] = useState<string | undefined>();
@@ -433,6 +435,7 @@ function App() {
   }
 
   function resetSampleData() {
+    setSampleRevision(value => value + 1);
     const samples = generateSampleRecordings();
     saveStoredDemoRecords(samples);
     setRecords(samples);
@@ -441,7 +444,7 @@ function App() {
       message:
         lang === "ko"
           ? "샘플 데이터를 초기화했습니다."
-          : "Sample recordings reset.",
+          : "Sample journal reset.",
     });
   }
 
@@ -622,7 +625,7 @@ function App() {
       setCategory("All"); setSearch(""); setDate("all"); setStripDateKey("ALL");
     }
   };
-  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} records={records} onOpenRecording={onOpenRecording} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
+  const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} readOnly={isDemo} records={records} onOpenRecording={onOpenRecording} lang={lang} onSavePlace={() => requestPlace(item.stay)} />;
   const displayRecordings =
     viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
       ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)
@@ -666,6 +669,7 @@ function App() {
             <span className="top-label">{t.brand_slogan}</span>
           </div>
           <div className="top-right">
+            {connection && <Suspense fallback={null}><RawLocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} lang={lang} isDemo={isDemo} stays={locationJournal.snapshot?.stays ?? []} /></Suspense>}
             <button
               className="theme-switch-btn"
               onClick={toggleTheme}
@@ -1036,7 +1040,7 @@ function App() {
           </section>
         </main>
       ) : mobile ? (
-        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
+        <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} onSavePlace={!isDemo && locationJournal.snapshot?.state.consent_enabled ? item => requestPlace(item.stay) : undefined} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
           date={date} setDate={setDate} category={category} setCategory={setCategory} search={search} setSearch={setSearch}
           summary={summary} count={dateJournal.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
@@ -1479,8 +1483,8 @@ function App() {
                     </div>
                   ) : (
                     <div className="record-list">
-                      {displayItems.map((item) => {
-                    if (item.kind === "stay") return <JournalStayCard key={`stay:${item.id}`} item={item} lang={lang} now={locationJournal.now} selected={activeItem?.id === item.id} onSelect={() => setSelected(item.id)} />;
+                      <JournalTimeline items={displayItems} allItems={allItems} now={locationJournal.now} lang={lang} onSelectStay={item => setSelected(item.id)} onSavePlace={!isDemo && locationJournal.snapshot?.state.consent_enabled ? item => requestPlace(item.stay) : undefined} renderVoice={(item) => {
+                    if (item.kind !== "voice") return null;
                     const r = item.recording;
                     const e = latest(r),
                       state = processingState(r),
@@ -1527,7 +1531,7 @@ function App() {
                         </span>
                       </button>
                     );
-                  })}
+                  }} />
                 </div>
               )}
             </section>

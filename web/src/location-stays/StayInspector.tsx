@@ -20,14 +20,14 @@ class StayMapBoundary extends Component<{ children: ReactNode; ko: boolean }, { 
       : this.props.children;
   }
 }
-export function StayInspector({ item, journal, lang, onSavePlace, records, onOpenRecording }: { item: Extract<JournalItem, { kind: 'stay' }>; journal: LocationJournal; lang: 'ko' | 'en'; onSavePlace: () => void; records: Recording[]; onOpenRecording: (recording: Recording) => void }) {
+export function StayInspector({ item, journal, lang, onSavePlace, records, onOpenRecording, readOnly = false }: { readOnly?: boolean; item: Extract<JournalItem, { kind: 'stay' }>; journal: LocationJournal; lang: 'ko' | 'en'; onSavePlace: () => void; records: Recording[]; onOpenRecording: (recording: Recording) => void }) {
   const ko = lang === 'ko', stay = item.stay;
   const [confirm, setConfirm] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const status = presence(stay, journal.now);
   const linked = relatedRecordings(records, journal.snapshot?.stays ?? [], stay.id, journal.now);
   const time = (value: string) => new Date(value).toLocaleString(ko ? 'ko-KR' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   async function remove() {
-    if (!journal.repository || !journal.snapshot) return;
+    if (readOnly || !journal.repository || !journal.snapshot) return;
     setBusy(true); setError('');
     try {
       const snapshot = journal.snapshot;
@@ -54,7 +54,8 @@ export function StayInspector({ item, journal, lang, onSavePlace, records, onOpe
       <p className="location-secondary">{ko ? '관측 시간과 확인 가능한 위치에 따른 후보입니다. 장소를 확정하지 않습니다.' : 'Candidates based on observed times and available locations. Place association is not confirmed.'}</p>
       {linked.length ? <ul>{linked.map(recording => <li key={recording.id}><button className="text-button" onClick={() => onOpenRecording(recording)}>{latest(recording)?.summary || (ko ? '음성 기록 열기' : 'Open voice recording')}</button></li>)}</ul> : <p>{ko ? '연결할 음성 후보가 없습니다.' : 'No unambiguous voice candidates.'}</p>}
     </section>
-    <div className="stay-actions"><button className="secondary-button" disabled={busy || !journal.snapshot?.state.consent_enabled} onClick={onSavePlace}><MapPin size={16} />{ko ? '장소로 저장' : 'Save as a place'}</button><button className="secondary-button" disabled={busy} onClick={() => setConfirm(true)}><Trash2 size={16} />{ko ? '이 체류 삭제' : 'Delete this stay'}</button></div>
+    {readOnly && <p className="location-secondary" role="status">{ko ? '샘플 체류입니다. 실제 워치나 서버 기록이 아니며, 이 화면에서는 장소 저장·서버 삭제를 실행하지 않습니다.' : 'Sample stay. This is not real watch or server history; saving places and deleting server data are unavailable here.'}</p>}
+    {!readOnly && <div className="stay-actions"><button className="secondary-button" disabled={busy || !journal.snapshot?.state.consent_enabled} onClick={onSavePlace}><MapPin size={16} />{ko ? '장소로 저장' : 'Save as a place'}</button><button className="secondary-button" disabled={busy} onClick={() => setConfirm(true)}><Trash2 size={16} />{ko ? '이 체류 삭제' : 'Delete this stay'}</button></div>}
     {error && <p role="alert">{error}</p>}
     {confirm && <section className="stay-delete-confirm" aria-label={ko ? '체류 삭제 확인' : 'Confirm stay deletion'}><p>{ko ? '이 체류를 영구 삭제할까요? 다시 동기화해도 복원되지 않습니다. 음성과 내 장소는 유지됩니다.' : 'Permanently delete this stay? Synchronization will not restore it. Voice recordings and saved places are retained.'}</p><button className="secondary-button" disabled={busy} onClick={() => void remove()}>{ko ? '체류 영구 삭제' : 'Permanently delete stay'}</button><button className="secondary-button" disabled={busy} onClick={() => setConfirm(false)}>{ko ? '취소' : 'Cancel'}</button></section>}
   </article>;

@@ -1,0 +1,15 @@
+<resources>
+    <string name="raw_location_title">연속 위치 원본 동기화 동의</string>
+    <string name="raw_location_agree">만 18세 이상이며 위치 원본 전송에 동의</string>
+    <string name="raw_location_accepted">연속 위치 원본 동기화 승인됨</string>
+    <string name="raw_location_unavailable">위치 원본 동기화를 켜지 못했습니다. 클라우드 동기화와 서버 버전을 확인한 뒤 다시 시도하세요.</string>
+    <string name="raw_location_requires_cloud">설정에서 먼저 클라우드 동기화를 켜세요. 원본 동의가 클라우드나 위치 수집을 켜지는 않습니다.</string>
+    <string-array name="raw_location_disclosure_steps">
+        <item>선택 사항 · 만 18세 이상. 동의 이후 정밀 위치·측정 시각·정확도 및 수집된 고도·속도를 Supabase로 전송합니다.</item>
+        <item>원본으로 이동 경로를 재구성할 수 있습니다. 측정 시점부터 7일간 보관합니다.</item>
+        <item>연결한 브라우저의 개발자 지도에서 조회할 수 있습니다. Gemini에는 보내지 않습니다.</item>
+        <item>이전에 수집한 위치는 전송하지 않습니다. 이 동의가 위치 수집을 시작하지는 않습니다.</item>
+        <item>클라우드 동기화를 끄면 전송을 중지합니다. 서버 복사본은 삭제하거나 보존 기간이 지나면 제거됩니다.</item>
+        <item>연속 위치 수집에는 위치 기록을 항상으로 설정하세요.</item>
+    </string-array>
+</resources>

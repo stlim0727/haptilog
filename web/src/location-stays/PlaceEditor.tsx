@@ -34,7 +34,7 @@ export function PlaceEditor({ initial, places, editingId, expectedRevision, onSa
     } catch { setStatus(ko ? "저장하지 못했습니다. 변경 내용을 유지했습니다. 다시 시도하세요." : "Could not save. Your draft is preserved; retry when connected."); }
     finally { setBusy(false); }
   }}>
-    <fieldset disabled={busy}><legend>{ko ? "내 장소" : "My place"}</legend>
+    <fieldset disabled={busy}><legend>{editingId ? (ko ? "내 장소 수정" : "Edit my place") : (ko ? "내 장소 추가" : "Add to my places")}</legend>
       <PlaceMap latitude={draft.latitude} longitude={draft.longitude} radius={draft.radius_meters} lang={lang} onSelect={(latitude, longitude) => update({ latitude, longitude })} />
       <label>{ko ? "이름" : "Name"}<input value={draft.name} onChange={e => update({ name: e.target.value })} required /></label>
       <label>{ko ? "위도" : "Latitude"}<input type="number" step="any" min="-90" max="90" value={Number.isFinite(draft.latitude) ? draft.latitude : ""} onChange={e => update({ latitude: e.target.valueAsNumber })} required /></label>

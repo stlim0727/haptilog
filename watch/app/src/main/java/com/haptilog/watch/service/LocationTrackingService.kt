@@ -154,6 +154,10 @@ class LocationTrackingService : Service() {
                             is Write.Samples -> write.locations.forEach { location ->
                                 // Monotonic timestamps reject stale cached/batched fixes even
                                 // when the device wall clock changes during a session.
+                                com.haptilog.watch.data.location.RawLocationOutbox.get(applicationContext).append(
+                                    location, SystemClock.elapsedRealtime(), repository.captureSessionId!!,
+                                    com.haptilog.watch.sync.RawLocationConsent.grant(applicationContext),
+                                )
                                 repository.recordSample(
                                     LocationSample(
                                         latitude = location.latitude,

@@ -13,7 +13,7 @@ test("voice and stays share the chronological feed, search and type filters", as
   const feed = page.locator(".record-list");
   await expect(feed.locator(voiceCard)).toHaveCount(1);
   await expect(feed.locator(stayCard)).toHaveCount(1);
-  await expect(feed.locator("button").first()).toContainText("Coffee on the corner");
+  await expect(feed.locator(voiceCard).first()).toContainText("Coffee on the corner");
   await page.screenshot({ path: "test-results/unified-journal-desktop.png", fullPage: true });
   await page.getByRole("button", { name: "Stays", exact: true }).click();
   await expect(feed.locator(stayCard)).toHaveCount(1);
@@ -149,7 +149,7 @@ for (const theme of ["light", "dark"] as const) {
     await staysFixture(page);
     await page.addInitScript(value => localStorage.setItem("haptilog_theme", value), theme);
     await page.goto("/");
-    const card = page.locator(`.mobile-record${stayCard}`);
+    const card = page.locator(`.ribbon-stay-open${stayCard}`);
     await card.click();
     await expect(page.locator(".mobile-detail")).toContainText("59 min observed");
     await expect(page.locator(".mobile-detail audio")).toHaveCount(0);
@@ -169,7 +169,7 @@ for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 844 });
     await staysFixture(page);
     await page.goto("/");
-    await page.locator(width < 700 ? `.mobile-record${stayCard}` : `.record-list ${stayCard}`).click();
+    await page.locator(width < 700 ? `.ribbon-stay-open${stayCard}` : `.record-list ${stayCard}`).click();
     const save = page.getByRole("button", { name: "Save as a place", exact: true });
     await save.click();
     const settings = page.getByRole("dialog", { name: "Place settings", exact: true });
@@ -189,7 +189,7 @@ for (const width of [1280, 390]) {
     portal.recording.recorded_at = "2026-10-26T05:30:00Z";
     portal.recording.latitude = 37.5; portal.recording.longitude = 127;
     await page.goto("/");
-    const card = page.locator(width < 700 ? `.mobile-record${stayCard}` : `.record-list ${stayCard}`);
+    const card = page.locator(width < 700 ? `.ribbon-stay-open${stayCard}` : `.record-list ${stayCard}`);
     await card.click();
     await page.getByRole("region", { name: "Voice candidates during this stay" }).getByRole("button", { name: "Coffee on the corner", exact: true }).click();
     await expect(page.getByRole("button", { name: "Load original audio", exact: true })).toBeVisible();
@@ -228,3 +228,31 @@ test("opening a related voice clears desktop filters that would hide its detail"
   await expect(page.locator(`.record-list ${voiceCard}`)).toHaveClass(/selected/);
   await expect(page.getByRole("searchbox", { name: "Search journal" })).toHaveValue("");
 });
+
+for (const width of [1280, 390]) {
+  test(`stay ribbon spans voice and empty stay has half height at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    const { portal, state } = await staysFixture(page);
+    portal.recording.recorded_at = '2026-10-26T05:30:00Z';
+    portal.recording.latitude = 37.5; portal.recording.longitude = 127;
+    await page.goto('/');
+    const timeline = page.locator('.journal-ribbons');
+    const ribbon = timeline.locator('.stay-ribbon');
+    await expect(ribbon).toHaveCount(1);
+    const ribbonBox = await ribbon.boundingBox();
+    const voiceBox = await timeline.locator('[data-journal-kind="voice"]').boundingBox();
+    expect(ribbonBox!.y).toBeLessThan(voiceBox!.y);
+    expect(ribbonBox!.y + ribbonBox!.height).toBeGreaterThanOrEqual(voiceBox!.y + voiceBox!.height - 1);
+    await ribbon.click();
+    await expect(page.locator('.stay-inspector')).toContainText('59 min observed');
+    if (width < 700) await page.getByRole('button', { name: 'Back to journal' }).click();
+    state.data.places = [];
+    portal.recording.recorded_at = '2026-10-26T04:00:00Z';
+    await page.reload();
+    await expect(timeline.getByRole('button', { name: '+ Save place', exact: true })).toBeVisible();
+    await expect.poll(async () => Math.round((await ribbon.boundingBox())!.height)).toBe(64);
+    await timeline.getByRole('button', { name: '+ Save place', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Place settings' }).locator('.place-editor')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
