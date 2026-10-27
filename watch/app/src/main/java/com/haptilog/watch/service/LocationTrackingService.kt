@@ -68,7 +68,8 @@ class LocationTrackingService : Service() {
                 context.startService(Intent(context, LocationTrackingService::class.java)
                     .setAction(ACTION_START))
             } catch (_: RuntimeException) {
-                // A refused start leaves the failure reason in status for the caller to show.
+                // The platform can refuse the request outright; the screens then simply show
+                // the scope as not recording, as they did before this helper existed.
             }
         }
         // Accessed only on Main. A destroyed service may still be draining disk writes.
