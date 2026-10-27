@@ -17,3 +17,19 @@
 .raw-location-dialog > button { position: sticky; top: 0; z-index: 1100; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--text-muted); border-radius: 8px; padding: 8px 16px; min-height: 40px; }
 .raw-workspace button { background: var(--bg-surface-elevated); color: var(--text-primary); border: 1px solid var(--text-muted); border-radius: 8px; padding: 8px 12px; }
 .raw-workspace button:disabled { opacity: .5; }
+
+.raw-timeline { margin: 16px 0; }
+.raw-timeline h3 { margin-bottom: 4px; font-size: 16px; }
+.raw-timeline-level { border: 1px solid var(--text-muted); border-radius: 10px; margin: 12px 0; padding: 10px; min-width: 0; }
+.raw-timeline-level legend { font-weight: 600; font-size: 13px; padding: 0 6px; }
+.raw-dot-scroll { overflow-x: auto; scrollbar-width: thin; }
+.raw-dot-rail { display: block; width: 100%; height: 60px; touch-action: pan-y; cursor: crosshair; }
+.raw-range-band { fill: #2563eb; fill-opacity: .17; stroke: #60a5fa; stroke-width: 1; }
+.raw-dot-axis, .raw-dot-tick { stroke: var(--text-muted); stroke-width: 1; opacity: .35; }
+.raw-observation-dot { fill: #60a5fa; pointer-events: none; }
+.raw-dot-labels { display: grid; }
+.raw-workspace .raw-dot-labels button { border: 0; border-radius: 4px; background: transparent; padding: 4px 1px; font-size: 11px; }
+.raw-workspace .raw-dot-labels button[aria-pressed="true"] { color: #60a5fa; background: #2563eb22; }
+.raw-range-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.raw-range-controls input { width: 100%; accent-color: #3b82f6; min-height: 32px; padding: 0; }
+.raw-selected-range { overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }

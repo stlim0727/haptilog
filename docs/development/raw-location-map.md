@@ -71,3 +71,25 @@ pagination. Record emulator evidence alongside this document before release.
 
 Real-watch battery/GNSS/background delivery and production deployment are separate
 release checks. Emulator observations do not establish physical sensor fidelity.
+
+## Two-level dot timeline
+
+The date control anchors a seven-calendar-day overview in the browser timezone.
+The first horizontal rail renders one dot per observed hour (dot size indicates
+fix count), including blank days. Selecting a day range expands the second rail
+into its actual hourly intervals. The second rail renders each observation at its
+measurement time. Repeated daylight-saving hours have distinct UTC-offset labels.
+
+Drag across either dot rail, click its labels (Shift+click expands a range), or
+use the native start/end sliders with touch or keyboard. Day selection resets the
+hour selection to the complete selected days. Hour boundaries filter with
+`start <= observed_at < end`. Only that subset appears in the map and source
+inspector; an empty interval clears both. The map fits a newly chosen interval
+without resetting pan/zoom on background refresh of the same interval.
+
+The portal reuses the bounded day-read RPC for the seven days and rejects mixed
+deletion epochs before displaying a combined snapshot. This UI increment needs
+no database or watch change. Timeline unit checks cover boundaries, empty ranges,
+23/25-hour days and repeated-hour labels. Desktop/mobile E2E checks cover day and
+hour ranges, keyboard selection, pointer brushing, map/inspector counts, empty
+states and horizontal containment.

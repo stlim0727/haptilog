@@ -29,7 +29,7 @@ export function rawRepository(owner: string, rpc: RawRpc) {
           seen.add(sample.id); samples.push(sample);
         }
         enabled = response.consent_enabled;
-        if (!response.has_more) return { samples, enabled };
+        if (!response.has_more) return { samples, enabled, epoch };
         const last = batch.at(-1);
         if (!last) throw new Error('INVALID_RESPONSE');
         after = { after_time: last.observed_at, after_id: last.id };

@@ -19,7 +19,7 @@ for (const width of [1280,390]) {
     await page.route('https://tile.openstreetmap.org/**',route=>route.abort());
     await page.goto('/');await page.getByRole('button',{name:'Developer continuous location map'}).click();
     const dialog=page.getByRole('dialog',{name:'Developer continuous location map'});
-    await expect(dialog.getByRole('status').first()).toContainText('3 fixes · 2 segments');
+    await expect(dialog.getByRole('status').filter({ hasText: 'fixes ·' })).toContainText('3 / 3 fixes · 2 segments');
     await expect(dialog.getByRole('region',{name:'Continuous raw location map'})).toBeVisible();
     await expect(dialog.locator('.leaflet-overlay-pane path')).toHaveCount(6); // line + three fixes + selected circle/highlight
     const inspector=dialog.getByRole('region',{name:'Raw fix inspector'});

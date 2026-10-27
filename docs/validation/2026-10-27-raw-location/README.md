@@ -35,3 +35,20 @@ failed tile layer. `watch-raw-disclosure.png` / `.xml` show the emulator UI.
 These checks do not establish physical GNSS/battery behavior or production
 end-to-end delivery. The database migration, portal and watch build are not
 published by this task. See `docs/development/raw-location-map.md` for activation.
+
+
+## Daily/hourly dot timeline follow-up
+
+Web unit tests: 58 passed, including half-open interval boundaries, aggregation,
+empty selections and DST (23/25 hours with distinct repeated-hour offsets).
+Web build passed. `raw-location.spec.ts` and `raw-timeline.spec.ts`: four E2E
+checks passed at 1280px and 390px. Tests verify daily ranges expanding the hourly
+axis, keyboard/touch-capable native sliders, pointer brushing, matching map and
+inspector subsets, empty-range clearing and no client exceptions. Range changes
+fit the selected locations without Leaflet zoom-transition teardown errors.
+
+`web-raw-timeline-390.png` / `web-raw-timeline-1280.png` show the two horizontal
+dot rails. The daily overview scrolls the selected day into view; the hourly
+rail shows its observations and selected brush interval. Capture/sync guidance
+is collapsed so the timeline appears before setup detail. No backend/watch or
+production deployment changes are part of this follow-up.
