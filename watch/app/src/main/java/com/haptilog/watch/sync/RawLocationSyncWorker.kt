@@ -47,16 +47,32 @@ class RawLocationSyncWorker(context: Context, params: WorkerParameters) : Corout
                     allowed
                 }
                 if (eligible.isEmpty()) continue
-                val samples = eligible.map { it.getJSONObject("sample") }
-                val result = client.call("ingest", JSONObject().put("protocol_version", 1)
-                    .put("consent_id", grant.getString("consent_id")).put("sync_epoch", state.getLong("sync_epoch"))
-                    .put("samples", JSONArray(samples)))
-                val results = result.getJSONArray("results")
-                val expected = samples.map { it.getString("id") }.toSet()
-                val returned = (0 until results.length()).map { results.getJSONObject(it) }
-                check(returned.size == expected.size && returned.map { it.getString("id") }.toSet() == expected)
-                check(returned.all { it.getString("outcome") in setOf("accepted", "idempotent", "expired", "deleted", "consent_excluded") })
-                returned.forEach { outbox.acknowledge(it.getString("id"), it.getString("outcome")) }
+                fun send(samples: List<JSONObject>) {
+                    if (samples.isEmpty() || !maySend()) return
+
+                    val result = try {
+                        client.call("ingest", JSONObject().put("protocol_version", 1)
+                            .put("consent_id", grant.getString("consent_id")).put("sync_epoch", state.getLong("sync_epoch"))
+                            .put("samples", JSONArray(samples)))
+                    } catch (error: LocationSyncException) {
+                        if (error.error !in setOf("INVALID_PAYLOAD", "CONTENT_CONFLICT")) throw error
+                        // A batch error identifies no individual row. Bisect before isolating sources.
+                        if (samples.size == 1) outbox.quarantine(samples.single().getString("id"), error.error)
+                        else {
+                            val middle = samples.size / 2
+                            send(samples.take(middle))
+                            send(samples.drop(middle))
+                        }
+                        return
+                    }
+                    val results = result.getJSONArray("results")
+                    val expected = samples.map { it.getString("id") }.toSet()
+                    val returned = (0 until results.length()).map { results.getJSONObject(it) }
+                    check(returned.size == expected.size && returned.map { it.getString("id") }.toSet() == expected)
+                    check(returned.all { it.getString("outcome") in setOf("accepted", "idempotent", "expired", "deleted", "consent_excluded") })
+                    returned.forEach { outbox.acknowledge(it.getString("id"), it.getString("outcome")) }
+                }
+                send(eligible.map { it.getJSONObject("sample") })
             }
             outbox.prune()
         }

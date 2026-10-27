@@ -40,13 +40,20 @@ pipeline proposed in `location-capture-v2.md`. Existing v1 stay processing remai
   samples / 256 KiB. Server authorizes the authenticated owner, locks the same
   location state as consent/deletion, rejects content conflicts and rolls invalid
   batches back. Browsers cannot ingest watch samples or grant raw consent.
+- A permanent `INVALID_PAYLOAD` or `CONTENT_CONFLICT` batch error triggers
+  bisection, with consent rechecked before each subrequest. Only an individually
+  rejected sample receives a separate `rejected_<uuid>.json` reason marker.
+  It is excluded from automatic retries across restarts, never acknowledged as
+  accepted, and its immutable source remains available locally until its own
+  seven-day retention deadline. Normal samples continue uploading. Network,
+  authorization and epoch errors retain their existing retry/consent behavior.
 - Disabling common sync cancels raw work/requests and clears the local grant.
   Common server withdrawal invalidates the raw grant; legacy re-enable does not
   restore it. Re-consent never reassigns old queued sources to a new grant.
 - Source-time retention is seven days. Expired and consent-excluded/deleted
   results are explicit terminal outcomes. Pending consented files are not evicted
   by local retention. At 20,000 files, collection stops through the existing
-  storage-error path, preserving sources and independent voice capture. Terminal
+  storage-error path, preserving sources and independent voice capture. Terminal and individually rejected
   files are pruned during capture/sync; app removal clears local files.
 - Only the owner or an active paired browser can read the private raw table,
   through a bounded RPC (one local day, 1,000 rows/page, cursor by time+ID). The

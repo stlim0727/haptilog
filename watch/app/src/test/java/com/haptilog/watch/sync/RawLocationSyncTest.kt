@@ -91,4 +91,68 @@ class RawLocationSyncTest {
         RawLocationSyncWorker.flush(outbox, RawLocationClient(api { throw AssertionError("must not send") }), grant) { false }
         assertEquals(1, outbox.pending().size)
     }
+    @Test fun rejectedFutureSampleDoesNotBlockValidSamplesOrReturnAfterRestart() {
+        val directory = dir(); val outbox = RawLocationOutbox(directory)
+        val future = location().apply { time += 86400000L }
+        outbox.append(future, 1000, session, grant)
+        outbox.append(location(2000), 2000, session, grant)
+        val original = outbox.pending().first().getJSONObject("sample")
+        val rejectedId = original.getString("id")
+        var calls = 0
+        RawLocationSyncWorker.flush(outbox, RawLocationClient(api { payload ->
+            calls++
+            val samples = payload.getJSONArray("samples")
+            if ((0 until samples.length()).any { samples.getJSONObject(it).getString("id") == rejectedId })
+                JSONObject().put("error", "INVALID_PAYLOAD") else ack(payload)
+        }), grant) { true }
+        assertEquals(3, calls)
+        assertTrue(RawLocationOutbox(directory).pending().isEmpty())
+        val source = java.io.File(directory, "sample_$rejectedId.json")
+        assertEquals(original.toString(), JSONObject(source.readText()).getJSONObject("sample").toString())
+        assertFalse(java.io.File(directory, "ack_$rejectedId.json").exists())
+        assertEquals("INVALID_PAYLOAD", JSONObject(java.io.File(directory, "rejected_$rejectedId.json").readText()).getString("reason"))
+        val restarted = RawLocationOutbox(directory)
+        restarted.append(location(3000), 3000, session, grant)
+        RawLocationSyncWorker.flush(restarted, RawLocationClient(api { payload ->
+            assertEquals(1, payload.getJSONArray("samples").length()); ack(payload)
+        }), grant) { true }
+        assertTrue(restarted.pending().isEmpty())
+        restarted.prune()
+        assertTrue(source.exists())
+        restarted.prune(future.time + RawLocationOutbox.RETENTION_MILLIS + 1)
+        assertFalse(source.exists())
+        assertFalse(java.io.File(directory, "rejected_$rejectedId.json").exists())
+    }
+    @Test fun transientFailureNeverQuarantinesAndWithdrawalStopsSplitRequests() {
+        val directory = dir(); val outbox = RawLocationOutbox(directory)
+        outbox.append(location(), 1000, session, grant)
+        outbox.append(location(2000), 2000, session, grant)
+        assertThrows(LocationSyncException::class.java) {
+            RawLocationSyncWorker.flush(outbox, RawLocationClient(api { JSONObject().put("error", "UNAVAILABLE") }), grant) { true }
+        }
+        assertEquals(2, outbox.pending().size)
+        var allowed = true
+        RawLocationSyncWorker.flush(outbox, RawLocationClient(api {
+            allowed = false; JSONObject().put("error", "INVALID_PAYLOAD")
+        }), grant) { allowed }
+        assertEquals(2, RawLocationOutbox(directory).pending().size)
+        assertEquals(0, directory.listFiles()!!.count { it.name.startsWith("rejected_") })
+    }
+
+    @Test fun contentConflictIsIsolatedWithoutChangingTheOriginal() {
+        val directory = dir(); val outbox = RawLocationOutbox(directory)
+        outbox.append(location(), 1000, session, grant)
+        outbox.append(location(2000), 2000, session, grant)
+        val rejected = outbox.pending().first().getJSONObject("sample").getString("id")
+        RawLocationSyncWorker.flush(outbox, RawLocationClient(api { payload ->
+            val samples = payload.getJSONArray("samples")
+            if ((0 until samples.length()).any { samples.getJSONObject(it).getString("id") == rejected })
+                JSONObject().put("error", "CONTENT_CONFLICT") else ack(payload)
+        }), grant) { true }
+        assertTrue(outbox.pending().isEmpty())
+        assertEquals(2, directory.listFiles()!!.count { it.name.startsWith("sample_") })
+        assertEquals(1, directory.listFiles()!!.count { it.name.startsWith("ack_") })
+        assertEquals("CONTENT_CONFLICT", JSONObject(java.io.File(directory, "rejected_$rejected.json").readText()).getString("reason"))
+    }
+
 }

@@ -51,7 +51,7 @@ class RawLocationOutbox internal constructor(private val directory: File) {
 
     @Synchronized fun pending(): List<JSONObject> = sources().mapNotNull { source ->
         val id = source.name.removePrefix("sample_").removeSuffix(".json")
-        if (File(directory, "ack_$id.json").exists()) null else read(source)
+        if (File(directory, "ack_$id.json").exists() || File(directory, "rejected_$id.json").exists()) null else read(source)
     }.sortedWith(compareBy({ it.getJSONObject("sample").getString("session_id") }, { it.getJSONObject("sample").getLong("sequence") }))
 
     @Synchronized fun acknowledge(id: String, outcome: String) {
@@ -60,15 +60,24 @@ class RawLocationOutbox internal constructor(private val directory: File) {
         write(File(directory, "ack_$id.json"), JSONObject().put("outcome", outcome))
     }
 
+    /** Separate local rejection checkpoint: never rewrite a source or claim server acceptance. */
+    @Synchronized fun quarantine(id: String, reason: String) {
+        UUID.fromString(id)
+        require(reason in setOf("INVALID_PAYLOAD", "CONTENT_CONFLICT"))
+        write(File(directory, "rejected_$id.json"), JSONObject().put("reason", reason))
+    }
+
     @Synchronized fun prune(now: Long = System.currentTimeMillis()) {
         for (source in sources()) {
             val row = read(source)
             val sample = row.getJSONObject("sample")
             val ack = File(directory, "ack_${sample.getString("id")}.json")
             // Unconsented local observations are terminal local-only, never backfilled.
-            val terminal = ack.exists() || row.isNull("grant")
+            val rejected = File(directory, "rejected_${sample.getString("id")}.json")
+            val terminal = ack.exists() || rejected.exists() || row.isNull("grant")
             if (terminal && Instant.parse(sample.getString("observed_at")).toEpochMilli() <= now - RETENTION_MILLIS) {
                 check(source.delete()); if (ack.exists()) check(ack.delete())
+                if (rejected.exists()) check(rejected.delete())
             }
         }
     }
