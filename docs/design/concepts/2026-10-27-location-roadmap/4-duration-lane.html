@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe 4 — Stay durations as a thin Gantt lane beside journal items</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Inter","Helvetica Neue",Arial,sans-serif}
+  body{width:1280px;height:800px;background:#14161a;color:#e8eaf0;overflow:hidden}
+  .app{display:grid;grid-template-rows:56px 1fr;height:100%}
+  header{display:flex;align-items:center;gap:16px;padding:0 20px;background:#191c21;border-bottom:1px solid #2a2f38}
+  .logo{font-weight:700}.logo span{color:#ff6b57}
+  .datettl{font-size:14px;color:#aeb6c2}
+  .toggle{margin-left:auto;font-size:12px;color:#aeb6c2}
+  .switch{display:inline-block;width:34px;height:18px;border-radius:9px;background:#5ac8a0;position:relative;vertical-align:middle;margin-left:6px}
+  .switch::after{content:"";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#fff}
+  .cols{display:grid;grid-template-columns:70px 110px 1fr;height:100%}
+  .axis{background:#191c21;border-right:1px solid #232830;padding-top:10px;font-size:10px;color:#7d8694}
+  .axis .h{height:31px;text-align:right;padding-right:6px}
+  .lane{position:relative;background:#15181d;border-right:1px solid #2a2f38}
+  .items{position:relative}
+  .grid{position:absolute;left:0;right:0;border-top:1px dashed #232830}
+  .bar{position:absolute;left:14px;width:26px;border-radius:13px;background:#5ac8a033;border:2px solid #5ac8a0}
+  .bar.night{background:#4da3ff26;border-color:#4da3ff}
+  .lab{position:absolute;font-size:10px;color:#5ac8a0;white-space:nowrap}
+  .lab.blue{color:#4da3ff}
+  .tick{position:absolute;left:4px;width:16px;height:4px;border-radius:2px;background:#ff6b57}
+  .card{position:absolute;left:24px;background:#22262d;border:1px solid #2e343e;border-radius:10px;padding:5px 12px;font-size:12px;display:flex;gap:14px;align-items:center;width:620px;height:26px}
+  .card .ttl{font-weight:600}
+  .card .m{color:#aeb6c2;font-size:11px}
+  .card.voice{border-left:3px solid #ff6b57}
+  .card.stay{border-left:3px solid #5ac8a0}
+  .ann{position:absolute;right:28px;top:520px;width:300px;background:#1d2127;border:1px solid #39404b;border-radius:12px;padding:12px 14px;font-size:12px;color:#aeb6c2;line-height:1.6}
+  .ann b{color:#e8eaf0}
+  .ann .k{display:flex;gap:8px;align-items:center;margin-top:6px}
+  .sw{width:22px;height:8px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">Hapti<span>Log</span> · Journal</div>
+    <div class="datettl">Tue, Oct 27</div>
+    <div class="toggle">Duration lane <span class="switch"></span></div>
+  </header>
+  <div class="cols">
+    <div class="axis" id="axis"></div>
+    <div class="lane" id="lane"></div>
+    <div class="items" id="items"></div>
+  </div>
+</div>
+<script>
+const H=31, TOP=10;
+const y=t=>TOP+t*H;                       // t in hours
+const axis=document.getElementById('axis');
+for(let i=0;i<24;i++){const d=document.createElement('div');d.className='h';d.textContent=String(i).padStart(2,'0');
+  if(i===6||i===8||i===12||i===19)d.style.color='#ffcf3f';axis.appendChild(d);}
+const lane=document.getElementById('lane'), items=document.getElementById('items');
+for(let i=0;i<24;i++){const g=document.createElement('div');g.className='grid';g.style.top=y(i)+'px';lane.appendChild(g);}
+function bar(t0,t1,label,cls){const b=document.createElement('div');b.className='bar '+(cls||'');
+  b.style.top=y(t0)+'px';b.style.height=(t1-t0)*H+'px';lane.appendChild(b);
+  const l=document.createElement('div');l.className='lab '+(cls||'');l.textContent=label;
+  l.style.left='48px';l.style.top=y(t0)+((t1-t0)*H)/2-5+'px';lane.appendChild(l);}
+function tick(t){const k=document.createElement('div');k.className='tick';k.style.top=y(t)+'px';lane.appendChild(k);}
+function card(t,kind,title,meta){const c=document.createElement('div');c.className='card '+kind;
+  let top=y(t)-13; if(top<lastCardBottom+4) top=lastCardBottom+4; lastCardBottom=top+26;
+  c.style.top=top+'px';c.innerHTML='<span class="ttl">'+title+'</span><span class="m">'+meta+'</span>';items.appendChild(c);}
+let lastCardBottom=0;
+bar(0,7.67,'Home · slice','night');           // overnight stay slice 00:00–07:50
+bar(9.5,12,'Office');                          // 09:30–12:00
+bar(13.17,18.33,'Office · 5h 10m');            // 13:10–18:20
+tick(8.75);tick(9.2);tick(12.07);tick(19.4);
+card(0.4,'stay','Stay · Home (slice from Oct 26)','00:00–07:50 · 7h 50m · started Oct 26 22:10');
+card(8.75,'voice','“Standup note”','08:45 · 1:02');
+card(9.2,'voice','“Station arr”','09:12 · 0:11');
+card(9.62,'stay','Stay · Gangnam Office','09:30–12:00 · 2h 30m');
+card(12.07,'voice','“Lunch with Ji-yoon”','12:04 · 0:38');
+card(19.4,'voice','“Gym plan”','19:24 · 0:25');
+const ann=document.createElement('div');ann.className='ann';
+ann.innerHTML='<b>Duration lane (Gantt-style)</b><br>One thin vertical lane on the hour axis; long stays render as rounded bars via <b>splitStayByDate()</b> slices; each recording is a 4px tick at its start time. Feed cards keep today’s grammar — the lane is an optional toggle, not a separate view.'+
+'<div class="k"><span class="sw" style="background:#5ac8a055;border:1px solid #5ac8a0"></span>stay bar (closed / open)</div>'+
+'<div class="k"><span class="sw" style="background:#4da3ff55;border:1px solid #4da3ff"></span>overnight stay slice</div>'+
+'<div class="k"><span class="sw" style="background:#ff6b57"></span>recording tick</div>';
+items.appendChild(ann);
+</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe 1 — Developer mode: raw GPS on map</title>
+<style>
+  body{width:1280px;height:800px;background:#14161a;color:#e8eaf0;overflow:hidden}
+  .app{display:grid;grid-template-rows:56px 1fr;height:100%}
+  header{display:flex;align-items:center;gap:16px;padding:0 20px;background:#191c21;border-bottom:1px solid #2a2f38}
+  .logo{font-weight:700;letter-spacing:.3px}
+  .logo span{color:#ff6b57}
+  .devbadge{background:#ffcf3f;color:#1d1a08;font-size:11px;font-weight:800;padding:2px 8px;border-radius:4px;letter-spacing:1px}
+  .toggle{display:flex;align-items:center;gap:8px;margin-left:auto;font-size:13px;color:#aeb6c2}
+  .switch{width:40px;height:22px;border-radius:11px;background:#ff6b57;position:relative}
+  .switch::after{content:"";position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:#fff}
+  main{display:grid;grid-template-columns:300px 1fr}
+  aside{background:#191c21;border-right:1px solid #2a2f38;padding:14px;overflow:hidden}
+  aside h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#7d8694;margin-bottom:10px}
+  .item{background:#22262d;border:1px solid #2e343e;border-radius:10px;padding:10px 12px;margin-bottom:8px;font-size:13px}
+  .item.sel{border-color:#ff6b57;background:#2a2422}
+  .item .t{color:#aeb6c2;font-size:11px;margin-top:4px}
+  .map{position:relative;background:#232a26}
+  .road{position:absolute;background:#3a443d}
+  .r1{top:0;bottom:0;left:34%;width:14px;transform:rotate(8deg)}
+  .r2{left:0;right:0;top:30%;height:12px;transform:rotate(-4deg)}
+  .r3{left:0;right:0;top:66%;height:10px}
+  .r4{top:0;bottom:0;left:70%;width:10px;transform:rotate(-12deg)}
+  .park{position:absolute;left:8%;top:44%;width:180px;height:120px;background:#2e3d2f;border-radius:14px}
+  .dot{position:absolute;width:10px;height:10px;border-radius:50%;background:#4da3ff;border:2px solid #d7ecff;opacity:.85}
+  .dot.old{background:#8a93a3;border-color:#c6ccd6;opacity:.5}
+  .pin{position:absolute;width:26px;height:26px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:#ff6b57;border:2px solid #fff;display:flex;align-items:center;justify-content:center}
+  .pin b{transform:rotate(45deg);font-size:12px;color:#fff}
+  .popup{position:absolute;width:290px;background:#1d2127;border:1px solid #ff6b57;border-radius:12px;padding:12px 14px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .popup h4{font-size:13px;margin-bottom:8px}
+  .popup table{width:100%;border-collapse:collapse}
+  .popup td{padding:3px 0;color:#aeb6c2}
+  .popup td:last-child{text-align:right;color:#e8eaf0;font-family:ui-monospace,Menlo,monospace}
+  .popfoot{margin-top:8px;padding-top:8px;border-top:1px dashed #39404b;color:#7d8694}
+  .devpanel{position:absolute;right:16px;top:16px;width:230px;background:#1d2127cc;border:1px solid #39404b;border-radius:12px;padding:12px 14px;font-size:12px;backdrop-filter:blur(2px)}
+  .devpanel h4{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#ffcf3f;margin-bottom:8px}
+  .row{display:flex;align-items:center;gap:8px;margin:6px 0;color:#aeb6c2}
+  .chk{width:14px;height:14px;border-radius:4px;border:1px solid #5a6270}
+  .chk.on{background:#4da3ff;border-color:#4da3ff}
+  .legend{position:absolute;left:16px;bottom:16px;background:#1d2127dd;border:1px solid #39404b;border-radius:10px;padding:10px 12px;font-size:11px;color:#aeb6c2}
+  .legend .k{display:flex;align-items:center;gap:8px;margin:3px 0}
+  .sw{width:10px;height:10px;border-radius:50%}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">Hapti<span>Log</span> · Web</div>
+    <div class="devbadge">DEV</div>
+    <div class="toggle">Developer mode <div class="switch"></div></div>
+  </header>
+  <main>
+    <aside>
+      <h3>Oct 27 · recordings</h3>
+      <div class="item sel">“Lunch with Ji-yoon”<div class="t">12:04 · 0:38 · GPS ✓ raw dev view active</div></div>
+      <div class="item">“Station arr”<div class="t">09:12 · 0:11 · GPS ✓</div></div>
+      <div class="item">“Standup note”<div class="t">08:45 · 1:02 · GPS ✓</div></div>
+      <div class="item">“Groceries”<div class="t">Oct 26 · 0:21 · GPS ✓</div></div>
+    </aside>
+    <div class="map">
+      <div class="road r1"></div><div class="road r2"></div><div class="road r3"></div><div class="road r4"></div>
+      <div class="park"></div>
+      <!-- breadcrumb trail of GPS snapshots for the day -->
+      <div class="dot old" style="left:12%;top:78%"></div>
+      <div class="dot old" style="left:20%;top:70%"></div>
+      <div class="dot old" style="left:27%;top:64%"></div>
+      <div class="dot" style="left:36%;top:56%"></div>
+      <div class="dot" style="left:44%;top:52%"></div>
+      <div class="dot" style="left:53%;top:47%"></div>
+      <div class="pin" style="left:61%;top:41%"><b>3</b></div>
+      <div class="pin" style="left:31%;top:34%"><b>2</b></div>
+      <div class="pin" style="left:18%;top:22%"><b>1</b></div>
+      <div class="popup" style="left:63%;top:46%">
+        <h4>“Lunch with Ji-yoon” — raw GPS</h4>
+        <table>
+          <tr><td>latitude</td><td>37.498214</td></tr>
+          <tr><td>longitude</td><td>127.028947</td></tr>
+          <tr><td>altitude</td><td>38.4 m</td></tr>
+          <tr><td>speed</td><td>0.2 m/s</td></tr>
+          <tr><td>accuracy</td><td>± 12 m</td></tr>
+          <tr><td>fix age</td><td>41 ms snapshot</td></tr>
+        </table>
+        <div class="popfoot">recordings row · tap pin to switch · <a style="color:#4da3ff">open in Google Maps</a></div>
+      </div>
+      <div class="devpanel">
+        <h4>Raw GPS (dev)</h4>
+        <div class="row"><div class="chk on"></div>Breadcrumb of per-recording fixes</div>
+        <div class="row"><div class="chk on"></div>Accuracy ring on selected pin</div>
+        <div class="row"><div class="chk on"></div>Raw field popups</div>
+        <div class="row"><div class="chk"></div>Show stay summary coords</div>
+        <div class="row"><div class="chk"></div>Sync/unsync filter</div>
+      </div>
+      <div class="legend">
+        <b style="color:#e8eaf0">Legend</b>
+        <div class="k"><div class="sw" style="background:#ff6b57"></div>recording GPS snapshot</div>
+        <div class="k"><div class="sw" style="background:#4da3ff"></div>older fix (today trail)</div>
+        <div class="k"><div class="sw" style="background:#8a93a3"></div>previous days</div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

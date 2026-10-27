@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe 3 — Create beacon from frequent areas on map</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Inter","Helvetica Neue",Arial,sans-serif}
+  body{width:1280px;height:800px;background:#14161a;color:#e8eaf0;overflow:hidden}
+  .app{display:grid;grid-template-rows:56px 1fr;height:100%}
+  header{display:flex;align-items:center;gap:16px;padding:0 20px;background:#191c21;border-bottom:1px solid #2a2f38}
+  .logo{font-weight:700}.logo span{color:#ff6b57}
+  .ttl{font-size:14px;color:#aeb6c2}
+  main{display:grid;grid-template-columns:1fr 400px}
+  .map{position:relative;background:#232a26}
+  .road{position:absolute;background:#3a443d}
+  .r1{top:0;bottom:0;left:30%;width:14px}
+  .r2{left:0;right:0;top:46%;height:12px}
+  .r3{top:0;bottom:0;left:62%;width:10px;transform:rotate(6deg)}
+  .r4{left:0;right:0;top:20%;height:9px}
+  .freq{position:absolute;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:default}
+  .freq .core{position:absolute;width:14px;height:14px;border-radius:50%;background:#ffcf3f;border:2px solid #fff}
+  .freq b{font-size:11px;background:#14161ad9;color:#ffcf3f;padding:2px 8px;border-radius:6px;z-index:2}
+  .f1{left:18%;top:30%;width:200px;height:200px;background:#ffcf3f1f;border:2px solid #ffcf3f}
+  .f2{left:56%;top:56%;width:150px;height:150px;background:#ffcf3f14;border:2px dashed #c9a635}
+  .f3{left:70%;top:12%;width:110px;height:110px;background:#ffcf3f0d;border:2px dashed #8a7a3a}
+  .saved{position:absolute;left:8%;top:66%;width:120px;height:120px;border-radius:50%;background:#5ac8a01a;border:2px solid #5ac8a0}
+  .saved b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#5ac8a0;background:#14161ad9;border-radius:50%;margin:4px}
+  .beaconstar{position:absolute;left:14.5%;top:71%;font-size:18px;color:#5ac8a0}
+  .panel{background:#191c21;border-left:1px solid #2a2f38;padding:16px;overflow:hidden}
+  .panel h3{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#7d8694;margin-bottom:4px}
+  .panel .sub{font-size:11px;color:#7d8694;margin-bottom:12px}
+  .cand{background:#22262d;border:1px solid #2e343e;border-radius:12px;padding:12px;margin-bottom:10px;font-size:13px}
+  .cand.top{border-color:#ffcf3f}
+  .cand .name{font-weight:600}
+  .cand .meta{color:#aeb6c2;font-size:11px;margin-top:4px;line-height:1.5}
+  .btn{display:inline-block;margin-top:8px;background:#ffcf3f;color:#1d1a08;font-weight:700;font-size:12px;border-radius:8px;padding:7px 12px}
+  .btn.ghost{background:transparent;color:#aeb6c2;border:1px solid #39404b;font-weight:500}
+  .modal{position:absolute;left:36%;top:330px;width:340px;background:#1d2127;border:1px solid #ffcf3f;border-radius:14px;padding:16px;box-shadow:0 16px 40px rgba(0,0,0,.55);font-size:13px}
+  .modal h4{margin-bottom:10px;font-size:14px}
+  .field{margin-bottom:10px}
+  .field label{display:block;font-size:11px;color:#7d8694;margin-bottom:4px}
+  .field .in{background:#14161a;border:1px solid #39404b;border-radius:8px;padding:8px 10px;color:#e8eaf0}
+  .slider{height:6px;background:#2e343e;border-radius:3px;position:relative;margin-top:14px}
+  .slider::before{content:"";position:absolute;left:0;top:0;bottom:0;width:45%;background:#ffcf3f;border-radius:3px}
+  .slider::after{content:"";position:absolute;left:45%;top:-6px;width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #ffcf3f}
+  .row2{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+  .mapnote{position:absolute;left:16px;top:16px;background:#1d2127dd;border:1px solid #39404b;border-radius:10px;padding:8px 12px;font-size:11px;color:#aeb6c2;max-width:330px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">Hapti<span>Log</span> · Places &amp; Beacons</div>
+    <div class="ttl">Frequent areas detected from your stays</div>
+  </header>
+  <main>
+    <div class="map">
+      <div class="road r1"></div><div class="road r2"></div><div class="road r3"></div><div class="road r4"></div>
+      <div class="mapnote">Frequent-area circles sized by visit count (from client recommendations: closed stays, ±≤30 m, ≥3 visits / ≥2 days). Tap a circle → “Create beacon”.</div>
+      <div class="freq f1"><div class="core"></div><b>12 visits · 9 days</b></div>
+      <div class="freq f2"><div class="core"></div><b>6 visits · 5 days</b></div>
+      <div class="freq f3"><div class="core"></div><b>3 visits · 3 days</b></div>
+      <div class="saved"><b>Home</b></div>
+      <div class="beaconstar">●</div>
+      <div class="modal">
+        <h4>Create beacon</h4>
+        <div class="field"><label>Name</label><div class="in">Gangnam Office</div></div>
+        <div class="field"><label>Center</label><div class="in">37.4986, 127.0281</div></div>
+        <div class="field"><label>Radius — 180 m</label><div class="slider"></div></div>
+        <div class="row2"><span class="btn ghost">Cancel</span><span class="btn">Save beacon</span></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Suggested frequent areas</h3>
+      <div class="sub">Same source as today’s text list, now clickable and mapped</div>
+      <div class="cand top">
+        <div class="name">Seoul, Gangnam-daero · 12 visits</div>
+        <div class="meta">last 14 days · avg stay 3h 05m · accuracy ±14 m<br>center 37.4986, 127.0281 · suggested radius 180 m</div>
+        <span class="btn">Create beacon</span> <span class="btn ghost">Dismiss</span>
+      </div>
+      <div class="cand">
+        <div class="name">Suseo Station · 6 visits</div>
+        <div class="meta">last 14 days · transit pattern · accuracy ±22 m<br>suggested radius 120 m</div>
+        <span class="btn ghost">Create beacon</span>
+      </div>
+      <div class="cand">
+        <div class="name">Café near Samseong · 3 visits</div>
+        <div class="meta">weekends only · accuracy ±28 m</div>
+        <span class="btn ghost">Create beacon</span> <span class="btn ghost">Dismiss</span>
+      </div>
+      <h3 style="margin-top:14px">Existing beacons (saved places · max 20)</h3>
+      <div class="cand"><div class="name">● Home</div><div class="meta">radius 150 m · edit · delete</div></div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
