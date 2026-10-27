@@ -251,7 +251,7 @@ for (const width of [1280, 390]) {
     portal.recording.recorded_at = '2026-10-26T04:00:00Z';
     await page.reload();
     await expect(timeline.getByRole('button', { name: '+ Save place', exact: true })).toBeVisible();
-    await expect.poll(async () => Math.round((await ribbon.boundingBox())!.height)).toBe(64);
+    await expect.poll(async () => Math.round((await ribbon.boundingBox())!.height)).toBe(44);
     await timeline.getByRole('button', { name: '+ Save place', exact: true }).click();
     await expect(timeline.getByRole('form', { name: 'Name this place' }).getByLabel('Place name')).toBeFocused();
     await expect(page.getByRole('dialog', { name: 'Place settings' })).not.toBeVisible();

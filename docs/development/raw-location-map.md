@@ -158,7 +158,7 @@ clock discontinuities and intervening stays at another place do not join a group
 Filters and mobile day slices only summarize visible source stays.
 
 A grouped label/ribbon expands its source list; each original stay remains selectable
-for details and individual deletion. An empty group retains the 64px collapsed row.
+for details and individual deletion. An empty group uses a compact 44px minimum row.
 Saved-place IDs determine stable ribbon hues across days, filters and reloads;
 unknown places use their source IDs and are never inferred to be the same place.
 
@@ -172,3 +172,9 @@ require an explicit refresh/review and keep the draft. Acknowledged names update
 shared journal state before refreshing, so a failed refresh does not discard the
 successful result. Cloud consent, owner/session isolation and the 20-place limit
 still apply. Sample mode remains read-only.
+
+
+The compact ribbon shows the place name and a short time range with observed
+minutes. Day-grouped mobile lists omit repeated dates; mixed-date desktop lists
+keep a short date prefix. A chevron reveals original source stays, and a pencil
+opens inline renaming. Group counts and gap explanations do not occupy feed rows.

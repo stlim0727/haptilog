@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import type { JournalItem } from '../journal.ts';
 import { placeCandidates } from '../journal.ts';
 import { LocationError, parseSnapshot } from './repository.ts';
@@ -43,7 +44,7 @@ export function StayPlaceName({ item, journal, lang, compact = false }: {
   if (!allowed) return null;
   return <div className={`stay-place-name${editing ? ' is-editing' : ''}`}>
     {!editing ? <>
-      <button ref={trigger} type="button" className={compact ? 'ribbon-place-save' : 'secondary-button'} onClick={open}>{known ? (ko ? '이름 수정' : 'Rename place') : compact ? (ko ? '＋ 장소로 저장' : '+ Save place') : (ko ? '장소로 저장' : 'Save as a place')}</button>
+      <button ref={trigger} type="button" className={compact ? 'ribbon-place-save' : 'secondary-button'} aria-label={known ? (ko ? '이름 수정' : 'Rename place') : undefined} title={known ? (ko ? '이름 수정' : 'Rename place') : undefined} onClick={open}>{known ? compact ? <Pencil size={12} aria-hidden="true" /> : (ko ? '이름 수정' : 'Rename place') : compact ? (ko ? '＋ 장소로 저장' : '+ Save place') : (ko ? '장소로 저장' : 'Save as a place')}</button>
       {message && <p role="status" className={compact ? 'sr-only' : undefined}>{message}</p>}
     </> : <form aria-label={ko ? '장소 이름 정하기' : 'Name this place'} onSubmit={async event => {
       event.preventDefault();

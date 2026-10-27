@@ -574,7 +574,7 @@ export function MobileWorkspace(p: Props) {
                         {ko ? "개" : " records"}
                       </span>
                     </h2>
-                    <JournalTimeline items={entries.filter(r => journalDates(r).includes(day))} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} renderPlaceName={p.renderPlaceName} />
+                    <JournalTimeline dayGrouped items={entries.filter(r => journalDates(r).includes(day))} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} renderPlaceName={p.renderPlaceName} />
                   </section>
                 ))
                 : (

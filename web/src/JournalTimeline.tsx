@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { ChevronDown } from 'lucide-react';
 import type { JournalItem } from './journal.ts';
 import { journalDuration, journalTitle } from './journal.ts';
 import { ribbonColor } from './ribbonGroups.ts';
@@ -7,14 +8,26 @@ import { ribbonLayout } from './ribbons.ts';
 import './ribbons.css';
 
 /** Shared list geometry keeps voice chronology and gives stays a continuous time range. */
-export function JournalTimeline({ items, allItems, now, lang, renderVoice, onSelectStay, renderPlaceName }: {
-  items: JournalItem[]; allItems: JournalItem[]; now: number; lang: 'ko' | 'en';
+export function JournalTimeline({ items, allItems, now, lang, renderVoice, onSelectStay, renderPlaceName, dayGrouped = false }: {
+  items: JournalItem[]; allItems: JournalItem[]; now: number; lang: 'ko' | 'en'; dayGrouped?: boolean;
   renderVoice: (item: JournalItem) => ReactNode;
   onSelectStay: (item: Extract<JournalItem, { kind: 'stay' }>) => void;
   renderPlaceName?: (item: Extract<JournalItem, { kind: 'stay' }>, compact?: boolean) => ReactNode;
 }) {
   const { rows, ranges, lanes, groups } = ribbonLayout(items, allItems, now);
   const ko = lang === 'ko';
+  const time = (value: string) => new Date(value).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const showDate = !dayGrouped && new Set(items.map(item => new Date(item.recorded_at).toLocaleDateString())).size > 1;
+  const range = (from: string, to: string, dated = false) => {
+    const a = new Date(from), b = new Date(to);
+    const day = (value: string) => { const date = new Date(value); return `${date.getMonth() + 1}/${date.getDate()}`; };
+    if (a.toLocaleDateString() === b.toLocaleDateString()) return `${dated ? day(from) + ' ' : ''}${time(from)}–${time(to)}`;
+    return `${day(from)} ${time(from)}–${day(to)} ${time(to)}`;
+  };
+  const minutes = (item: Extract<JournalItem, { kind: 'stay' }>) => {
+    const count = Math.floor(item.stay.observed_duration_millis / 60_000);
+    return ko ? `관측 ${count}분` : `${count}m observed`;
+  };
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const expand = (id: string, open: boolean) => setExpanded(previous => {
     if (previous.has(id) === open) return previous;
@@ -26,18 +39,16 @@ export function JournalTimeline({ items, allItems, now, lang, renderVoice, onSel
   };
   return <div className="journal-ribbons" style={{ gridTemplateColumns: `repeat(${lanes}, 8px) minmax(0, 1fr)` }}>
     {ranges.flatMap(({ item, lane, segments }) => segments.map(({ first, last }) => <button key={`ribbon:${item.id}:${first}`} type="button" className="stay-ribbon" style={{ background: ribbonColor(item), gridColumn: lane + 1, gridRow: `${first + 1} / ${last + 2}` }} onClick={() => select(item)} aria-expanded={groups.get(item.id)!.members.length > 1 ? expanded.has(item.id) : undefined} aria-label={`${journalTitle(item, lang)} · ${journalDuration(groups.get(item.id)!.summary, lang)}`} />))}
-    {rows.map((item, index) => <div key={`${item.kind}:${item.id}`} className={item.kind === 'stay' ? 'ribbon-stay-row' : 'ribbon-voice-row'} style={{ gridColumn: lanes + 1, gridRow: index + 1 }}>
+    {rows.map((item, index) => <div key={`${item.kind}:${item.id}`} className={item.kind === 'stay' ? `ribbon-stay-row${expanded.has(item.id) ? ' is-expanded' : ''}` : 'ribbon-voice-row'} style={{ gridColumn: lanes + 1, gridRow: index + 1 }}>
       {item.kind === 'voice' ? renderVoice(item) : <div className="ribbon-stay-label">
         <button type="button" className="ribbon-stay-open" data-record-id={item.id} data-journal-kind="stay" onClick={() => select(item)} aria-expanded={groups.get(item.id)!.members.length > 1 ? expanded.has(item.id) : undefined}>
-          <strong>{journalTitle(item, lang)}</strong>
-          <span>{new Date(groups.get(item.id)!.summary.stay.started_at).toLocaleString(lang, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} – {new Date(item.stay.last_observed_at).toLocaleString(lang, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · {journalDuration(groups.get(item.id)!.summary, lang)}</span>
+          <span className="ribbon-stay-title"><strong>{journalTitle(item, lang)}</strong>{groups.get(item.id)!.members.length > 1 && <ChevronDown size={12} aria-hidden="true" className={expanded.has(item.id) ? "expanded" : ""} />}</span>
+          <span className="ribbon-stay-time">{range(groups.get(item.id)!.summary.stay.started_at, item.stay.last_observed_at, showDate)} · {minutes(groups.get(item.id)!.summary)}</span>
         </button>
         {renderPlaceName?.(item, true)}
-        {groups.get(item.id)!.members.length > 1 && <details className="ribbon-group-sources" open={expanded.has(item.id)} onToggle={event => expand(item.id, event.currentTarget.open)}>
-          <summary>{ko ? `${groups.get(item.id)!.members.length}개 체류 묶음` : `${groups.get(item.id)!.members.length} stays grouped`}</summary>
-          <p>{ko ? '3분 이내 공백으로 이어진 같은 장소입니다. 공백은 확인된 시간에 포함하지 않습니다.' : 'Same place with gaps up to 3 minutes. Gaps are excluded from observed time.'}</p>
-          {groups.get(item.id)!.members.map(member => <button key={member.id} type="button" data-record-id={member.id} onClick={() => onSelectStay(member)}>{new Date(member.stay.started_at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })} – {new Date(member.stay.last_observed_at).toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' })} · {journalDuration(member, lang)}</button>)}
-        </details>}
+        {groups.get(item.id)!.members.length > 1 && expanded.has(item.id) && <div className="ribbon-group-sources" role="group" aria-label={ko ? '원본 체류' : 'Original stays'}>
+          {groups.get(item.id)!.members.map(member => <button key={member.id} type="button" data-record-id={member.id} onClick={() => onSelectStay(member)}>{range(member.stay.started_at, member.stay.last_observed_at)} · {minutes(member)}</button>)}
+        </div>}
       </div>}
     </div>)}
   </div>;

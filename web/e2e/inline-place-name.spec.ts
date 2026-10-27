@@ -7,7 +7,7 @@ for(const width of [1280,390]) {
     const {state}=await staysFixture(page);
     state.data.places=[];
     const source=JSON.stringify(state.data.stays);
-    await page.goto('/');
+    await page.goto('/',{waitUntil:'domcontentloaded'});
     const timeline=page.locator('.journal-ribbons');
     await timeline.getByRole('button',{name:'+ Save place',exact:true}).click();
     const form=timeline.getByRole('form',{name:'Name this place'});
@@ -16,7 +16,7 @@ for(const width of [1280,390]) {
     await expect(form.getByRole('button',{name:'Save',exact:true})).toBeDisabled();
     await form.getByLabel('Place name').fill('Company');
     await expect(page.getByRole('dialog')).not.toBeVisible();
-    await page.screenshot({path:`test-results/inline-place-name-${width}.png`,fullPage:true});
+    await timeline.first().screenshot({path:`test-results/inline-place-name-${width}.png`,animations:'disabled',timeout:10000});
     await form.getByRole('button',{name:'Save',exact:true}).click();
     await expect(timeline.locator('.ribbon-stay-open')).toContainText('Company');
     expect(state.puts).toHaveLength(1);
@@ -33,7 +33,7 @@ test('inline rename preserves geometry and draft through conflicts and explicit 
   const {state}=await staysFixture(page);
   state.data.places[0].radius_meters=350;
   state.conflictNext=true;
-  await page.goto('/');
+  await page.goto('/',{waitUntil:'domcontentloaded'});
   const timeline=page.locator('.journal-ribbons');
   await timeline.getByRole('button',{name:'Rename place',exact:true}).click();
   const form=timeline.getByRole('form',{name:'Name this place'});
@@ -54,7 +54,7 @@ test('inline save retains the name after a network failure',async({page})=>{
   await page.route('**/rest/v1/rpc/location_stays',async route=>{
     if(fail&&route.request().postDataJSON().p_action==='put_place') {fail=false;await route.fulfill({status:503,json:{code:'NETWORK'}});} else await route.fallback();
   });
-  await page.goto('/');
+  await page.goto('/',{waitUntil:'domcontentloaded'});
   const timeline=page.locator('.journal-ribbons');
   await timeline.getByRole('button',{name:'+ Save place',exact:true}).click();
   const form=timeline.getByRole('form',{name:'Name this place'});
@@ -71,7 +71,7 @@ test('acknowledged name remains visible if refreshing the journal fails',async({
     if(route.request().postDataJSON().p_action==='snapshot'&&state.puts.length>0) await route.fulfill({status:503,json:{code:'NETWORK'}});
     else await route.fallback();
   });
-  await page.goto('/');
+  await page.goto('/',{waitUntil:'domcontentloaded'});
   const timeline=page.locator('.journal-ribbons');
   await timeline.getByRole('button',{name:'+ Save place',exact:true}).click();
   const form=timeline.getByRole('form',{name:'Name this place'});
