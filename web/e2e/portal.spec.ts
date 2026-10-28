@@ -166,7 +166,11 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
   });
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.getByRole("region", { name: "Map of recording locations" })).toBeVisible();
+  // The mobile map is an overlay, not a tab: the feed can change underneath it.
   await page.getByRole("button", { name: "Timeline", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Map of recording locations" }))
+    .toBeVisible();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.getByRole("region", { name: "Map of recording locations" }))
     .toHaveCount(0);
 });
