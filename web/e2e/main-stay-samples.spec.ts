@@ -21,7 +21,7 @@ for(const width of [1280,390]) {
     if(width<700) {
       await page.getByRole('button',{name:'Map',exact:true}).click();
       await expect(page.getByRole('region',{name:'Map of voice and stay locations'})).toBeVisible();
-      await page.getByRole('button',{name:'List',exact:true}).click();
+      await page.getByRole('button',{name:'Timeline',exact:true}).click();
     } else {
       await page.getByRole('button',{name:'Show map',exact:true}).click();
       await expect(page.getByRole('region',{name:'Map of voice and stay locations'})).toBeVisible();

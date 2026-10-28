@@ -38,17 +38,19 @@ import {
   localDate,
   money,
   processingState,
+  toLocalDateString,
 } from "./domain";
 import type { Recording } from "./domain";
 import { JournalStayCard } from "./JournalStayCard";
 import { JOURNAL_CATEGORIES, categoryPressed, toggleCategory } from "./categoryFilter";
 import { JournalTimeline } from "./JournalTimeline";
+import TimeSliderStrip from "./TimeSliderStrip";
 import { journalDates, journalLocated, voiceItem } from "./journal";
 import type { JournalItem } from "./journal";
 import type { Language, TranslationKeys } from "./i18n";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
-type View = "list" | "map" | "calendar";
+type View = "timeline" | "map" | "calendar";
 class MobileMapBoundary extends React.Component<
   { children: React.ReactNode; message: string },
   { failed: boolean }
@@ -111,7 +113,9 @@ export function MobileWorkspace(p: Props) {
   const { t, lang, filtered, records } = p;
   const entries = p.filteredItems;
   const ko = lang === "ko";
-  const [view, setView] = useState<View>("list");
+  const [view, setView] = useState<View>("timeline");
+  const [dateKey, setDateKey] = useState<string>("ALL");
+  const [calendarDateKey, setCalendarDateKey] = useState<string>(() => toLocalDateString());
   const [detailId, setDetailId] = useState<string | null>(() =>
     (new URL(location.href).searchParams.get("recording") ?? new URL(location.href).searchParams.get("stay"))
   );
@@ -314,7 +318,8 @@ export function MobileWorkspace(p: Props) {
     p.setCategory("Trash");
     p.setSearch("");
     p.setDate("all");
-    setView("list");
+    setView("timeline");
+    setDateKey("ALL");
     window.scrollTo(0, 0);
   }
   function card(item: JournalItem) {
@@ -375,6 +380,9 @@ export function MobileWorkspace(p: Props) {
     );
   }
   const days = [...new Set(entries.flatMap(journalDates))].sort().reverse();
+  const timelineEntries = view === "timeline" && !isTrash && dateKey !== "ALL"
+    ? entries.filter(item => journalDates(item).includes(dateKey))
+    : entries;
   return (
     <div className="mobile-workspace">
       <div hidden={!!detailId}>
@@ -495,7 +503,7 @@ export function MobileWorkspace(p: Props) {
                   className="mobile-views"
                   aria-label={ko ? "기록 보기" : "Recording views"}
                 >
-                  {([["list", t.view_list, LayoutList], [
+                  {([["timeline", t.view_timeline, LayoutList], [
                     "map",
                     ko ? "지도" : "Map",
                     MapPin,
@@ -559,7 +567,17 @@ export function MobileWorkspace(p: Props) {
           {p.truncated && <p className="limit-note">{t.showing_limit_note}</p>}
           {!p.loaded ? <p role="status">{t.finding_moments}</p> : (
             <>
-              {view === "list" && (entries.length
+              {view === "timeline" && !isTrash && (
+                <TimeSliderStrip
+                  recordings={filtered}
+                  journalItems={entries}
+                  selectedDateKey={dateKey}
+                  onSelectDate={setDateKey}
+                  t={t}
+                  lang={lang}
+                />
+              )}
+              {view === "timeline" && (timelineEntries.length
                 ? days.map((day) => (
                   <section key={day}>
                     <h2 className="mobile-day-heading">
@@ -569,11 +587,11 @@ export function MobileWorkspace(p: Props) {
                         weekday: "short",
                       })}
                       <span>
-                        {entries.filter((r) => journalDates(r).includes(day)).length}
+                        {timelineEntries.filter((r) => journalDates(r).includes(day)).length}
                         {ko ? "개" : " records"}
                       </span>
                     </h2>
-                    <JournalTimeline dayGrouped items={entries.filter(r => journalDates(r).includes(day))} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} renderPlaceName={p.renderPlaceName} />
+                    <JournalTimeline dayGrouped items={timelineEntries.filter(r => journalDates(r).includes(day))} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} renderPlaceName={p.renderPlaceName} />
                   </section>
                 ))
                 : (
@@ -605,6 +623,8 @@ export function MobileWorkspace(p: Props) {
                   }}
                   t={t}
                   lang={lang}
+                  selectedDateKey={calendarDateKey}
+                  onSelectDay={setCalendarDateKey}
                 />
               )}
               {view === "map" && (
@@ -655,7 +675,7 @@ export function MobileWorkspace(p: Props) {
                     <button
                       className="text-button"
                       onClick={() => {
-                        setView("list");
+                        setView("timeline");
                         requestAnimationFrame(() =>
                           document.querySelector<HTMLButtonElement>(
                             '.mobile-views [aria-current="page"]',
@@ -663,7 +683,7 @@ export function MobileWorkspace(p: Props) {
                         );
                       }}
                     >
-                      {ko ? "목록에서 보기" : "View list"}
+                      {ko ? "타임라인에서 보기" : "View timeline"}
                     </button>
                   </div>
                   {places.length > 0 && (

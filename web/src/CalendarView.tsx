@@ -21,23 +21,29 @@ export default function CalendarView({
   t,
   lang = "en",
   onDateChange,
-  onSelectedDateChange,
+  selectedDateKey,
+  onSelectDay,
 }: {
   lang?: "en" | "ko";
   onDateChange?: () => boolean | void;
-  onSelectedDateChange?: (dateKey: string) => void;
+  selectedDateKey: string;
+  onSelectDay: (dateKey: string) => void;
   recordings: Recording[];
   journalItems?: JournalItem[];
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
   t: TranslationKeys;
 }) {
-  const [currentDate, setCurrentDate] = useState(() => new Date());
-  const [selectedDateKey, setSelectedDateKey] = useState<string>(() => toLocalDateString());
+  const [currentDate, setCurrentDate] = useState(() => new Date(`${selectedDateKey}T12:00:00`));
 
+  // The selected day can change from outside the grid (e.g. the time slider),
+  // so keep the displayed month in sync with it.
   useEffect(() => {
-    onSelectedDateChange?.(selectedDateKey);
-  }, [selectedDateKey, onSelectedDateChange]);
+    const next = new Date(`${selectedDateKey}T12:00:00`);
+    setCurrentDate((prev) =>
+      prev.getFullYear() === next.getFullYear() && prev.getMonth() === next.getMonth()
+        ? prev : next);
+  }, [selectedDateKey]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth(); // 0-indexed
@@ -59,7 +65,7 @@ export default function CalendarView({
     if (key === selectedDateKey) return;
     if (onDateChange?.() === false) return;
     setCurrentDate(next);
-    setSelectedDateKey(key);
+    onSelectDay(key);
   };
   const prevMonth = () => selectDate(new Date(year, month - 1, 1));
   const nextMonth = () => selectDate(new Date(year, month + 1, 1));

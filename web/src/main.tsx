@@ -14,7 +14,6 @@ import {
   Clock,
   FileText,
   Headphones,
-  LayoutList,
   Link2,
   LoaderCircle,
   LogOut,
@@ -188,10 +187,8 @@ function App() {
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording") ?? new URL(window.location.href).searchParams.get("stay"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
-  const [showTimeSlider, setShowTimeSlider] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
-  const [stripDateKey, setStripDateKey] = useState<string>("ALL");
-  const [calendarDateKey, setCalendarDateKey] = useState<string>(() => toLocalDateString());
+  const [viewMode, setViewMode] = useState<"timeline" | "calendar">("timeline");
+  const [dateKey, setDateKey] = useState<string>("ALL");
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     if (typeof window === "undefined") return "dark";
     const saved = localStorage.getItem("haptilog_theme");
@@ -624,19 +621,20 @@ function App() {
   const filtered = filteredItems.flatMap(item => item.kind === "voice" ? [item.recording] : []);
   const activeItem = filteredItems.find(item => item.id === selected) ?? (selected ? undefined : filteredItems[0]);
   const active = activeItem?.kind === "voice" ? activeItem.recording : undefined;
-  const displayItems = viewMode === "list" && showTimeSlider && stripDateKey !== "ALL" ? filteredItems.filter(item => journalDates(item).includes(stripDateKey)) : filteredItems;
+  const displayItems = viewMode === "timeline" && dateKey !== "ALL" ? filteredItems.filter(item => journalDates(item).includes(dateKey)) : filteredItems;
   const openRelatedRecording = (recording: Recording) => {
     setSelected(recording.id);
     if (!filteredItems.some(item => item.kind === "voice" && item.id === recording.id)) {
-      setCategory("All"); setSearch(""); setDate("all"); setStripDateKey("ALL");
+      setCategory("All"); setSearch(""); setDate("all"); setDateKey("ALL");
     }
   };
   const renderPlaceName = (item: Extract<JournalItem, { kind: "stay" }>, compact = false, identity?: string) => !isDemo ? <StayPlaceName key={`${connection?.owner_user_id}:${connection?.session_id}:${identity ?? item.id}`} item={item} journal={locationJournal} lang={lang} compact={compact} /> : null;
   const renderStay = (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording = openRelatedRecording) => <StayInspector key={`${item.id}:${connection?.session_id}`} item={item} journal={locationJournal} readOnly={isDemo} records={records} onOpenRecording={onOpenRecording} lang={lang} renderPlaceName={renderPlaceName} />;
   const displayRecordings =
-    viewMode === "list" && showTimeSlider && stripDateKey !== "ALL"
-      ? filtered.filter((r) => localDate(r.recorded_at) === stripDateKey)
+    viewMode === "timeline" && dateKey !== "ALL"
+      ? filtered.filter((r) => localDate(r.recorded_at) === dateKey)
       : filtered;
+  const calendarActiveDateKey = dateKey === "ALL" ? toLocalDateString() : dateKey;
   const dateFilteredActiveRecords = activeRecords.filter((r) => {
     const day = localDate(r.recorded_at),
       today = toLocalDateString();
@@ -1216,11 +1214,11 @@ function App() {
               <button
                 type="button"
                 role="tab"
-                aria-selected={viewMode === "list"}
-                className={viewMode === "list" ? "active" : ""}
-                onClick={() => setViewMode("list")}
+                aria-selected={viewMode === "timeline"}
+                className={viewMode === "timeline" ? "active" : ""}
+                onClick={() => setViewMode("timeline")}
               >
-                <LayoutList size={14} /> {t.view_list}
+                <Clock size={14} /> {t.view_timeline}
               </button>
               <button
                 type="button"
@@ -1239,16 +1237,6 @@ function App() {
             </div>
             {!isTrashView && (
               <div className="workbench-toggles">
-                {viewMode === "list" && (
-                  <button
-                    type="button"
-                    className={`workbench-toggle-btn ${showTimeSlider ? "active" : ""}`}
-                    onClick={() => setShowTimeSlider(!showTimeSlider)}
-                    aria-expanded={showTimeSlider}
-                  >
-                    <Clock size={14} /> {showTimeSlider ? t.hide_time_slider : t.toggle_time_slider}
-                  </button>
-                )}
                 <button
                   type="button"
                   className={`workbench-toggle-btn ${showMap ? "active" : ""}`}
@@ -1291,7 +1279,8 @@ function App() {
                 className={`trash-tab ${category === "Trash" ? "active" : ""}`}
                 onClick={() => {
                   setCategory("Trash");
-                  setViewMode("list");
+                  setViewMode("timeline");
+                  setDateKey("ALL");
                 }}
                 aria-label="View trash"
               >
@@ -1308,7 +1297,7 @@ function App() {
             />
           </div>
 
-          {category === "Trash" && viewMode !== "list" && (
+          {category === "Trash" && viewMode !== "timeline" && (
             <div className="trash-warning-banner">
               <span>{t.viewing_trash_warning}</span>
               <button type="button" onClick={() => setCategory("All")}>
@@ -1339,8 +1328,8 @@ function App() {
                       <RecordingMap
                         heading={t.map_heading}
                         lang={lang}
-                        recordings={filtered.filter((r) => localDate(r.recorded_at) === calendarDateKey)}
-                        journalItems={filteredItems.filter(item => journalDates(item).includes(calendarDateKey))}
+                        recordings={filtered.filter((r) => localDate(r.recorded_at) === calendarActiveDateKey)}
+                        journalItems={filteredItems.filter(item => journalDates(item).includes(calendarActiveDateKey))}
                         selectedId={activeItem?.id ?? null}
                         onSelect={(id, revealDetails) => {
                           setSelected(id);
@@ -1382,18 +1371,19 @@ function App() {
                   setSelected(null);
                   return true;
                 }}
-                onSelectedDateChange={setCalendarDateKey}
+                selectedDateKey={calendarActiveDateKey}
+                onSelectDay={setDateKey}
               />
             </>
           ) : (
             <>
-              {showTimeSlider && (
+              {!isTrashView && (
                 <div className="workbench-slider-wrapper">
                   <TimeSliderStrip
                     recordings={filtered}
                     journalItems={filteredItems}
-                    selectedDateKey={stripDateKey}
-                    onSelectDate={setStripDateKey}
+                    selectedDateKey={dateKey}
+                    onSelectDate={setDateKey}
                     t={t}
                     lang={lang}
                   />

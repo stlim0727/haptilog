@@ -597,3 +597,18 @@ body.light-mode .mobile-record-foot .mobile-amount {
   flex-wrap: wrap;
   overflow-wrap: anywhere;
 }
+
+/* Timeline view: the day strip is pinned above the records, so keep it
+   compact enough that the first record stays near the top of the page.
+   Tapping the selected card clears the filter, replacing the hidden header. */
+.mobile-workspace .time-strip-container {
+  margin-bottom: 12px;
+  padding: 6px 10px;
+}
+.mobile-workspace .time-strip-header {
+  display: none;
+}
+.mobile-workspace .time-strip-track {
+  gap: 6px;
+  padding: 2px 2px 4px 2px;
+}

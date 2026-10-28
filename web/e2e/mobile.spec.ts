@@ -68,9 +68,11 @@ test("mobile views fit narrow screens in both languages and put records first", 
         ).toBe(true);
         if (i === 0) {
           await page.evaluate(() => scrollTo(0, 0));
+          // Records stay above the fold even with the pinned day strip (~100px)
+          // in the timeline view.
           expect(
             (await page.locator(".mobile-record").first().boundingBox())!.y,
-          ).toBeLessThan(600);
+          ).toBeLessThan(700);
         }
         if (i === 2) {
           const cell = await page.locator(".calendar-cell:not(:disabled)")
@@ -155,7 +157,7 @@ test("mobile map stays first and locationless records remain reachable", async (
   expect((await page.locator(".recording-map").boundingBox())!.y).toBeLessThan(
     600,
   );
-  await page.getByRole("button", { name: "View list", exact: true }).click();
+  await page.getByRole("button", { name: "View timeline", exact: true }).click();
   await expect(page.locator('[data-record-id="no-location"]')).toBeVisible();
   await expect(page.locator('.mobile-views [aria-current="page"]'))
     .toBeFocused();
@@ -401,7 +403,7 @@ test("mobile map follows category filters and handles a selection without GPS", 
   await page.getByRole("button", { name: "Apply filter" }).click();
   await expect(page.locator(".map-empty")).toBeVisible();
   await expect(page.locator(".mobile-record")).toHaveCount(0);
-  await page.getByRole("button", { name: "View list", exact: true }).click();
+  await page.getByRole("button", { name: "View timeline", exact: true }).click();
   await expect(page.locator(".mobile-empty")).toBeVisible();
 });
 
