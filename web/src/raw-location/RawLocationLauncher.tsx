@@ -114,7 +114,7 @@ export default function RawLocationLauncher({ owner, lang, isDemo, stays = [] }:
   useEffect(() => { if (open) dialog.current?.showModal(); else dialog.current?.close(); }, [open]);
   const ko = lang === 'ko';
   return <>
-    <button ref={button} type="button" className="lang-switch-btn" aria-label={ko ? '개발자 연속 위치 지도' : 'Developer continuous location map'} aria-pressed={open} onClick={() => setOpen(true)}>DEV</button>
+    <button ref={button} type="button" className="account-dev-launcher-btn" aria-label={ko ? '개발자 연속 위치 지도' : 'Developer continuous location map'} aria-pressed={open} onClick={() => setOpen(true)}>DEV</button>
     {createPortal(<dialog ref={dialog} className="raw-location-dialog" aria-label={ko ? '개발자 연속 위치 지도' : 'Developer continuous location map'} onClose={() => { setOpen(false); button.current?.focus(); }}>
       <button type="button" onClick={() => setOpen(false)}>{ko ? '닫기' : 'Close'}</button>
       {open && <>

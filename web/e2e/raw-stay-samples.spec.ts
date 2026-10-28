@@ -10,7 +10,7 @@ for(const width of [1280,390]) {
     await page.route('**/rest/v1/rpc/raw_locations',async route=>{rawCalls++;await route.abort();});
     await page.route('https://tile.openstreetmap.org/**',route=>route.abort());
     await page.goto('/');await page.getByTestId('preview-test-login-button').click();
-    await page.getByRole('button',{name:'Developer continuous location map'}).click();
+    await page.locator('.account-trigger-btn').click();await page.getByRole('button',{name:'Developer continuous location map'}).click();
     const dialog=page.getByRole('dialog',{name:'Developer continuous location map'});
     await expect(dialog.getByLabel('Developer data')).toHaveValue('sample');
     await expect(dialog.getByText(/Synthetic samples/)).toBeVisible();
@@ -41,7 +41,7 @@ test('real stay summaries remain visible without raw ingestion and samples never
   await staysFixture(page);
   let rawCalls=0;
   await page.route('**/rest/v1/rpc/raw_locations',async route=>{rawCalls++;await route.fulfill({json:{error:'UNAVAILABLE'}});});
-  await page.goto('/');await page.getByRole('button',{name:'Developer continuous location map'}).click();
+  await page.goto('/');await page.locator('.account-trigger-btn').click();await page.getByRole('button',{name:'Developer continuous location map'}).click();
   const dialog=page.getByRole('dialog',{name:'Developer continuous location map'});
   const stays=dialog.getByRole('region',{name:'Stays in selected range'});
   await expect(stays.getByRole('button',{name:/^Stay ·/})).toHaveCount(1);
