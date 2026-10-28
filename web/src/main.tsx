@@ -145,10 +145,10 @@ function PairStep({ screen, label }: { screen: React.ReactNode; label: string })
     </div>
   );
 }
-function WatchPairGuide() {
+function WatchPairGuide({ t }: { t: TranslationKeys }) {
   return (
-    <div className="pair-guide" role="img" aria-label="Three steps on the watch: open Settings, tap Review on the web, tap Create connection code">
-      <PairStep label="Settings"
+    <div className="pair-guide" role="img" aria-label={t.guide_aria}>
+      <PairStep label={t.guide_step_settings}
         screen={<>
           <circle cx="38" cy="37" r="11" className="watch-ghost" />
           <g transform="translate(46 58) scale(0.4)" className="watch-accent">
@@ -157,7 +157,7 @@ function WatchPairGuide() {
           </g>
         </>} />
       <ChevronRight size={16} className="pair-guide-arrow" aria-hidden="true" />
-      <PairStep label="Review on the web"
+      <PairStep label={t.guide_step_review}
         screen={<>
           <rect x="28" y="23" width="20" height="3" rx="1.5" className="watch-ghost" />
           <rect x="19" y="31" width="38" height="10" rx="5" className="watch-ghost" />
@@ -169,7 +169,7 @@ function WatchPairGuide() {
           <rect x="38" y="49.5" width="15" height="4" rx="2" className="watch-active-ink" />
         </>} />
       <ChevronRight size={16} className="pair-guide-arrow" aria-hidden="true" />
-      <PairStep label="Create connection code"
+      <PairStep label={t.guide_step_code}
         screen={<>
           <text x="38" y="42" textAnchor="middle" className="watch-code">123 456</text>
           <rect x="19" y="47" width="38" height="12" rx="6" className="watch-active" />
@@ -1006,7 +1006,7 @@ function App() {
             <span className="step-label">{t.step_label}</span>
             <h2>{addingWatch ? t.add_watch : t.connect_title}</h2>
             {addingWatch && connection && <button onClick={() => setAddingWatch(false)}>{t.cancel_pair}</button>}
-            <WatchPairGuide />
+            <WatchPairGuide t={t} />
             {accountEmail && <p>{t.account_pair_help}</p>}
             <p>{t.connect_desc}</p>
             {!accountEmail && !addingWatch && supabase && (

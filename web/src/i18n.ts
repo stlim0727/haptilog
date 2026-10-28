@@ -42,6 +42,11 @@ export const translations = {
     connecting: "Connecting…",
     pair_footnote:
       "Use a watch code for temporary access.\nLink Google for access after replacing your watch.",
+    guide_aria:
+      "Three steps on the watch: open Settings, tap Review on the web, tap Create connection code",
+    guide_step_settings: "Settings",
+    guide_step_review: "Review on the web",
+    guide_step_code: "Create connection code",
     preview_test_badge: "PR Preview / Demo",
     preview_divider_or: "OR TRY WITH SAMPLE DATA",
     preview_test_desc:
@@ -228,6 +233,11 @@ export const translations = {
     connecting: "연결 중…",
     pair_footnote:
       "워치 코드로 임시 접근할 수 있습니다.\n워치 교체 후에도 접근하려면 Google 계정을 연결하세요.",
+    guide_aria:
+      "워치에서 따라할 세 단계: 설정을 열고, '웹에서 기록 보기'를 누르고, '연결 코드 만들기'를 누릅니다",
+    guide_step_settings: "설정",
+    guide_step_review: "웹에서 기록 보기",
+    guide_step_code: "연결 코드 만들기",
     preview_test_badge: "PR 프리뷰 / 데모",
     preview_divider_or: "또는 샘플 데이터로 둘러보기",
     preview_test_desc:
