@@ -1,8 +1,11 @@
 import { expect } from '@playwright/test';
 import { test } from './fixtures';
 import { fixture } from './portal-fixture';
+// The initial range is today; keep it aligned with the fixed GPS samples.
+test.use({ timezoneId: 'UTC' });
 for (const width of [1280,390]) {
   test(`continuous raw trail and gaps at ${width}px`, async ({page})=>{
+    await page.clock.setFixedTime(new Date('2026-10-27T12:30:00Z'));
     await page.setViewportSize({width,height:844});await fixture(page);
     let deleted=false;
     await page.route('**/rest/v1/rpc/raw_locations',async route=>{

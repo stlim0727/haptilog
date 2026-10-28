@@ -34,6 +34,22 @@ async function mobile(page: Page, count = 1) {
   return state;
 }
 
+test("voice-only filter keeps mobile cards at the full timeline width", async ({ page }) => {
+  await mobile(page, 2);
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await onlyCategory(page, "Voice", true);
+  await page.getByRole("button", { name: "Apply filter" }).click();
+  for (const width of [320, 390, 590]) {
+    await page.setViewportSize({ width, height: 844 });
+    const timeline = page.locator(".journal-ribbons").first();
+    await expect(timeline.locator(".stay-ribbon")).toHaveCount(0);
+    await expect.poll(async () => timeline.evaluate(element => {
+      const card = element.querySelector(".mobile-record")!;
+      return Math.abs(element.getBoundingClientRect().width - card.getBoundingClientRect().width);
+    })).toBeLessThan(2);
+  }
+});
+
 test("mobile views fit narrow screens in both languages and put records first", async ({ page }) => {
   test.setTimeout(60000);
   await mobile(page, 9);
