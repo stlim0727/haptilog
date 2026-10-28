@@ -2,6 +2,8 @@
 
 Date: 2026-10-28. Status: implemented on `fix/records-view-controls`; resolves #113.
 
+[타임라인 보기](timeline-390-ko.png) · [지도 겹침 보기](map-overlay-390.png)
+
 ## Problem
 
 [Issue #113](https://github.com/stlim0727/haptilog/issues/113) reported two conflicts on the
@@ -36,3 +38,7 @@ timeline/calendar switch, the absence of a period dropdown, and the shared empty
 category filter. `web/e2e/portal.spec.ts` and `main-stay-samples.spec.ts` were updated for the
 overlay model. 119 Playwright tests and 74 unit tests pass; 320/360/390/430px stay free of
 horizontal overflow in both languages with 200% text.
+
+The captures come from those runs at 390px. `timeline-390-ko.png` is the Korean timeline with
+the two-way control and no period dropdown; `map-overlay-390.png` is the map switched on over
+the same feed, with the day strip and records still below it.
