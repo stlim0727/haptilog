@@ -1,5 +1,8 @@
 package com.haptilog.watch.presentation
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
@@ -155,6 +158,17 @@ class WebAccessActivity : ComponentActivity() {
                         item { Text(stringResource(R.string.web_access_title), fontSize = 18.sp, textAlign = TextAlign.Center) }
                         if (code == null) item { codeAction() }
                         item { Text(BuildConfig.WEB_PORTAL_URL.removePrefix("https://"), fontSize = 13.sp, textAlign = TextAlign.Center) }
+                        item {
+                            FlexibleChip(enabled = !busy, onClick = {
+                                error = null
+                                try {
+                                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.WEB_PORTAL_URL)))
+                                } catch (_: ActivityNotFoundException) {
+                                    error = getString(R.string.open_in_phone_fallback, BuildConfig.WEB_PORTAL_URL)
+                                }
+                            }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.open_in_phone_action)) },
+                                secondaryLabel = { Text(stringResource(R.string.open_in_phone_hint), maxLines = Int.MAX_VALUE) })
+                        }
                         item { Text(stringResource(R.string.browser_purpose), fontSize = 12.sp, textAlign = TextAlign.Center) }
                         if (connected) item { Text(stringResource(R.string.browser_connected), fontSize = 17.sp, textAlign = TextAlign.Center) }
                         if (code != null) {

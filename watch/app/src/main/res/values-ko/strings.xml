@@ -87,6 +87,9 @@
     <string name="cancel_code_action">코드 취소</string>
     <string name="revoke_action">접근 해제</string>
     <string name="browser_purpose">브라우저에서 기록을 확인합니다. 휴대폰 앱은 필요하지 않습니다.</string>
+    <string name="open_in_phone_action">휴대폰에서 열기</string>
+    <string name="open_in_phone_hint">휴대폰 브라우저에서 HaptiLog 사이트를 엽니다</string>
+    <string name="open_in_phone_fallback">휴대폰에서 열 수 없습니다. 휴대폰 브라우저에서 %1$s에 접속하세요.</string>
     <string name="browser_connected">브라우저 연결됨</string>
     <string name="no_browsers">연결된 브라우저가 없습니다</string>
     <string name="enter_code_hint">웹에서 이 코드를 입력하세요</string>

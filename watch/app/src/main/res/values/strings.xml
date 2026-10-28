@@ -87,6 +87,9 @@
     <string name="cancel_code_action">Cancel code</string>
     <string name="revoke_action">Revoke access</string>
     <string name="browser_purpose">Review recordings in a browser. No phone app needed.</string>
+    <string name="open_in_phone_action">Open in phone</string>
+    <string name="open_in_phone_hint">Opens the HaptiLog site in your phone\'s browser</string>
+    <string name="open_in_phone_fallback">Could not open on the phone. Visit %1$s in your phone\'s browser.</string>
     <string name="browser_connected">Browser connected</string>
     <string name="no_browsers">No connected browsers</string>
     <string name="enter_code_hint">Enter this code on the web</string>
