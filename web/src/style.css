@@ -448,6 +448,53 @@ button {
   color: var(--text-primary);
   font-weight: 600;
 }
+.pair-guide {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: clamp(2px, 2.5cqi, 6px);
+  margin: 18px 0 6px;
+  container-type: inline-size;
+}
+.pair-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: clamp(58px, 26cqi, 104px);
+}
+.pair-step .watch-frame {
+  width: 90%;
+  height: auto;
+}
+.pair-step span {
+  font-size: clamp(9px, 3.2cqi, 11px);
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--text-muted);
+}
+.pair-guide-arrow {
+  color: var(--text-muted);
+  margin-top: clamp(22px, 10cqi, 38px);
+  flex-shrink: 0;
+}
+.watch-frame .watch-strap { fill: var(--bg-surface-elevated); stroke: var(--border); }
+.watch-frame .watch-bezel { fill: var(--bg-surface-elevated); stroke: var(--border-strong); stroke-width: 1.5; }
+.watch-frame .watch-screen { fill: var(--bg-canvas); stroke: var(--border); }
+.watch-frame .watch-ghost { fill: none; stroke: var(--border-strong); stroke-width: 2; }
+.watch-frame .watch-active { fill: var(--bg-surface-hover); stroke: var(--border-accent); stroke-width: 1.5; }
+.watch-frame .watch-accent { stroke: var(--text-secondary); stroke-width: 1.6; }
+.watch-frame .watch-accent-fill { fill: var(--text-secondary); stroke: none; }
+.watch-frame .watch-screen-fill { fill: var(--bg-canvas); stroke: none; }
+.watch-frame .watch-active-ink { fill: var(--text-secondary); }
+.watch-frame .watch-code {
+  fill: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
 form label {
   display: block;
   font-size: 13px;

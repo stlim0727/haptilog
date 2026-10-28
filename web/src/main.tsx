@@ -131,6 +131,52 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
+function PairStep({ screen, label }: { screen: React.ReactNode; label: string }) {
+  return (
+    <div className="pair-step">
+      <svg className="watch-frame" width="76" height="92" viewBox="0 0 76 92" aria-hidden="true">
+        <rect x="26" y="2" width="24" height="16" rx="5" className="watch-strap" />
+        <rect x="26" y="74" width="24" height="16" rx="5" className="watch-strap" />
+        <rect x="8" y="14" width="60" height="64" rx="20" className="watch-bezel" />
+        <rect x="13" y="19" width="50" height="54" rx="16" className="watch-screen" />
+        {screen}
+      </svg>
+      <span>{label}</span>
+    </div>
+  );
+}
+function WatchPairGuide() {
+  return (
+    <div className="pair-guide" role="img" aria-label="Three steps on the watch: open Settings, tap Review on the web, tap Create connection code">
+      <PairStep label="Settings"
+        screen={<>
+          <circle cx="38" cy="37" r="11" className="watch-ghost" />
+          <g transform="translate(46 58) scale(0.4)" className="watch-accent">
+            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" className="watch-accent-fill" />
+            <circle cx="12" cy="12" r="3" className="watch-screen-fill" />
+          </g>
+        </>} />
+      <ChevronRight size={16} className="pair-guide-arrow" aria-hidden="true" />
+      <PairStep label="Review on the web"
+        screen={<>
+          <rect x="28" y="23" width="20" height="3" rx="1.5" className="watch-ghost" />
+          <rect x="19" y="31" width="38" height="10" rx="5" className="watch-ghost" />
+          <rect x="19" y="45" width="38" height="13" rx="6.5" className="watch-active" />
+          <g transform="translate(23 48.5) scale(0.34)" className="watch-accent">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" fill="none" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" fill="none" />
+          </g>
+          <rect x="38" y="49.5" width="15" height="4" rx="2" className="watch-active-ink" />
+        </>} />
+      <ChevronRight size={16} className="pair-guide-arrow" aria-hidden="true" />
+      <PairStep label="Create connection code"
+        screen={<>
+          <text x="38" y="42" textAnchor="middle" className="watch-code">123 456</text>
+          <rect x="19" y="47" width="38" height="12" rx="6" className="watch-active" />
+        </>} />
+    </div>
+  );
+}
 function App() {
   const [draftInProgress, setDraftInProgress] = useState(false);
   const [notionOpen, setNotionOpen] = useState(false);
@@ -960,6 +1006,7 @@ function App() {
             <span className="step-label">{t.step_label}</span>
             <h2>{addingWatch ? t.add_watch : t.connect_title}</h2>
             {addingWatch && connection && <button onClick={() => setAddingWatch(false)}>{t.cancel_pair}</button>}
+            <WatchPairGuide />
             {accountEmail && <p>{t.account_pair_help}</p>}
             <p>{t.connect_desc}</p>
             {!accountEmail && !addingWatch && supabase && (
