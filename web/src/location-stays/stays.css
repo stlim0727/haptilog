@@ -55,7 +55,6 @@
 .stay-delete-confirm p { flex-basis: 100%; }
 .stay-inspector .recording-map { min-height: 220px; }
 .record-card strong, .mobile-record strong { overflow-wrap: anywhere; }
-.stay-card-context { color: var(--text-secondary); font-size: .75rem; }
 [data-journal-kind="stay"] .record-bottom, [data-journal-kind="stay"] .mobile-record-foot { flex-wrap: wrap; gap: .5rem; }
 [data-journal-kind="stay"] .record-meta, [data-journal-kind="stay"] .mobile-record-meta { flex-wrap: wrap; gap: .5rem; }
 .stay-place-name { min-width: 0; }

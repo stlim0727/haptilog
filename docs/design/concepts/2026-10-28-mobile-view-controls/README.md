@@ -1,6 +1,6 @@
 # Mobile records page: view controls
 
-Date: 2026-10-28. Status: implemented on `fix/records-view-controls`; resolves #113.
+Date: 2026-10-28. Status: implemented on `fix/records-view-controls` (#114) with the map's stay ribbons follow-up on `fix/map-stay-ribbons` (#115); resolves #113.
 
 [타임라인 보기](timeline-390-ko.png) · [지도 겹침 보기](map-overlay-390.png)
 
@@ -30,6 +30,9 @@ Date: 2026-10-28. Status: implemented on `fix/records-view-controls`; resolves #
   simply in the feed below the map.
 - One day scope drives the feed and the map together. Picking a day narrows both; the calendar
   scopes the map to its active day, as desktop does.
+- Because the map's place list now sits directly above the feed, it renders stays through
+  `JournalTimeline` like the feed does. It had used the flat pre-ribbon `JournalStayCard`, which
+  was harmless as its own tab but showed the same stay two ways side by side. Fixed in #115.
 
 ## Verification
 
@@ -41,4 +44,4 @@ horizontal overflow in both languages with 200% text.
 
 The captures come from those runs at 390px. `timeline-390-ko.png` is the Korean timeline with
 the two-way control and no period dropdown; `map-overlay-390.png` is the map switched on over
-the same feed, with the day strip and records still below it.
+the same feed, with the day strip and records still below it; `map-stay-ribbons-390.png` is the place list with the map on, where a stay now carries the same ribbon as the feed under it.
