@@ -4,7 +4,7 @@ import { toLocalDateString } from "./domain";
 import type { Recording } from "./domain";
 import { voiceItem, journalDates, journalIntent } from "./journal";
 import type { JournalItem } from "./journal";
-import type { translations } from "./i18n";
+import type { TranslationKeys } from "./i18n";
 
 export default function TimeSliderStrip({
   recordings,
@@ -18,7 +18,7 @@ export default function TimeSliderStrip({
   journalItems?: JournalItem[];
   selectedDateKey: string; // "ALL" or "YYYY-MM-DD"
   onSelectDate: (key: string) => void;
-  t: (typeof translations)["en"] | (typeof translations)["ko"];
+  t: TranslationKeys;
   lang: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -129,7 +129,7 @@ export default function TimeSliderStrip({
               className={`time-strip-card ${isSelected ? "selected" : ""} ${
                 isToday ? "today" : ""
               } ${list.length === 0 ? "empty-day" : ""}`}
-              onClick={() => onSelectDate(dateKey)}
+              onClick={() => onSelectDate(isSelected ? "ALL" : dateKey)}
               role="button"
               tabIndex={0}
               onKeyDown={(evt) => {

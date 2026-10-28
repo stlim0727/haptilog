@@ -166,7 +166,7 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
   });
   await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.getByRole("region", { name: "Map of recording locations" })).toBeVisible();
-  await page.getByRole("button", { name: "List", exact: true }).click();
+  await page.getByRole("button", { name: "Timeline", exact: true }).click();
   await expect(page.getByRole("region", { name: "Map of recording locations" }))
     .toHaveCount(0);
 });
@@ -259,6 +259,7 @@ test("moves a recording to trash with undo and restores from the trash tab", asy
   await page.getByRole("button", { name: "View trash" }).click();
   await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
   await expect(page.getByRole("alert")).toContainText("In trash");
+  await expect(page.locator(".time-strip-container")).toHaveCount(0);
 
   // Restore from trash
   await page.getByRole("button", { name: "Restore" }).click();
@@ -331,47 +332,45 @@ test("transcript edits preserve originals, can be cancelled, and expose history"
   await expect(page.locator(".transcript-editor > p.transcript")).toHaveText("Corrected coffee text");
 });
 
-test("switches between List and Calendar and toggles the time slider and map", async ({ page }) => {
+test("switches between Timeline and Calendar and toggles the map", async ({ page }) => {
   await fixture(page);
   await page.goto("/");
 
-  // 1. Default list view, both toggles off
+  // 1. Default timeline view: slider pinned, map off
+  await expect(page.getByRole("tab", { name: "Timeline" })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".review-layout")).toBeVisible();
   await expect(page.locator(".global-filters-bar")).toBeVisible();
   await expect(page.locator(".category-expense")).toBeVisible();
-  await expect(page.locator(".time-strip-container")).toHaveCount(0);
-  await expect(page.locator(".map-section")).toHaveCount(0);
-
-  // 2. Time Slider toggle in List
-  await page.getByRole("button", { name: "Time Slider", exact: true }).click();
   await expect(page.locator(".time-strip-container")).toBeVisible();
   await expect(page.locator(".time-strip-card").first()).toBeVisible();
   await page.locator(".time-strip-card").first().click();
   await expect(page.locator(".time-strip-card").first()).toHaveClass(/selected/);
   await page.locator(".time-strip-all-btn").click();
   await expect(page.locator(".time-strip-all-btn")).toHaveClass(/active/);
+  await expect(page.locator(".map-section")).toHaveCount(0);
 
-  // 3. Map toggle in List
+  // 2. Map toggle in Timeline
   await page.getByRole("button", { name: "Show map" }).click();
   await expect(page.locator(".map-section")).toBeVisible();
   await expect(page.locator(".recording-map")).toBeVisible();
 
-  // 4. Switch to Calendar — Map persists, Time Slider toggle is not offered
+  // 3. Switch to Calendar — slider is gone, map persists
   await page.getByRole("tab", { name: "Calendar" }).click();
   await expect(page.locator(".calendar-view-container")).toBeVisible();
   await expect(page.locator(".calendar-grid")).toBeVisible();
   await expect(page.locator(".calendar-day-panel")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Hide Slider", exact: true })).toHaveCount(0);
+  await expect(page.locator(".time-strip-container")).toHaveCount(0);
 
-  // 5. Map toggle in Calendar
+  // 4. Map toggle in Calendar
   await page.getByRole("button", { name: "Hide map" }).click();
   await expect(page.locator(".map-section")).toHaveCount(0);
   await page.getByRole("button", { name: "Show map" }).click();
   await expect(page.locator(".map-section")).toBeVisible();
 
-  // 6. Return to List
-  await page.getByRole("tab", { name: "List" }).click();
+  // 5. Return to Timeline
+  await page.getByRole("tab", { name: "Timeline" }).click();
   await expect(page.locator(".review-layout")).toBeVisible();
+  await expect(page.locator(".time-strip-container")).toBeVisible();
 });
 
 test("Calendar map follows the selected day, hides pins for empty days, and opens the recording on tap", async ({ page }) => {
@@ -426,7 +425,7 @@ test("Calendar map follows the selected day, hides pins for empty days, and open
   await expect(page.locator(".transcript")).toHaveText("Earlier day transcript");
 });
 
-test("Time Slider day pick stays visible when returning from Calendar so the day filter is never silent", async ({ page }) => {
+test("Timeline day pick is shared with Calendar so the day filter is never silent", async ({ page }) => {
   const state = await fixture(page);
   state.additional.push({
     ...structuredClone(baseRecording),
@@ -441,17 +440,20 @@ test("Time Slider day pick stays visible when returning from Calendar so the day
   });
   await page.goto("/");
 
-  // Turn on the Time Slider and pick 2026-10-14; only that day's card shows.
-  await page.getByRole("button", { name: "Time Slider", exact: true }).click();
+  // Pick 2026-10-14 on the always-visible slider; only that day's card shows.
   await expect(page.locator(".time-strip-container")).toBeVisible();
   await page.locator('[data-date-key="2026-10-14"]').click();
   await expect(page.locator(".record-card")).toHaveCount(1);
   await expect(page.locator(".record-card").first()).toContainText("Earlier coffee");
 
-  // Round-trip through Calendar: strip and its day selection must survive the trip.
+  // Round-trip through Calendar: the picked day is preselected there,
+  // and returning to Timeline restores the same day filter.
   await page.getByRole("tab", { name: "Calendar" }).click();
-  await expect(page.getByRole("button", { name: "Time Slider", exact: true })).toHaveCount(0);
-  await page.getByRole("tab", { name: "List" }).click();
+  await expect(page.locator(".time-strip-container")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "1 recording on 2026-10-14", exact: true }))
+    .toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".calendar-day-card")).toHaveCount(1);
+  await page.getByRole("tab", { name: "Timeline" }).click();
   await expect(page.locator(".time-strip-container")).toBeVisible();
   await expect(page.locator(".time-strip-card.selected")).toHaveAttribute("data-date-key", "2026-10-14");
   await expect(page.locator(".record-card")).toHaveCount(1);
