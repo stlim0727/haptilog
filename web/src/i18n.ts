@@ -35,13 +35,18 @@ export const translations = {
     step_label: "YOUR WATCH → YOUR BROWSER",
     connect_title: "Make the connection.",
     connect_desc:
-      "On your watch, open Web access and tap Create code. Enter the six-digit code below.",
+      "On your watch, open Settings and tap Review on the web, then tap Create connection code. Enter the six-digit code below.",
     access_code: "Access code",
     expires_in: "Expires after 5 minutes",
     connect_btn: "Connect my watch",
     connecting: "Connecting…",
     pair_footnote:
       "Use a watch code for temporary access.\nLink Google for access after replacing your watch.",
+    guide_aria:
+      "Three steps on the watch: open Settings, tap Review on the web, tap Create connection code",
+    guide_step_settings: "Settings",
+    guide_step_review: "Review on the web",
+    guide_step_code: "Create connection code",
     preview_test_badge: "PR Preview / Demo",
     preview_divider_or: "OR TRY WITH SAMPLE DATA",
     preview_test_desc:
@@ -221,13 +226,18 @@ export const translations = {
     step_label: "워치에서 → 브라우저로",
     connect_title: "워치와 연결하기",
     connect_desc:
-      "워치에서 '웹 접속'을 열고 '코드 생성'을 누른 후, 6자리 코드를 아래에 입력하세요.",
+      "워치에서 설정 → '웹에서 기록 보기'로 들어가 '연결 코드 만들기'를 누른 후, 6자리 코드를 아래에 입력하세요.",
     access_code: "접속 코드",
     expires_in: "5분 후 만료",
     connect_btn: "워치 연결하기",
     connecting: "연결 중…",
     pair_footnote:
       "워치 코드로 임시 접근할 수 있습니다.\n워치 교체 후에도 접근하려면 Google 계정을 연결하세요.",
+    guide_aria:
+      "워치에서 따라할 세 단계: 설정을 열고, '웹에서 기록 보기'를 누르고, '연결 코드 만들기'를 누릅니다",
+    guide_step_settings: "설정",
+    guide_step_review: "웹에서 기록 보기",
+    guide_step_code: "연결 코드 만들기",
     preview_test_badge: "PR 프리뷰 / 데모",
     preview_divider_or: "또는 샘플 데이터로 둘러보기",
     preview_test_desc:
