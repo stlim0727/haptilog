@@ -379,8 +379,25 @@ test("system instruction offers UNKNOWN with an unintelligible-audio escape hatc
     assert.ok(text.includes("MEMO or UNKNOWN"));
     assert.ok(text.includes("do not guess or invent content"));
     assert.ok(text.includes('the fixed short summary "No words recognized."'));
+    assert.ok(text.includes('the fixed short summary "No speech detected."'));
+    assert.ok(text.includes("only background or environmental noise"));
     assert.ok(!text.includes("speech could not be recognized"));
   }
+});
+
+test("background-noise-only audio is stored as UNKNOWN with the fixed summary", async () => {
+  const noiseOnly = {
+    transcript: "",
+    summary: "No speech detected.",
+    intent_type: "UNKNOWN",
+    structured_data: {},
+  };
+  assert.deepEqual(validateResult(noiseOnly), noiseOnly);
+  const { handler, calls } = fixture({ providerResult: noiseOnly });
+  const response = await handler(request());
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls.writes[0].intent_type, "UNKNOWN");
+  assert.equal(calls.writes[0].summary, "No speech detected.");
 });
 
 test("unintelligible audio is stored as UNKNOWN instead of a forced guess", async () => {
