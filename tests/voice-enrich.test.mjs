@@ -378,13 +378,15 @@ test("system instruction offers UNKNOWN with an unintelligible-audio escape hatc
     const text = calls.input.systemInstruction.parts[0].text;
     assert.ok(text.includes("MEMO or UNKNOWN"));
     assert.ok(text.includes("do not guess or invent content"));
+    assert.ok(text.includes('the fixed short summary "No words recognized."'));
+    assert.ok(!text.includes("speech could not be recognized"));
   }
 });
 
 test("unintelligible audio is stored as UNKNOWN instead of a forced guess", async () => {
   const unclear = {
     transcript: "",
-    summary: "음성이 불명확하여 인식할 수 없음",
+    summary: "No words recognized.",
     intent_type: "UNKNOWN",
     structured_data: {},
   };
