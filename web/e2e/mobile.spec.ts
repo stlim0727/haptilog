@@ -139,6 +139,45 @@ test("mobile calendar has keyboard dates, no unrelated detail, and preserves sel
   await expect(page.locator(".calendar-day-card,.inspector")).toHaveCount(0);
 });
 
+test("mobile timeline day pick is shared with Calendar and clears itself when stale", async ({ page }) => {
+  const state = await mobile(page, 3);
+  state.additional.push({
+    ...structuredClone(baseRecording),
+    id: "mobile-old",
+    recorded_at: "2026-10-14T09:00:00Z",
+    created_at: "2026-10-14T09:00:00Z",
+    voice_enrichments: [{
+      ...baseRecording.voice_enrichments[0],
+      summary: "Earlier coffee",
+    }],
+  });
+  await page.reload();
+  // Pick 2026-10-14 on the strip: only that day's section renders.
+  await page.locator('[data-date-key="2026-10-14"]').click();
+  await expect(page.locator(".mobile-record")).toHaveCount(1);
+  await expect(page.locator(".mobile-record").first()).toContainText("Earlier coffee");
+  await expect(page.locator(".mobile-day-heading")).toHaveCount(1);
+
+  // The same day is preselected in Calendar.
+  await page.getByRole("button", { name: "Calendar", exact: true }).click();
+  await expect(page.getByRole("button", { name: "1 recording on 2026-10-14", exact: true }))
+    .toHaveAttribute("aria-pressed", "true");
+
+  // Returning to Timeline keeps the same day filter (shared state), and a
+  // filter change that drops the picked day's card clears it instead of
+  // leaving the timeline silently empty.
+  await page.getByRole("button", { name: "Timeline", exact: true }).click();
+  await expect(page.locator(".mobile-record")).toHaveCount(1);
+  await page.getByRole("searchbox", { name: "Search journal" }).fill("zzz-none");
+  await expect(page.locator(".mobile-empty")).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search journal" }).fill("moment");
+  await expect(page.locator('[data-date-key="2026-10-14"]')).toHaveCount(0);
+  await expect(page.locator(".mobile-record").first()).toContainText("Coffee moment");
+  await expect(page.locator(".mobile-record")).toHaveCount(2);
+  // The explicit "All days" control stays reachable on mobile.
+  await expect(page.getByRole("button", { name: "All Days" })).toBeVisible();
+});
+
 test("mobile map stays first and locationless records remain reachable", async ({ page }) => {
   const state = await mobile(page, 12);
   state.additional.push({

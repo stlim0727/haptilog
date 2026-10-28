@@ -115,7 +115,6 @@ export function MobileWorkspace(p: Props) {
   const ko = lang === "ko";
   const [view, setView] = useState<View>("timeline");
   const [dateKey, setDateKey] = useState<string>("ALL");
-  const [calendarDateKey, setCalendarDateKey] = useState<string>(() => toLocalDateString());
   const [detailId, setDetailId] = useState<string | null>(() =>
     (new URL(location.href).searchParams.get("recording") ?? new URL(location.href).searchParams.get("stay"))
   );
@@ -379,10 +378,18 @@ export function MobileWorkspace(p: Props) {
       </button>
     );
   }
-  const days = [...new Set(entries.flatMap(journalDates))].sort().reverse();
   const timelineEntries = view === "timeline" && !isTrash && dateKey !== "ALL"
     ? entries.filter(item => journalDates(item).includes(dateKey))
     : entries;
+  const timelineDays = [...new Set(timelineEntries.flatMap(journalDates))].sort().reverse();
+  // The mobile strip hides its "All days" button, so a picked day whose card
+  // is gone must clear itself rather than trap the feed on an empty day.
+  useEffect(() => {
+    if (dateKey !== "ALL" && !timelineEntries.some(item => journalDates(item).includes(dateKey))) {
+      setDateKey("ALL");
+    }
+  }, [timelineEntries, dateKey]);
+  const calendarActiveDateKey = dateKey === "ALL" ? toLocalDateString() : dateKey;
   return (
     <div className="mobile-workspace">
       <div hidden={!!detailId}>
@@ -578,7 +585,7 @@ export function MobileWorkspace(p: Props) {
                 />
               )}
               {view === "timeline" && (timelineEntries.length
-                ? days.map((day) => (
+                ? timelineDays.map((day) => (
                   <section key={day}>
                     <h2 className="mobile-day-heading">
                       {new Date(`${day}T12:00:00`).toLocaleDateString(lang, {
@@ -623,8 +630,8 @@ export function MobileWorkspace(p: Props) {
                   }}
                   t={t}
                   lang={lang}
-                  selectedDateKey={calendarDateKey}
-                  onSelectDay={setCalendarDateKey}
+                  selectedDateKey={calendarActiveDateKey}
+                  onSelectDay={setDateKey}
                 />
               )}
               {view === "map" && (

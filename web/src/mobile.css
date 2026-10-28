@@ -599,16 +599,28 @@ body.light-mode .mobile-record-foot .mobile-amount {
 }
 
 /* Timeline view: the day strip is pinned above the records, so keep it
-   compact enough that the first record stays near the top of the page.
-   Tapping the selected card clears the filter, replacing the hidden header. */
+   compact enough that the first record stays near the top of the page. */
 .mobile-workspace .time-strip-container {
   margin-bottom: 12px;
-  padding: 6px 10px;
+  padding: 4px 8px;
 }
 .mobile-workspace .time-strip-header {
+  justify-content: flex-end;
+  margin-bottom: 2px;
+}
+.mobile-workspace .time-strip-title {
   display: none;
+}
+.mobile-workspace .time-strip-actions button {
+  min-height: 32px;
 }
 .mobile-workspace .time-strip-track {
   gap: 6px;
   padding: 2px 2px 4px 2px;
+}
+.mobile-workspace .time-strip-card {
+  height: 68px;
+}
+.mobile-workspace .mobile-day-heading {
+  margin-top: 12px;
 }
