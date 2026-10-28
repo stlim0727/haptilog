@@ -20,7 +20,7 @@ for (const width of [1280,390]) {
       await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(body)});
     });
     await page.route('https://tile.openstreetmap.org/**',route=>route.abort());
-    await page.goto('/');await page.getByRole('button',{name:'Developer continuous location map'}).click();
+    await page.goto('/');await page.locator('.account-trigger-btn').click();await page.getByRole('button',{name:'Developer continuous location map'}).click();
     const dialog=page.getByRole('dialog',{name:'Developer continuous location map'});
     await expect(dialog.getByRole('status').filter({ hasText: 'fixes ·' })).toContainText('3 / 3 fixes · 2 segments');
     await expect(dialog.getByRole('region',{name:'Continuous raw location map'})).toBeVisible();

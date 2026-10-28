@@ -18,7 +18,7 @@ for (const width of [1280,390]) {
         samples:readings.filter(s=>Date.parse(s.observed_at)>=Date.parse(p.from)&&Date.parse(s.observed_at)<Date.parse(p.to))}});
     });
     await page.route('https://tile.openstreetmap.org/**',route=>route.abort());
-    await page.goto('/');await page.getByRole('button',{name:'Developer continuous location map'}).click();
+    await page.goto('/');await page.locator('.account-trigger-btn').click();await page.getByRole('button',{name:'Developer continuous location map'}).click();
     const dialog=page.getByRole('dialog');
     const stats=dialog.getByRole('status').filter({hasText:'fixes ·'});
     await expect(stats).toContainText('3 / 4 fixes');

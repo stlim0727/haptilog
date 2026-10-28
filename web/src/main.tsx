@@ -717,6 +717,11 @@ function App() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
+  const rawLocationLauncher = connection ? (
+    <Suspense fallback={null}>
+      <RawLocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} lang={lang} isDemo={isDemo} stays={locationJournal.snapshot?.stays ?? []} />
+    </Suspense>
+  ) : null;
   return (
     <>
       <header className="topbar">
@@ -726,7 +731,6 @@ function App() {
             <span className="top-label">{t.brand_slogan}</span>
           </div>
           <div className="top-right">
-            {connection && <Suspense fallback={null}><RawLocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} owner={connection.owner_user_id} lang={lang} isDemo={isDemo} stays={locationJournal.snapshot?.stays ?? []} /></Suspense>}
             <button
               className="theme-switch-btn"
               onClick={toggleTheme}
@@ -746,7 +750,7 @@ function App() {
             </button>
 
             {supabase && (
-              <div className="account-dropdown-wrapper" ref={accountMenuRef}>
+              <div className={`account-dropdown-wrapper${accountOpen ? " menu-open" : ""}`} ref={accountMenuRef}>
                 <button
                   className={`account-trigger-btn ${accountEmail ? "signed-in" : ""}`}
                   onClick={() => setAccountOpen(!accountOpen)}
@@ -901,6 +905,8 @@ function App() {
                     </details>
                   </div>
                 )}
+                {/* Kept mounted outside the panel so closing the menu does not tear down an open dialog. */}
+                {rawLocationLauncher}
               </div>
             )}
 
