@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { JournalItem } from './journal.ts';
 import { journalDuration, journalTitle } from './journal.ts';
+import { presence } from './location-stays/domain.ts';
 import { ribbonColor } from './ribbonGroups.ts';
 import { ribbonLayout } from './ribbons.ts';
 import './ribbons.css';
@@ -39,12 +40,12 @@ export function JournalTimeline({ items, allItems, now, lang, renderVoice, onSel
     else onSelectStay(item);
   };
   return <div className="journal-ribbons" style={{ gridTemplateColumns: lanes > 0 ? `repeat(${lanes}, 10px) minmax(0, 1fr)` : 'minmax(0, 1fr)' }}>
-    {ranges.flatMap(({ item, lane, segments }) => segments.map(({ first, last }) => <button key={`ribbon:${item.id}:${first}`} type="button" className="stay-ribbon" style={{ color: ribbonColor(item), gridColumn: lane + 1, gridRow: `${first + 1} / ${last + 2}` }} onClick={() => select(item)} aria-expanded={groups.get(item.id)!.members.length > 1 ? expanded.has(identity(item)) : undefined} aria-label={`${journalTitle(item, lang)} · ${journalDuration(groups.get(item.id)!.summary, lang)}`} />))}
+    {ranges.flatMap(({ item, lane, segments, active }) => segments.map(({ first, last }, segmentIndex) => <button key={`ribbon:${item.id}:${first}`} type="button" className={`stay-ribbon${active && segmentIndex === 0 ? ' is-active' : ''}`} style={{ color: ribbonColor(item), gridColumn: lane + 1, gridRow: `${first + 1} / ${last + 2}` }} onClick={() => select(item)} aria-expanded={groups.get(item.id)!.members.length > 1 ? expanded.has(identity(item)) : undefined} aria-label={`${journalTitle(item, lang)}${active ? (ko ? ' · 체류 중' : ' · Staying now') : ''} · ${journalDuration(groups.get(item.id)!.summary, lang)}`} />))}
     {rows.map((item, index) => <div key={`${item.kind}:${identity(item)}`} className={item.kind === 'stay' ? `ribbon-stay-row${expanded.has(identity(item)) ? ' is-expanded' : ''}` : 'ribbon-voice-row'} style={{ gridColumn: lanes + 1, gridRow: index + 1 }}>
       {item.kind === 'voice' ? renderVoice(item) : <div className="ribbon-stay-label">
         <button type="button" className="ribbon-stay-open" data-record-id={item.id} data-journal-kind="stay" onClick={() => select(item)} aria-expanded={groups.get(item.id)!.members.length > 1 ? expanded.has(identity(item)) : undefined}>
           <span className="ribbon-stay-title"><strong>{journalTitle(item, lang)}</strong>{groups.get(item.id)!.members.length > 1 && <ChevronDown size={12} aria-hidden="true" className={expanded.has(identity(item)) ? "expanded" : ""} />}</span>
-          <span className="ribbon-stay-time">{range(groups.get(item.id)!.summary.stay.started_at, item.stay.last_observed_at, showDate)} · {minutes(groups.get(item.id)!.summary)}</span>
+          <span className="ribbon-stay-time">{presence(item.stay, now) === 'active' ? `${showDate ? new Date(groups.get(item.id)!.summary.stay.started_at).toLocaleDateString(lang) + ' ' : ''}${time(groups.get(item.id)!.summary.stay.started_at)}–${ko ? '현재 · 체류 중' : 'now · Staying now'}` : range(groups.get(item.id)!.summary.stay.started_at, item.stay.last_observed_at, showDate)} · {minutes(groups.get(item.id)!.summary)}</span>
         </button>
         {renderPlaceName?.(item, true, identity(item))}
         {groups.get(item.id)!.members.length > 1 && expanded.has(identity(item)) && <div className="ribbon-group-sources" role="group" aria-label={ko ? '원본 체류' : 'Original stays'}>

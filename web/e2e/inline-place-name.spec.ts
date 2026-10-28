@@ -117,7 +117,7 @@ for(const width of [1280,390]) {
     await page.clock.runFor(30001);
     await expect(input).toHaveValue('Draft while syncing');
     await expect(input).toBeFocused();
-    await expect(timeline.locator('.ribbon-stay-open')).toContainText('05:00–05:59');
+    await expect(timeline.locator('.ribbon-stay-open')).toContainText('05:00–now · Staying now · 57m observed');
     await form.getByRole('button',{name:'Save',exact:true}).click();
     await expect(timeline.locator('.ribbon-stay-open')).toContainText('Draft while syncing');
     expect(state.puts).toHaveLength(1);
