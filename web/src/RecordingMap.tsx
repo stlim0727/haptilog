@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { journalLocated, journalTitle, voiceItem } from "./journal";
-import type { JournalItem } from "./journal";
+import { journalLocated, journalTitle, routeTrail, voiceItem } from "./journal";
+import type { JournalItem, LocatedJournalItem } from "./journal";
 import { CLUSTER_MAX_ZOOM, clusterLocations } from "./mapClustering";
 import type { Recording } from "./domain";
 
@@ -33,7 +33,7 @@ export default function RecordingMap({
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const markers = useRef<L.LayerGroup | null>(null);
-  const routeLayer = useRef<L.Polyline | null>(null);
+  const routeLayer = useRef<L.LayerGroup | null>(null);
   const markersById = useRef(new Map<string, L.Marker>());
   const idsByMarker = useRef(new Map<L.Marker, string[]>());
   const clusterSizes = useRef(new Map<string, number>());
@@ -148,18 +148,33 @@ export default function RecordingMap({
     }
     const zoom = instance.getZoom();
 
-    // Connect sequential GPS records with a coral route line
-    if (showRoute && located.length > 1 && located.every(item => item.kind === "voice")) {
-      const sorted = [...located].sort(
-        (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime(),
-      );
-      const points: L.LatLngExpression[] = sorted.map((r) => [r.latitude, r.longitude]);
-      routeLayer.current = L.polyline(points, {
-        color: "#f43f5e",
-        weight: 3,
-        opacity: 0.7,
-        dashArray: "6, 8",
-      }).addTo(instance);
+    // Chronological route through the whole journal, stays included. Links that
+    // cross an unobserved day are faint: nothing was seen while they passed.
+    if (showRoute && located.length > 1) {
+      const at = (item: LocatedJournalItem): L.LatLngExpression =>
+        [item.latitude, item.longitude];
+      const trail = routeTrail(located);
+      const route = L.layerGroup().addTo(instance);
+      for (const run of trail.runs) {
+        if (run.length < 2) continue;
+        L.polyline(run.map(at), {
+          color: "#f43f5e",
+          weight: 3,
+          opacity: 0.7,
+          dashArray: "6, 8",
+          className: "journal-route",
+        }).addTo(route);
+      }
+      for (const [from, to] of trail.gaps) {
+        L.polyline([at(from), at(to)], {
+          color: "#f43f5e",
+          weight: 2,
+          opacity: 0.4,
+          dashArray: "2, 8",
+          className: "journal-route-gap",
+        }).addTo(route);
+      }
+      routeLayer.current = route;
     }
 
     for (const cluster of clusterLocations(located, zoom)) {

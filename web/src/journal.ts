@@ -45,7 +45,28 @@ export function matchesJournal(item: JournalItem, { category = 'All', categories
   const text = item.kind === 'voice' ? `${journalTitle(item)} ${transcript(item.recording)}` : `${journalTitle(item)} ${journalTitle(item, 'ko')} ${item.places.filter(p => placeCandidates(item).includes(p)).map(p => p.name).join(' ')} stay 체류`;
   return !search || text.toLowerCase().includes(search.trim().toLowerCase());
 }
-export const journalLocated = (item: JournalItem): item is JournalItem & { latitude: number; longitude: number } => typeof item.latitude === 'number' && Number.isFinite(item.latitude) && Math.abs(item.latitude) <= 90 && typeof item.longitude === 'number' && Number.isFinite(item.longitude) && Math.abs(item.longitude) <= 180;
+export type LocatedJournalItem = JournalItem & { latitude: number; longitude: number };
+export const journalLocated = (item: JournalItem): item is LocatedJournalItem => typeof item.latitude === 'number' && Number.isFinite(item.latitude) && Math.abs(item.latitude) <= 90 && typeof item.longitude === 'number' && Number.isFinite(item.longitude) && Math.abs(item.longitude) <= 180;
+
+/** Chronological trail of visible points, split into travelled runs and the links that bridge unobserved days. */
+export function routeTrail(items: LocatedJournalItem[]): {
+  runs: LocatedJournalItem[][];
+  gaps: [LocatedJournalItem, LocatedJournalItem][];
+} {
+  const sorted = [...items].sort((a, b) => Date.parse(a.recorded_at) - Date.parse(b.recorded_at));
+  const runs: LocatedJournalItem[][] = [];
+  const gaps: [LocatedJournalItem, LocatedJournalItem][] = [];
+  for (const item of sorted) {
+    const run = runs.at(-1);
+    const previous = run?.at(-1);
+    if (previous && localDate(item.recorded_at) !== localDate(previous.recorded_at)) {
+      gaps.push([previous, item]);
+      runs.push([item]);
+    } else if (run) run.push(item);
+    else runs.push([item]);
+  }
+  return { runs, gaps };
+}
 
 /** Every visible stay competes, so ambiguous observations never become a unique link. */
 export function relatedRecordings(records: Recording[], stays: Stay[], stayId: string, now: number) {
