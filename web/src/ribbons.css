@@ -25,3 +25,6 @@
 .ribbon-stay-title svg.expanded { transform: rotate(180deg); }
 .ribbon-group-sources { margin: 0 0 4px; padding-left: 8px; border-left: 1px solid var(--border); }
 .ribbon-place-save { min-width: 28px; min-height: 28px; display: inline-flex; align-items: center; justify-content: center; }
+
+/* Newest time is at the top: leave the ongoing end of the bracket open. */
+.stay-ribbon.is-active::before { display: none; }

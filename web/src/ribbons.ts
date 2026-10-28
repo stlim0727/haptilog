@@ -1,10 +1,13 @@
 import type { JournalItem } from './journal.ts';
 import { ribbonGroups } from './ribbonGroups.ts';
-import { recordingAssociation } from './location-stays/domain.ts';
+import { presence, recordingAssociation } from './location-stays/domain.ts';
 type StayItem = Extract<JournalItem, { kind: 'stay' }>;
 export function ribbonLayout(items: JournalItem[], allItems: JournalItem[], now: number) {
   const stays = allItems.filter((item): item is StayItem => item.kind === 'stay');
-  const observations = stays.map(item => item.stay);
+  // Extend only the display association window while the latest observation is fresh.
+  // Source timestamps and observed duration remain untouched.
+  const observations = stays.map(({ stay }) => presence(stay, now) === 'active'
+    ? { ...stay, last_observed_at: new Date(now).toISOString() } : stay);
   const groups = ribbonGroups(items, allItems);
   const groupById = new Map(groups.map(group => [group.item.id, group]));
   const representative = new Map(groups.flatMap(group => group.members.map(member => [member.id, group.item.id] as const)));
@@ -34,7 +37,7 @@ export function ribbonLayout(items: JournalItem[], allItems: JournalItem[], now:
       if (previous && previous.last === index - 1) previous.last = index;
       else segments.push({ first: index, last: index });
     }
-    return [{ item, first, last, lane, segments }];
+    return [{ item, first, last, lane, segments, active: presence(item.stay, now) === 'active' }];
   });
   return { rows, ranges, lanes: ends.length, groups: groupById };
 }
