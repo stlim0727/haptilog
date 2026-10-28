@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  :root {
+    --accent: #4f46e5;
+    --accent-soft: #eef2ff;
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1e2230;
+    --muted: #6b7280;
+    --line: #e3e6ec;
+    --red: #dc2626; --blue: #2563eb; --green: #16a34a; --gray: #6b7280;
+  }
+  * { box-sizing: border-box; margin: 0; font-family: "Segoe UI", "Noto Sans KR", sans-serif; }
+  body { background: var(--bg); color: var(--text); }
+  .window { width: 1480px; margin: 0 auto; background: var(--bg); min-height: 900px; padding: 0 28px 28px; }
+
+  header { display: flex; align-items: center; gap: 10px; padding: 16px 0; }
+  .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent);
+          display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
+  .brand { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
+  .avatar { margin-left: auto; width: 28px; height: 28px; border-radius: 50%; background: #c7cbd4; }
+
+  .switchbar { display: flex; align-items: center; margin-top: 6px; }
+  .tabs { display: flex; background: #e8eaf0; border-radius: 10px; padding: 3px; gap: 3px; }
+  .tab { display: flex; align-items: center; gap: 6px; padding: 7px 18px; border-radius: 8px;
+         font-size: 14px; font-weight: 600; color: var(--muted); }
+  .tab.active { background: var(--accent); color: #fff; box-shadow: 0 1px 4px rgba(79,70,229,.4); }
+  .maptoggle { margin-left: auto; display: flex; align-items: center; gap: 7px; padding: 7px 14px;
+               border: 1px solid var(--line); border-radius: 9px; background: var(--card);
+               font-size: 13.5px; font-weight: 600; color: var(--muted); }
+  .pin { width: 12px; height: 12px; border-radius: 50% 50% 50% 0; background: var(--accent); transform: rotate(-45deg); }
+
+  .slider { display: flex; gap: 8px; align-items: center; margin-top: 14px; background: var(--card);
+            border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .day { width: 62px; flex: none; border: 1px solid var(--line); border-radius: 9px; padding: 6px 0 7px;
+         text-align: center; background: #fafbfc; }
+  .day .wd { font-size: 10.5px; color: var(--muted); font-weight: 600; }
+  .day .dn { font-size: 15px; font-weight: 700; margin: 1px 0 4px; }
+  .dots { display: flex; justify-content: center; gap: 3px; height: 6px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .day.today { border: 2px solid var(--accent); background: var(--accent-soft); }
+  .day.today .wd { color: var(--accent); }
+  .all { flex: none; margin-left: auto; padding: 8px 16px; border-radius: 999px; font-size: 12.5px;
+         font-weight: 700; color: var(--accent); background: var(--accent-soft); border: 1px solid #d9dcff; }
+
+  .filters { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .chip { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+          font-size: 13px; font-weight: 600; color: var(--muted); }
+  .chip.on { background: var(--text); color: #fff; border-color: var(--text); }
+  .search { margin-left: auto; width: 260px; padding: 8px 14px; border-radius: 9px; border: 1px solid var(--line);
+            background: var(--card); font-size: 13px; color: #9ca3af; }
+
+  .columns { display: grid; grid-template-columns: 56fr 44fr; gap: 16px; margin-top: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+
+  .rec { display: flex; gap: 12px; padding: 13px 15px; border-bottom: 1px solid var(--line); align-items: center; }
+  .rec:last-child { border-bottom: none; }
+  .rec.sel { background: var(--accent-soft); }
+  .play { width: 30px; height: 30px; flex: none; border-radius: 50%; background: var(--text); color: #fff;
+          display: grid; place-items: center; font-size: 10px; }
+  .rec .body { flex: 1; min-width: 0; }
+  .rec .txt { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rec .sub { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .badge { flex: none; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+  .b-exp { color: var(--red); background: #fee2e2; }
+  .b-trv { color: var(--blue); background: #dbeafe; }
+  .b-wrk { color: var(--green); background: #dcfce7; }
+  .b-mmo { color: var(--gray); background: #e8eaf0; }
+
+  .inspector { padding: 18px 20px; }
+  .inspector h2 { font-size: 15.5px; }
+  .inspector .when { font-size: 12px; color: var(--muted); margin: 3px 0 14px; }
+  .wave { display: flex; align-items: center; gap: 12px; background: #f6f7fa; border-radius: 10px; padding: 12px 14px; }
+  .bars { flex: 1; display: flex; gap: 2.5px; align-items: center; height: 34px; }
+  .bars i { width: 3px; border-radius: 2px; background: #b6bccb; }
+  .bars i.hot { background: var(--accent); }
+  .dur { font-size: 12px; font-weight: 700; color: var(--muted); }
+  .section { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .4px; margin: 16px 0 6px; }
+  .transcript { font-size: 13px; line-height: 1.55; color: #333a4d; }
+  .gps { font-size: 12.5px; color: var(--text); background: #f6f7fa; border-radius: 8px; padding: 8px 12px; margin-top: 12px; }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 2px; border-bottom: 1px dashed var(--line); }
+  .kv:last-child { border-bottom: none; }
+  .kv b { font-weight: 700; }
+  .hint { margin-top: 14px; font-size: 11.5px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="window">
+  <header>
+    <div class="logo">H</div>
+    <div class="brand">HaptiLog</div>
+    <div class="avatar"></div>
+  </header>
+
+  <div class="switchbar">
+    <div class="tabs">
+      <div class="tab active">◷ Timeline</div>
+      <div class="tab">▦ Calendar</div>
+    </div>
+    <div class="maptoggle"><span class="pin"></span> Map</div>
+  </div>
+
+  <div class="slider">
+    <div class="day"><div class="wd">MON</div><div class="dn">19</div><div class="dots"><span class="dot" style="background:var(--red)"></span></div></div>
+    <div class="day"><div class="wd">TUE</div><div class="dn">20</div><div class="dots"><span class="dot" style="background:var(--blue)"></span><span class="dot" style="background:var(--gray)"></span></div></div>
+    <div class="day"><div class="wd">WED</div><div class="dn">21</div><div class="dots"></div></div>
+    <div class="day"><div class="wd">THU</div><div class="dn">22</div><div class="dots"><span class="dot" style="background:var(--green)"></span></div></div>
+    <div class="day"><div class="wd">FRI</div><div class="dn">23</div><div class="dots"><span class="dot" style="background:var(--red)"></span><span class="dot" style="background:var(--red)"></span><span class="dot" style="background:var(--gray)"></span></div></div>
+    <div class="day"><div class="wd">SAT</div><div class="dn">24</div><div class="dots"><span class="dot" style="background:var(--blue)"></span></div></div>
+    <div class="day"><div class="wd">SUN</div><div class="dn">25</div><div class="dots"></div></div>
+    <div class="day"><div class="wd">MON</div><div class="dn">26</div><div class="dots"><span class="dot" style="background:var(--gray)"></span><span class="dot" style="background:var(--green)"></span></div></div>
+    <div class="day today"><div class="wd">TODAY</div><div class="dn">27</div><div class="dots"><span class="dot" style="background:var(--red)"></span><span class="dot" style="background:var(--gray)"></span></div></div>
+    <div class="all">ALL dates</div>
+  </div>
+
+  <div class="filters">
+    <div class="chip on">All</div>
+    <div class="chip">Expense</div>
+    <div class="chip">Travel</div>
+    <div class="chip">Workout</div>
+    <div class="chip">Memo</div>
+    <div class="chip">Trash</div>
+    <div class="search">Search transcripts…</div>
+  </div>
+
+  <div class="columns">
+    <div class="card">
+      <div class="rec sel">
+        <div class="play">▶</div>
+        <div class="body"><div class="txt">강남역 근처 카페에서 아메리카노 값 12,000원 지출</div><div class="sub">Today 14:32 · Gangnam · 0:47</div></div>
+        <div class="badge b-exp">Expense</div>
+      </div>
+      <div class="rec">
+        <div class="play">▶</div>
+        <div class="body"><div class="txt">내일 아침 러닝 5km 계획, 날씨가 좋으면 한강 코스</div><div class="sub">Today 09:05 · 0:21</div></div>
+        <div class="badge b-wrk">Workout</div>
+      </div>
+      <div class="rec">
+        <div class="play">▶</div>
+        <div class="body"><div class="txt">주말에 속초 여행 준비물 체크: 충전기, 상비약, 지도 오프라인</div><div class="sub">MON 26 21:48 · Sokcho</div></div>
+        <div class="badge b-trv">Travel</div>
+      </div>
+      <div class="rec">
+        <div class="play">▶</div>
+        <div class="body"><div class="txt">미팅에서 정한 다음 스프린트 우선순위 메모</div><div class="sub">MON 26 11:12 · 1:03</div></div>
+        <div class="badge b-mmo">Memo</div>
+      </div>
+      <div class="rec">
+        <div class="play">▶</div>
+        <div class="body"><div class="txt">편의점 산 물품 합계 4,500원, 카드明세서 확인 필요</div><div class="sub">FRI 23 19:27 · Singalil</div></div>
+        <div class="badge b-exp">Expense</div>
+      </div>
+    </div>
+
+    <div class="card inspector">
+      <h2>Today · 14:32</h2>
+      <div class="when">Recorded on Galaxy Watch · enriched by Gemini</div>
+      <div class="wave">
+        <div class="play">▶</div>
+        <div class="bars">
+          <i class="hot" style="height:12px"></i><i class="hot" style="height:20px"></i><i class="hot" style="height:28px"></i><i class="hot" style="height:16px"></i><i class="hot" style="height:32px"></i><i class="hot" style="height:22px"></i><i class="hot" style="height:10px"></i><i class="hot" style="height:26px"></i><i class="hot" style="height:30px"></i><i class="hot" style="height:18px"></i><i style="height:14px"></i><i style="height:24px"></i><i style="height:30px"></i><i style="height:12px"></i><i style="height:20px"></i><i style="height:28px"></i><i style="height:16px"></i><i style="height:9px"></i><i style="height:22px"></i><i style="height:26px"></i>
+        </div>
+        <div class="dur">0:47</div>
+      </div>
+      <div class="section">TRANSCRIPT</div>
+      <div class="transcript">“강남역 근처 카페에서 아메리카노 두 잔이고, 총 만이천 원 결제했다. 영수증은 앱에 연동해 둔 카드로 처리됨.”</div>
+      <div class="section">LOCATION</div>
+      <div class="gps">📍 37.4979, 127.0276 — Gangnam-daero · ±8 m</div>
+      <div class="section">EXTRACTION · EXPENSE</div>
+      <div class="kv"><span>Amount</span><b>12,000 KRW</b></div>
+      <div class="kv"><span>Merchant</span><b>Cafe (Gangnam)</b></div>
+      <div class="kv"><span>Category</span><b>Beverage</b></div>
+      <div class="hint">Tap “Calendar” to switch this same list to month-grid navigation.</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
