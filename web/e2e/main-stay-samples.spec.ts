@@ -23,9 +23,13 @@ for(const width of [1280,390]) {
       await expect(page.getByRole('region',{name:'Map of voice and stay locations'})).toBeVisible();
       await page.getByRole('button',{name:'List',exact:true}).click();
     } else {
+      const route = page.locator('.journal-route, .journal-route-gap');
       await page.getByRole('button',{name:'Show map',exact:true}).click();
       await expect(page.getByRole('region',{name:'Map of voice and stay locations'})).toBeVisible();
+      // Stays share the map, so the route must not depend on a voice-only filter.
+      await expect(route.first()).toBeAttached();
       await onlyCategory(page, 'Stays');
+      await expect(route.first()).toBeAttached();
       await expect(cards).toHaveCount(stayRows);
       await expect(page.locator('.record-list [data-journal-kind="voice"]')).toHaveCount(0);
     }

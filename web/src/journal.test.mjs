@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { journalItems, journalDates, journalDuration, journalTitle, matchesJournal } from './journal.ts';
+import { journalItems, journalDates, journalDuration, journalTitle, matchesJournal, routeTrail } from './journal.ts';
 import { mockStay, mockPlaces, MOCK_NOW } from './location-stays/fixtures.ts';
 const voice = { id: 'voice-1', recorded_at: '2026-10-26T05:30:00Z', latitude: null, longitude: null, voice_enrichments: [{ summary: 'Coffee note', intent_type: 'MEMO', transcript: 'hello', created_at: '2026-10-26T05:30:01Z' }], recording_corrections: null, duration_seconds: 14 };
 test('journal interleaves original voice and stays without creating audio or enrichment for stays', () => {
@@ -51,4 +51,23 @@ test('related voice candidates compete against all stays and exclude deleted sou
   for (const extra of [{ deleted_at: '2026-10-26T05:40:00Z' }, { purging_at: '2026-10-26T05:40:00Z' }]) {
     assert.deepEqual(relatedRecordings([{ ...located, ...extra }], [first], first.id, MOCK_NOW), []);
   }
+});
+const locatedPoint = (id, kind, recorded_at) => ({ id, kind, recorded_at, latitude: 37.5, longitude: 127 });
+test('routeTrail connects stays and voices together and never reorders by kind', () => {
+  const trail = routeTrail([
+    locatedPoint('b', 'voice', '2026-10-26T09:02:00Z'),
+    locatedPoint('a', 'stay', '2026-10-26T09:00:00Z'),
+    locatedPoint('c', 'voice', '2026-10-26T10:40:00Z'),
+  ]);
+  assert.deepEqual(trail.runs.map(run => run.map(item => item.id)), [['a', 'b', 'c']]);
+  assert.deepEqual(trail.gaps, []);
+});
+test('routeTrail marks a link inferred when a day separates its points', () => {
+  const trail = routeTrail([
+    locatedPoint('a', 'voice', '2026-10-26T09:00:00Z'),
+    locatedPoint('b', 'stay', '2026-10-26T10:00:00Z'),
+    locatedPoint('c', 'voice', '2026-10-28T09:10:00Z'),
+  ]);
+  assert.deepEqual(trail.runs.map(run => run.map(item => item.id)), [['a', 'b'], ['c']]);
+  assert.deepEqual(trail.gaps.map(([from, to]) => [from.id, to.id]), [['b', 'c']]);
 });
