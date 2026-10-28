@@ -41,7 +41,6 @@ import {
   toLocalDateString,
 } from "./domain";
 import type { Recording } from "./domain";
-import { JournalStayCard } from "./JournalStayCard";
 import { JOURNAL_CATEGORIES, categoryPressed, toggleCategory } from "./categoryFilter";
 import { JournalTimeline } from "./JournalTimeline";
 import TimeSliderStrip from "./TimeSliderStrip";
@@ -335,7 +334,8 @@ export function MobileWorkspace(p: Props) {
     window.scrollTo(0, 0);
   }
   function card(item: JournalItem) {
-    if (item.kind === "stay") return <JournalStayCard key={`stay:${item.id}`} item={item} lang={lang} now={p.now} mobile onSelect={() => openDetail(item)} />;
+    // Stays are laid out by JournalTimeline, which draws their ribbon span.
+    if (item.kind !== "voice") return null;
     const r = item.recording;
     const e = latest(r), cost = expense(r), state = processingState(r);
     const category =
@@ -661,7 +661,9 @@ export function MobileWorkspace(p: Props) {
                       </select>
                     </label>
                   )}
-                  {placeRecords.map(card)}
+                  {placeRecords.length > 0 && (
+                    <JournalTimeline items={placeRecords} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} renderPlaceName={p.renderPlaceName} />
+                  )}
                 </section>
               )}
               {view === "timeline" && !isTrash && (
