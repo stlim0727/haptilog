@@ -50,7 +50,9 @@ import type { JournalItem } from "./journal";
 import type { Language, TranslationKeys } from "./i18n";
 
 const RecordingMap = lazy(() => import("./RecordingMap"));
-type View = "timeline" | "map" | "calendar";
+// Timeline and calendar are mutually exclusive ways to read the same day scope;
+// the map is an overlay that either of them can show, so it is not a third tab.
+type View = "timeline" | "calendar";
 class MobileMapBoundary extends React.Component<
   { children: React.ReactNode; message: string },
   { failed: boolean }
@@ -77,8 +79,6 @@ type Props = {
   renderStay: (item: Extract<JournalItem, { kind: "stay" }>, onOpenRecording?: (recording: Recording) => void) => React.ReactNode;
   loaded: boolean;
   truncated: boolean;
-  date: string;
-  setDate: (value: string) => void;
   category: string;
   selectedCategories: string[];
   applyCategories: (selected: string[]) => void;
@@ -114,6 +114,7 @@ export function MobileWorkspace(p: Props) {
   const entries = p.filteredItems;
   const ko = lang === "ko";
   const [view, setView] = useState<View>("timeline");
+  const [showMap, setShowMap] = useState(false);
   const [dateKey, setDateKey] = useState<string>("ALL");
   const [detailId, setDetailId] = useState<string | null>(() =>
     (new URL(location.href).searchParams.get("recording") ?? new URL(location.href).searchParams.get("stay"))
@@ -155,7 +156,19 @@ export function MobileWorkspace(p: Props) {
     ["Workout", t.workout_cat],
     ["Memo", t.memo_cat],
   ];
-  const located = entries.filter(journalLocated);
+  // One day scope drives the timeline list, the calendar and the map together,
+  // so an enabled map can never show pins the feed has already hidden.
+  const calendarActiveDateKey = dateKey === "ALL" ? toLocalDateString() : dateKey;
+  const dayScoped = dateKey === "ALL"
+    ? entries
+    : entries.filter((item) => journalDates(item).includes(dateKey));
+  const mapEntries = view === "calendar"
+    ? entries.filter((item) => journalDates(item).includes(calendarActiveDateKey))
+    : dayScoped;
+  const mapRecordings = mapEntries.flatMap(
+    (item) => item.kind === "voice" ? [item.recording] : [],
+  );
+  const located = mapEntries.filter(journalLocated);
   // Coordinates a short walk apart are the same stop, so the place list shows
   // one counted group per place the way the map shows one pin per group.
   const places = clusterPlaces(located);
@@ -316,8 +329,8 @@ export function MobileWorkspace(p: Props) {
     closeMenu();
     p.setCategory("Trash");
     p.setSearch("");
-    p.setDate("all");
     setView("timeline");
+    setShowMap(false);
     setDateKey("ALL");
     window.scrollTo(0, 0);
   }
@@ -378,18 +391,12 @@ export function MobileWorkspace(p: Props) {
       </button>
     );
   }
-  const timelineEntries = view === "timeline" && !isTrash && dateKey !== "ALL"
-    ? entries.filter(item => journalDates(item).includes(dateKey))
-    : entries;
-  const timelineDays = [...new Set(timelineEntries.flatMap(journalDates))].sort().reverse();
-  // The mobile strip hides its "All days" button, so a picked day whose card
-  // is gone must clear itself rather than trap the feed on an empty day.
+  const timelineDays = [...new Set(dayScoped.flatMap(journalDates))].sort().reverse();
+  // A picked day whose cards are gone (filter or search change) must clear
+  // itself rather than trap the feed on an empty day.
   useEffect(() => {
-    if (dateKey !== "ALL" && !timelineEntries.some(item => journalDates(item).includes(dateKey))) {
-      setDateKey("ALL");
-    }
-  }, [timelineEntries, dateKey]);
-  const calendarActiveDateKey = dateKey === "ALL" ? toLocalDateString() : dateKey;
+    if (dateKey !== "ALL" && dayScoped.length === 0) setDateKey("ALL");
+  }, [dayScoped, dateKey]);
   return (
     <div className="mobile-workspace">
       <div hidden={!!detailId}>
@@ -436,15 +443,27 @@ export function MobileWorkspace(p: Props) {
                 {isTrash ? t.trash : (ko ? "기록" : "Journal")}
               </h1>
             </div>
-            <button
-              ref={menuButton}
-              type="button"
-              className="mobile-icon"
-              aria-label={ko ? "더보기" : "More options"}
-              onClick={showMenu}
-            >
-              <MoreHorizontal />
-            </button>
+            <div className="mobile-heading-actions">
+              {!isTrash && (
+                <button
+                  type="button"
+                  className="mobile-icon"
+                  aria-label={ko ? "기록 새로고침" : "Refresh recordings"}
+                  onClick={p.refresh}
+                >
+                  <RefreshCw size={18} />
+                </button>
+              )}
+              <button
+                ref={menuButton}
+                type="button"
+                className="mobile-icon"
+                aria-label={ko ? "더보기" : "More options"}
+                onClick={showMenu}
+              >
+                <MoreHorizontal />
+              </button>
+            </div>
           </div>
           {isTrash
             ? (
@@ -465,29 +484,6 @@ export function MobileWorkspace(p: Props) {
             )
             : (
               <>
-                <div className="mobile-toolbar">
-                  <label className="date-picker">
-                    <CalendarDays size={16} />
-                    <span className="sr-only">
-                      {ko ? "조회 기간" : "Date range"}
-                    </span>
-                    <select
-                      value={p.date}
-                      onChange={(e) => p.setDate(e.target.value)}
-                    >
-                      <option value="all">{t.all_time}</option>
-                      <option value="today">{t.today}</option>
-                      <option value="month">{t.this_month}</option>
-                    </select>
-                  </label>
-                  <button
-                    className="mobile-icon"
-                    aria-label={ko ? "기록 새로고침" : "Refresh recordings"}
-                    onClick={p.refresh}
-                  >
-                    <RefreshCw size={18} />
-                  </button>
-                </div>
                 <div className="mobile-summary">
                   <span>
                     {ko ? `기록 ${p.count}개` : `${p.count} records`} ·{" "}
@@ -506,30 +502,37 @@ export function MobileWorkspace(p: Props) {
                     {t.spending_incomplete(p.summary.incomplete)}
                   </p>
                 )}
-                <nav
-                  className="mobile-views"
-                  aria-label={ko ? "기록 보기" : "Recording views"}
-                >
-                  {([["timeline", t.view_timeline, LayoutList], [
-                    "map",
-                    ko ? "지도" : "Map",
-                    MapPin,
-                  ], [
-                    "calendar",
-                    ko ? "달력" : "Calendar",
-                    CalendarDays,
-                  ]] as const).map(([key, label, Icon]) => (
-                    <button
-                      type="button"
-                      key={key}
-                      aria-current={view === key ? "page" : undefined}
-                      onClick={() => changeView(key)}
-                    >
-                      <Icon size={17} />
-                      {label}
-                    </button>
-                  ))}
-                </nav>
+                <div className="mobile-view-bar">
+                  <nav
+                    className="mobile-views"
+                    aria-label={ko ? "기록 보기" : "Recording views"}
+                  >
+                    {([["timeline", t.view_timeline, LayoutList], [
+                      "calendar",
+                      ko ? "달력" : "Calendar",
+                      CalendarDays,
+                    ]] as const).map(([key, label, Icon]) => (
+                      <button
+                        type="button"
+                        key={key}
+                        aria-current={view === key ? "page" : undefined}
+                        onClick={() => changeView(key)}
+                      >
+                        <Icon size={17} />
+                        {label}
+                      </button>
+                    ))}
+                  </nav>
+                  <button
+                    type="button"
+                    className={`mobile-map-toggle${showMap ? " active" : ""}`}
+                    aria-pressed={showMap}
+                    onClick={() => setShowMap(!showMap)}
+                  >
+                    <MapPin size={17} />
+                    {ko ? "지도" : "Map"}
+                  </button>
+                </div>
               </>
             )}
           <div className="mobile-search-row">
@@ -574,6 +577,93 @@ export function MobileWorkspace(p: Props) {
           {p.truncated && <p className="limit-note">{t.showing_limit_note}</p>}
           {!p.loaded ? <p role="status">{t.finding_moments}</p> : (
             <>
+              {showMap && !isTrash && (
+                <section className="mobile-map-view">
+                  <div className="map-heading">
+                    <p className="mobile-note">
+                      {ko
+                        ? `위치 있는 기록 ${located.length}개 · 장소 ${places.length}곳`
+                        : `${located.length} located recordings · ${places.length} places`}
+                    </p>
+                    <button
+                      type="button"
+                      className="map-close-btn"
+                      aria-label={ko ? "지도 닫기" : "Close map"}
+                      title={t.hide_map}
+                      onClick={() => setShowMap(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <MobileMapBoundary
+                    message={ko
+                      ? "지도를 불러올 수 없어요. 아래 기록이나 목록을 이용해 주세요."
+                      : "Map unavailable. Use the records below or the list."}
+                  >
+                    <Suspense fallback={<p>{t.loading_map}</p>}>
+                      <RecordingMap
+                        heading={t.map_heading}
+                        recordings={mapRecordings}
+                        journalItems={mapEntries}
+                        selectedId={mapSelected}
+                        groupIds={selectedPlace
+                          ? placeRecords.map((r) => r.id)
+                          : undefined}
+                        showRoute={false}
+                        lang={lang}
+                        onSelect={(id, reveal) => {
+                          const r = p.items.find((r) => r.id === id);
+                          if (!r) {
+                            return;
+                          }
+                          setSelectedPlace(groupKeyByRecording.get(r.id) ?? null);
+                          setMapSelected(id);
+                          if (reveal) {
+                            openDetail(r);
+                          }
+                        }}
+                      />
+                    </Suspense>
+                  </MobileMapBoundary>
+                  {mapEntries.length > located.length && (
+                    <p className="mobile-map-access">
+                      {ko
+                        ? `위치 없는 기록 ${mapEntries.length - located.length}개`
+                        : `${mapEntries.length - located.length} without location`}
+                    </p>
+                  )}
+                  {places.length > 0 && (
+                    <label className="mobile-place-select">
+                      {ko ? "장소 선택" : "Choose a place"}
+                      <select
+                        value={selectedGroup ? groupKey(selectedGroup) : ""}
+                        onChange={(e) => {
+                          setSelectedPlace(e.target.value);
+                          setMapSelected(
+                            groupAt(e.target.value)?.members[0].id ?? null,
+                          );
+                        }}
+                      >
+                        {places.map((group, index) => {
+                          const key = groupKey(group);
+                          const count = group.members.length;
+                          return (
+                            <option key={key} value={key}>
+                              {ko ? `장소 ${index + 1}` : `Place ${index + 1}`} ·
+                              {" "}
+                              {count}
+                              {ko
+                                ? "개 기록"
+                                : count === 1 ? " recording" : " recordings"}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+                  )}
+                  {placeRecords.map(card)}
+                </section>
+              )}
               {view === "timeline" && !isTrash && (
                 <TimeSliderStrip
                   recordings={filtered}
@@ -584,7 +674,7 @@ export function MobileWorkspace(p: Props) {
                   lang={lang}
                 />
               )}
-              {view === "timeline" && (timelineEntries.length
+              {view === "timeline" && (dayScoped.length
                 ? timelineDays.map((day) => (
                   <section key={day}>
                     <h2 className="mobile-day-heading">
@@ -594,11 +684,11 @@ export function MobileWorkspace(p: Props) {
                         weekday: "short",
                       })}
                       <span>
-                        {timelineEntries.filter((r) => journalDates(r).includes(day)).length}
+                        {dayScoped.filter((r) => journalDates(r).includes(day)).length}
                         {ko ? "개" : " records"}
                       </span>
                     </h2>
-                    <JournalTimeline dayGrouped items={timelineEntries.filter(r => journalDates(r).includes(day))} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} renderPlaceName={p.renderPlaceName} />
+                    <JournalTimeline dayGrouped items={dayScoped.filter(r => journalDates(r).includes(day))} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} renderPlaceName={p.renderPlaceName} />
                   </section>
                 ))
                 : (
@@ -633,97 +723,6 @@ export function MobileWorkspace(p: Props) {
                   selectedDateKey={calendarActiveDateKey}
                   onSelectDay={setDateKey}
                 />
-              )}
-              {view === "map" && (
-                <section className="mobile-map-view">
-                  <p className="mobile-note">
-                    {ko
-                      ? `위치 있는 기록 ${located.length}개 · 장소 ${places.length}곳`
-                      : `${located.length} located recordings · ${places.length} places`}
-                  </p>
-                  <MobileMapBoundary
-                    message={ko
-                      ? "지도를 불러올 수 없어요. 아래 기록이나 목록을 이용해 주세요."
-                      : "Map unavailable. Use the records below or the list."}
-                  >
-                    <Suspense fallback={<p>{t.loading_map}</p>}>
-                      <RecordingMap
-                        heading={t.map_heading}
-                        recordings={filtered}
-                  journalItems={entries}
-                        selectedId={mapSelected}
-                        groupIds={selectedPlace
-                          ? placeRecords.map((r) => r.id)
-                          : undefined}
-                        showRoute={false}
-                        lang={lang}
-                        onSelect={(id, reveal) => {
-                          const r = p.items.find((r) => r.id === id);
-                          if (!r) {
-                            return;
-                          }
-                          setSelectedPlace(groupKeyByRecording.get(r.id) ?? null);
-                          setMapSelected(id);
-                          if (reveal) {
-                            openDetail(r);
-                          }
-                        }}
-                      />
-                    </Suspense>
-                  </MobileMapBoundary>
-                  <div className="mobile-map-access">
-                    <span>
-                      {ko
-                        ? `위치 없는 기록 ${filtered.length - located.length}개`
-                        : `${
-                          filtered.length - located.length
-                        } without location`}
-                    </span>
-                    <button
-                      className="text-button"
-                      onClick={() => {
-                        setView("timeline");
-                        requestAnimationFrame(() =>
-                          document.querySelector<HTMLButtonElement>(
-                            '.mobile-views [aria-current="page"]',
-                          )?.focus()
-                        );
-                      }}
-                    >
-                      {ko ? "타임라인에서 보기" : "View timeline"}
-                    </button>
-                  </div>
-                  {places.length > 0 && (
-                    <label className="mobile-place-select">
-                      {ko ? "장소 선택" : "Choose a place"}
-                      <select
-                        value={selectedGroup ? groupKey(selectedGroup) : ""}
-                        onChange={(e) => {
-                          setSelectedPlace(e.target.value);
-                          setMapSelected(
-                            groupAt(e.target.value)?.members[0].id ?? null,
-                          );
-                        }}
-                      >
-                        {places.map((group, index) => {
-                          const key = groupKey(group);
-                          const count = group.members.length;
-                          return (
-                            <option key={key} value={key}>
-                              {ko ? `장소 ${index + 1}` : `Place ${index + 1}`} ·
-                              {" "}
-                              {count}
-                              {ko
-                                ? "개 기록"
-                                : count === 1 ? " recording" : " recordings"}
-                            </option>
-                          );
-                        })}
-                      </select>
-                    </label>
-                  )}
-                  {placeRecords.map(card)}
-                </section>
               )}
             </>
           )}

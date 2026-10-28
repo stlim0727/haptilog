@@ -53,20 +53,26 @@ test("voice-only filter keeps mobile cards at the full timeline width", async ({
 test("mobile views fit narrow screens in both languages and put records first", async ({ page }) => {
   test.setTimeout(60000);
   await mobile(page, 9);
+  const map = page.locator(".mobile-map-toggle");
   for (const lang of ["en", "ko"]) {
     if (lang === "ko") {
       await page.getByRole("button", { name: "Toggle language" }).click();
     }
     for (const width of [320, 360, 390, 430]) {
       await page.setViewportSize({ width, height: 844 });
-      for (let i = 0; i < 3; i++) {
-        await page.locator(".mobile-views button").nth(i).click();
+      for (const step of ["timeline", "calendar", "map"] as const) {
+        if (step === "map") {
+          await map.click();
+        } else {
+          await page.locator(".mobile-views button")
+            .nth(step === "calendar" ? 1 : 0).click();
+        }
         await expect.poll(() =>
           page.evaluate(() =>
             document.documentElement.scrollWidth <= innerWidth
           )
         ).toBe(true);
-        if (i === 0) {
+        if (step === "timeline") {
           await page.evaluate(() => scrollTo(0, 0));
           // Records stay above the fold even with the pinned day strip (~100px)
           // in the timeline view.
@@ -74,15 +80,16 @@ test("mobile views fit narrow screens in both languages and put records first", 
             (await page.locator(".mobile-record").first().boundingBox())!.y,
           ).toBeLessThan(700);
         }
-        if (i === 2) {
+        if (step === "calendar") {
           const cell = await page.locator(".calendar-cell:not(:disabled)")
             .first().boundingBox();
           expect(cell!.height).toBeGreaterThanOrEqual(44);
         }
         await page.screenshot({
-          path: `test-results/mobile-${lang}-${width}-${i}.png`,
+          path: `test-results/mobile-${lang}-${width}-${step}.png`,
           fullPage: false,
         });
+        if (step === "map") await map.click();
       }
     }
   }
@@ -178,7 +185,7 @@ test("mobile timeline day pick is shared with Calendar and clears itself when st
   await expect(page.getByRole("button", { name: "All Days" })).toBeVisible();
 });
 
-test("mobile map stays first and locationless records remain reachable", async ({ page }) => {
+test("mobile map is an independent overlay that keeps the feed underneath it", async ({ page }) => {
   const state = await mobile(page, 12);
   state.additional.push({
     ...structuredClone(baseRecording),
@@ -187,19 +194,38 @@ test("mobile map stays first and locationless records remain reachable", async (
     longitude: null,
   });
   await page.getByRole("button", { name: "Refresh recordings" }).click();
-  await page.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Map of recording locations" }))
-    .toBeVisible();
+  const mapRegion = page.getByRole("region", {
+    name: "Map of recording locations",
+  });
+  const mapToggle = page.getByRole("button", { name: "Map", exact: true });
+  // The day strip and the calendar are the only date controls on the phone:
+  // a period dropdown on top of them would be a third answer to one question.
+  await expect(page.getByLabel("Date range")).toHaveCount(0);
+  await expect(mapRegion).toHaveCount(0);
+  await expect(mapToggle).toHaveAttribute("aria-pressed", "false");
+  await mapToggle.click();
+  await expect(mapRegion).toBeVisible();
+  await expect(mapToggle).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByText("1 without location", { exact: true }))
     .toBeVisible();
   await page.evaluate(() => scrollTo(0, 0));
   expect((await page.locator(".recording-map").boundingBox())!.y).toBeLessThan(
     600,
   );
-  await page.getByRole("button", { name: "View timeline", exact: true }).click();
+  // Locationless records stay reachable in the feed below the map instead of
+  // needing a detour through another tab.
   await expect(page.locator('[data-record-id="no-location"]')).toBeVisible();
-  await expect(page.locator('.mobile-views [aria-current="page"]'))
-    .toBeFocused();
+  // Timeline and calendar are mutually exclusive; the map overlay survives both.
+  await page.getByRole("button", { name: "Calendar", exact: true }).click();
+  await expect(page.locator(".mobile-map-view")).toBeVisible();
+  await expect(page.locator(".calendar-cell").first()).toBeVisible();
+  await page.getByRole("button", { name: "Timeline", exact: true }).click();
+  await expect(mapRegion).toBeVisible();
+  await expect(page.locator(".mobile-views button[aria-current='page']"))
+    .toHaveCount(1);
+  await page.getByRole("button", { name: "Close map" }).click();
+  await expect(mapRegion).toHaveCount(0);
+  await expect(mapToggle).toHaveAttribute("aria-pressed", "false");
 });
 
 test("mobile map uses compact pins and a dismissible summary below the map", async ({ page }) => {
@@ -432,26 +458,30 @@ test("mobile map follows category filters and handles a selection without GPS", 
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await onlyCategory(page, "Travel", true);
   await page.getByRole("button", { name: "Apply filter" }).click();
-  await expect(page.locator(".mobile-record")).toHaveCount(1);
-  await expect(page.locator(".mobile-record")).toContainText(
+  await expect(page.locator(".mobile-map-view .mobile-record")).toHaveCount(1);
+  await expect(page.locator(".mobile-map-view .mobile-record")).toContainText(
     "Travel recording",
   );
   await expect(page.getByText("1 located recordings · 1 places")).toBeVisible();
   await page.getByRole("button", { name: "Filter · 5", exact: true }).click();
   await onlyCategory(page, "Workout", true);
   await page.getByRole("button", { name: "Apply filter" }).click();
+  // The map and the feed under it share one scope, so both go empty together.
   await expect(page.locator(".map-empty")).toBeVisible();
-  await expect(page.locator(".mobile-record")).toHaveCount(0);
-  await page.getByRole("button", { name: "View timeline", exact: true }).click();
   await expect(page.locator(".mobile-empty")).toBeVisible();
 });
 
 test("mobile narrow layout tolerates text enlargement", async ({ page }) => {
   await mobile(page);
   await page.setViewportSize({ width: 320, height: 844 });
-  for (const index of [0, 2]) {
+  for (const step of ["timeline", "calendar", "map"] as const) {
     await page.reload();
-    await page.locator(".mobile-views button").nth(index).click();
+    if (step === "map") {
+      await page.getByRole("button", { name: "Map", exact: true }).click();
+    } else {
+      await page.locator(".mobile-views button")
+        .nth(step === "calendar" ? 1 : 0).click();
+    }
     await page.evaluate(() => {
       const sizes = [
         ...document.querySelectorAll<HTMLElement>(
@@ -469,7 +499,7 @@ test("mobile narrow layout tolerates text enlargement", async ({ page }) => {
       }
     });
     await page.screenshot({
-      path: `test-results/mobile-text200-${index}.png`,
+      path: `test-results/mobile-text200-${step}.png`,
       fullPage: true,
     });
     const layout = await page.evaluate(() => ({

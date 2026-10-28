@@ -174,6 +174,12 @@ function App() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [date, setDate] = useState("all");
+  useEffect(() => {
+    // The mobile page has no period dropdown: its day strip and calendar already
+    // are the date controls, so a range picked on desktop would silently keep
+    // filtering a list the phone user has no way to widen again.
+    if (mobile) setDate("all");
+  }, [mobile]);
   const [category, setCategoryState] = useState("All");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([...JOURNAL_CATEGORIES]);
   const setCategory = (next: string) => {
@@ -1046,7 +1052,7 @@ function App() {
         </main>
       ) : mobile ? (
         <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} renderPlaceName={renderPlaceName} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
-          date={date} setDate={setDate} category={category} setCategory={setCategory} selectedCategories={selectedCategories} applyCategories={applyCategories} search={search} setSearch={setSearch}
+          category={category} setCategory={setCategory} selectedCategories={selectedCategories} applyCategories={applyCategories} search={search} setSearch={setSearch}
           summary={summary} count={dateJournal.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
           isDemo={isDemo} onResetDemo={resetSampleData}
