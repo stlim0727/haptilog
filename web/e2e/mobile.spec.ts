@@ -2,8 +2,29 @@ import { onlyCategory } from "./category-picker";
 import { expect, type Page } from "@playwright/test";
 import { test } from "./fixtures";
 import { baseRecording, fixture } from "./portal-fixture";
+import { staysFixture } from "./stays-fixture";
 
 test.use({ viewport: { width: 390, height: 844 } });
+test("portrait map keeps one journal with stay ribbons", async ({ page }) => {
+  await staysFixture(page);
+  await page.goto("/");
+  const voices = page.locator(".mobile-record");
+  const ribbons = page.locator(".stay-ribbon");
+  await expect(voices).not.toHaveCount(0);
+  await expect(ribbons).toHaveCount(1);
+  const voiceCount = await voices.count();
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.getByRole("button", { name: "Map", exact: true }).click();
+    await expect(page.locator(".mobile-map-view")).toBeVisible();
+    await expect(page.locator(".mobile-map-view .journal-ribbons")).toHaveCount(0);
+    await expect(voices).toHaveCount(voiceCount);
+    await expect(ribbons).toHaveCount(1);
+    await page.getByRole("button", { name: "Close map", exact: true }).click();
+    await expect(voices).toHaveCount(voiceCount);
+    await expect(ribbons).toHaveCount(1);
+  }
+});
 async function mobile(page: Page, count = 1) {
   await page.clock.setFixedTime(new Date("2026-10-25T12:00:00Z"));
   const state = await fixture(page);
@@ -333,22 +354,22 @@ test("place selection offers one counted group per place", async ({ page }) => {
   await expect(options.nth(0)).toHaveText(/Place 1\s+·\s+2 recordings/);
   await expect(options.nth(1)).toHaveText(/Place 2\s+·\s+1 recording/);
   await expect(page.locator(".mobile-map-view [data-record-id]"))
-    .toHaveCount(2);
+    .toHaveCount(0);
+  await expect(page.locator(".mobile-record")).toHaveCount(3);
   // Nothing is dimmed until a place is actually chosen.
   await expect(pins).toHaveCount(2);
   await expect(page.locator(".voice-marker.muted")).toHaveCount(0);
 
   await select.selectOption({ index: 1 });
   await expect(page.locator(".mobile-map-view [data-record-id]"))
-    .toHaveCount(1);
-  await expect(page.locator(".mobile-map-view [data-record-id='mobile-2']"))
-    .toBeVisible();
+    .toHaveCount(0);
+  await expect(page.locator(".mobile-record")).toHaveCount(3);
   await expect(page.locator(".voice-marker.active")).toHaveCount(1);
   await expect(page.locator(".voice-marker.muted")).toHaveCount(1);
 
   await select.selectOption({ index: 0 });
   await expect(page.locator(".mobile-map-view [data-record-id]"))
-    .toHaveCount(2);
+    .toHaveCount(0);
   await expect(page.locator(".voice-marker.active")).toHaveCount(1);
   await expect(page.locator(".voice-marker.muted")).toHaveCount(1);
   await page.screenshot({ path: "test-results/place-groups-mobile.png", fullPage: true });
@@ -458,8 +479,9 @@ test("mobile map follows category filters and handles a selection without GPS", 
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await onlyCategory(page, "Travel", true);
   await page.getByRole("button", { name: "Apply filter" }).click();
-  await expect(page.locator(".mobile-map-view .mobile-record")).toHaveCount(1);
-  await expect(page.locator(".mobile-map-view .mobile-record")).toContainText(
+  await expect(page.locator(".mobile-map-view .mobile-record")).toHaveCount(0);
+  await expect(page.locator(".mobile-record")).toHaveCount(1);
+  await expect(page.locator(".mobile-record")).toContainText(
     "Travel recording",
   );
   await expect(page.getByText("1 located recordings · 1 places")).toBeVisible();
