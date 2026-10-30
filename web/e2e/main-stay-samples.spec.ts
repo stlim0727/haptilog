@@ -21,13 +21,14 @@ for(const width of [1280,390]) {
     if(width<700) {
       await page.getByRole('button',{name:'Map',exact:true}).click();
       await expect(page.getByRole('region',{name:'Map of voice and stay locations'})).toBeVisible();
-      // The map's place list sits above the feed, so its stays must carry the
-      // same ribbon grammar rather than the flat card the feed no longer uses.
-      await expect(page.locator('.mobile-map-view .ribbon-stay-open').first()).toBeVisible();
-      await expect(page.locator('.mobile-map-view .stay-ribbon').first()).toBeAttached();
-      await expect(page.locator('.mobile-map-view .mobile-record[data-journal-kind="stay"]')).toHaveCount(0);
+      // Enabling the map must preserve one feed with ribbons, without adding
+      // another selected-place list inside the map panel.
+      await expect(page.locator('.mobile-map-view [data-record-id]')).toHaveCount(0);
+      await expect(cards).toHaveCount(stayRows);
+      await expect(page.locator('.stay-ribbon')).toHaveCount(stayRows);
+      await expect(page.locator('.mobile-record[data-journal-kind="voice"]')).toHaveCount(9);
       await page.screenshot({path:'test-results/map-stay-ribbons-390.png',fullPage:true});
-      // Turn the overlay back off so the feed below is the only card source.
+      // Turning the map off preserves the same single feed.
       await page.getByRole('button',{name:'Map',exact:true}).click();
       await expect(page.getByRole('region',{name:'Map of voice and stay locations'})).toHaveCount(0);
     } else {
