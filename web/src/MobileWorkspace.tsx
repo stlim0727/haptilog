@@ -447,6 +447,21 @@ export function MobileWorkspace(p: Props) {
               {!isTrash && (
                 <button
                   type="button"
+                  className="mobile-all-dates"
+                  aria-pressed={view === "timeline" && dateKey === "ALL"}
+                  onClick={() => {
+                    setDateKey("ALL");
+                    setView("timeline");
+                    setSelectedPlace(null);
+                    setMapSelected(null);
+                  }}
+                >
+                  {ko ? "전체 날짜" : "All dates"}
+                </button>
+              )}
+              {!isTrash && (
+                <button
+                  type="button"
                   className="mobile-icon"
                   aria-label={ko ? "기록 새로고침" : "Refresh recordings"}
                   onClick={p.refresh}
@@ -585,15 +600,6 @@ export function MobileWorkspace(p: Props) {
                         ? `위치 있는 기록 ${located.length}개 · 장소 ${places.length}곳`
                         : `${located.length} located recordings · ${places.length} places`}
                     </p>
-                    <button
-                      type="button"
-                      className="map-close-btn"
-                      aria-label={ko ? "지도 닫기" : "Close map"}
-                      title={t.hide_map}
-                      onClick={() => setShowMap(false)}
-                    >
-                      ✕
-                    </button>
                   </div>
                   <MobileMapBoundary
                     message={ko

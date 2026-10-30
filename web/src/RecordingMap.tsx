@@ -315,7 +315,7 @@ export default function RecordingMap({
       <div className="map-view-toolbar">
         <h2>{hasStays ? (lang === "ko" ? "기록 지도" : "Journal map") : heading ?? (lang === "ko" ? "기록이 남은 장소" : "Your voices, by place.")}</h2>
         <button type="button" className="map-show-all" disabled={!located.length} onClick={showAll}>
-          {lang === "ko" ? "전체 보기" : "Show all locations"}
+          {lang === "ko" ? "위치 모두 맞춤" : "Fit all locations"}
         </button>
       </div>
       {located.length ? (

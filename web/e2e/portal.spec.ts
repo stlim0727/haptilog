@@ -226,7 +226,7 @@ test("map groups close places into one counted pin and splits them on tap", asyn
   await expect(page.locator(".voice-pin-count")).toHaveCount(0);
   await expect(page.locator(".leaflet-popup")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Show all locations" }).click();
+  await page.getByRole("button", { name: "Fit all locations" }).click();
   await expect(pins).toHaveCount(2);
   await expect(group).toBeVisible();
   await page.screenshot({ path: "test-results/map-clustered.png", fullPage: true });
