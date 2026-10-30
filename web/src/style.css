@@ -3289,20 +3289,10 @@ audio {
   text-underline-offset: 4px;
 }
 .recording-location {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  min-width: 0;
   padding: 20px 0;
   border-top: 1px solid var(--border);
   font-size: 13px;
-}
-.recording-location > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-secondary);
 }
 .recording-location a { color: var(--text-primary); }
 .recording-details { border-top: 1px solid var(--border); }

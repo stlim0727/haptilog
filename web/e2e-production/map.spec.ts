@@ -38,7 +38,8 @@ test("production headers allow map tiles with origin-only referrer", async ({ pa
   await expect(page.locator(".leaflet-tile-loaded").first()).toBeVisible();
   expect(referrers.length).toBeGreaterThan(0);
   expect(referrers.every(value => value === "http://127.0.0.1:4179/")).toBe(true);
-  await expect(page.getByRole("region", { name: "Map of recording locations" })).toBeVisible();
+  await expect(page.locator(".map-section").getByRole("region", { name: "Map of recording locations" })).toBeVisible();
+  await expect(page.locator(".recording-location").getByRole("region", { name: "Map of recording locations" })).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
 
