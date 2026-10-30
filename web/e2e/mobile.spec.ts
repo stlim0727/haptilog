@@ -5,6 +5,32 @@ import { baseRecording, fixture } from "./portal-fixture";
 import { staysFixture } from "./stays-fixture";
 
 test.use({ viewport: { width: 390, height: 844 } });
+test("all dates resets timeline and calendar without another toolbar row", async ({ page }) => {
+  await mobile(page);
+  const reset = page.getByRole("button", { name: "All dates", exact: true });
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(reset).toBeVisible();
+    await page.locator('[data-date-key="2026-10-16"]').click();
+    await expect(reset).toHaveAttribute("aria-pressed", "false");
+    await reset.click();
+    await expect(reset).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("button", { name: "Calendar", exact: true }).click();
+    await expect(reset).toBeVisible();
+    await expect(reset).toHaveAttribute("aria-pressed", "false");
+    await page.getByRole("button", { name: "Map", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Close map" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Fit all locations" })).toBeVisible();
+    await reset.click();
+    await expect(page.getByRole("button", { name: "Timeline", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(reset).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator(".mobile-map-view")).toBeVisible();
+    await expect(page.locator(".mobile-record")).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: `test-results/date-reset-${width}.png`, fullPage: true });
+    await page.getByRole("button", { name: "Map", exact: true }).click();
+  }
+});
 test("portrait map keeps one journal with stay ribbons", async ({ page }) => {
   await staysFixture(page);
   await page.goto("/");
@@ -20,7 +46,7 @@ test("portrait map keeps one journal with stay ribbons", async ({ page }) => {
     await expect(page.locator(".mobile-map-view .journal-ribbons")).toHaveCount(0);
     await expect(voices).toHaveCount(voiceCount);
     await expect(ribbons).toHaveCount(1);
-    await page.getByRole("button", { name: "Close map", exact: true }).click();
+    await page.getByRole("button", { name: "Map", exact: true }).click();
     await expect(voices).toHaveCount(voiceCount);
     await expect(ribbons).toHaveCount(1);
   }
@@ -244,7 +270,7 @@ test("mobile map is an independent overlay that keeps the feed underneath it", a
   await expect(mapRegion).toBeVisible();
   await expect(page.locator(".mobile-views button[aria-current='page']"))
     .toHaveCount(1);
-  await page.getByRole("button", { name: "Close map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(mapRegion).toHaveCount(0);
   await expect(mapToggle).toHaveAttribute("aria-pressed", "false");
 });
@@ -297,7 +323,7 @@ test("map selection preserves the view and Show all restores the filtered extent
   }
   await map.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(positions).not.toEqual(initial);
-  await page.getByRole("button", { name: "Show all locations" }).click();
+  await page.getByRole("button", { name: "Fit all locations" }).click();
   await expect.poll(positions).toEqual(initial);
   await expect(page.locator(".map-selection-card")).toBeVisible();
   await page.locator(".map-selection-close").focus();
@@ -330,7 +356,7 @@ test("map selection preserves the view and Show all restores the filtered extent
   await expect(page.locator(".map-selection-card")).toContainText("Updated place summary");
   await expect.poll(positions).toEqual(beforeDetail);
   await page.getByRole("button", { name: "Toggle language" }).click();
-  await expect(page.getByRole("button", { name: "전체 보기", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "위치 모두 맞춤", exact: true })).toBeVisible();
   await expect.poll(positions).toEqual(beforeDetail);
   await page.screenshot({ path: "test-results/map-show-all-mobile.png", fullPage: true });
 });
@@ -386,7 +412,7 @@ test("place selection offers one counted group per place", async ({ page }) => {
   await expect(page.locator(".voice-marker.muted")).toHaveCount(1);
 
   // Re-grouping on "Show all" keeps the chosen place standing out.
-  await page.getByRole("button", { name: "Show all locations" }).click();
+  await page.getByRole("button", { name: "Fit all locations" }).click();
   await expect(pins).toHaveCount(2);
   await expect(page.locator(".voice-marker.active")).toHaveCount(1);
   await expect(page.locator(".voice-marker.muted")).toHaveCount(1);
