@@ -32,6 +32,10 @@
 .place-geometry[open] { display: grid; gap: 12px; }
 .place-editor { background: var(--bg-surface-elevated); border: 1px solid var(--border); border-radius: 6px; padding: 14px; }
 .place-editor .primary-button { color: #171717; }
+/* 44px box with a 12px transparent margin: the dot reads small while the grab area stays touch-sized. */
+.leaflet-marker-draggable.place-drag-handle { cursor: grab; }
+.place-drag-handle::after { content: ""; position: absolute; inset: 12px; border-radius: 50%; background: var(--border-accent); border: 2px solid #fff; box-shadow: 0 0 0 2px #0008; }
+.place-drag-handle:focus-visible { outline: 3px solid var(--border-accent); outline-offset: 2px; }
 .location-workspace p { overflow-wrap: anywhere; }
 .location-workspace label { color: var(--text-primary); }
 .location-workspace label:has(input[type="checkbox"]) { display: flex; align-items: flex-start; gap: .5rem; }
