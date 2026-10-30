@@ -2,24 +2,31 @@ import { expect } from "@playwright/test";
 import { test } from "./fixtures";
 import { fixture, baseRecording } from "./portal-fixture";
 
-test("recording context links its saved location to Google Maps", async ({ page }) => {
-  await fixture(page);
-  await page.goto("/");
-  const link = page.getByRole("link", { name: "Open in Google Maps" });
-  await expect(link).toBeVisible();
-  await expect(link).toHaveAttribute("href", "https://www.google.com/maps/search/?api=1&query=37.541%2C127.056");
-  await expect(link).toHaveAttribute("target", "_blank");
-  await expect(link).toHaveAttribute("rel", "noopener noreferrer");
-  await expect(page.getByText("37.54100, 127.05600", { exact: true })).toHaveCount(0);
-});
+for (const width of [390, 1280]) {
+  test(`recording detail shows its saved location inline on OpenStreetMap at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await fixture(page);
+    await page.route("https://tile.openstreetmap.org/**", route => route.abort());
+    await page.goto("/");
+    if (width < 700) await page.locator(".mobile-record").first().click();
+    const context = page.locator(".recording-location");
+    await expect(context.getByRole("region", { name: "Map of recording locations" })).toBeVisible();
+    await expect(context.locator(".voice-marker")).toHaveCount(1);
+    await expect(context.getByRole("link", { name: "OpenStreetMap" })).toBeVisible();
+    await expect(page.locator('a[href*="google.com/maps"]')).toHaveCount(0);
+    await expect(context.locator(".map-selection-card")).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  });
+}
 
-test("recording without a location has no map link", async ({ page }) => {
+test("recording without a location has no inline map", async ({ page }) => {
   const state = await fixture(page);
   state.recording.latitude = null;
   state.recording.longitude = null;
   await page.goto("/");
-  await expect(page.getByText("No location was captured for this recording.")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Open in Google Maps" })).toHaveCount(0);
+  const context = page.locator(".recording-location");
+  await expect(context.getByText("No location was captured for this recording.")).toBeVisible();
+  await expect(context.locator(".recording-map")).toHaveCount(0);
 });
 
 test("pairs through code only and restores browser connection after reload", async ({ page }) => {
@@ -154,7 +161,7 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
   }
   await page.goto("/");
   await page.getByRole("button", { name: "Show map" }).click();
-  await expect(page.getByRole("region", { name: "Map of recording locations" }))
+  await expect(page.locator(".map-section, .mobile-map-view").getByRole("region", { name: "Map of recording locations" }))
     .toBeVisible();
   await expect(page.getByText(/2 of 3 recordings have a saved location/))
     .toBeVisible();
@@ -163,7 +170,7 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
       .toBeGreaterThan(0);
   }
   await page.getByTitle("2 recordings at this place", { exact: true }).click();
-  await page.locator(".map-recordings button").filter({
+  await page.locator(".map-section .map-recordings button").filter({
     hasText: "Second voice here",
   }).click();
   await expect(page.locator(".transcript")).toHaveText("Second transcript");
@@ -180,13 +187,13 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
     fullPage: true,
   });
   await page.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Map of recording locations" })).toBeVisible();
+  await expect(page.locator(".map-section, .mobile-map-view").getByRole("region", { name: "Map of recording locations" })).toBeVisible();
   // The mobile map is an overlay, not a tab: the feed can change underneath it.
   await page.getByRole("button", { name: "Timeline", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Map of recording locations" }))
+  await expect(page.locator(".map-section, .mobile-map-view").getByRole("region", { name: "Map of recording locations" }))
     .toBeVisible();
   await page.getByRole("button", { name: "Map", exact: true }).click();
-  await expect(page.getByRole("region", { name: "Map of recording locations" }))
+  await expect(page.locator(".map-section, .mobile-map-view").getByRole("region", { name: "Map of recording locations" }))
     .toHaveCount(0);
 });
 
@@ -214,7 +221,7 @@ test("map groups close places into one counted pin and splits them on tap", asyn
   );
   await page.goto("/");
   await page.getByRole("button", { name: "Show map" }).click();
-  const pins = page.locator(".voice-marker");
+  const pins = page.locator(".map-section .voice-marker");
   await expect(pins).toHaveCount(2);
   const group = page.getByTitle("2 recordings nearby", { exact: true });
   await expect(group).toBeVisible();
@@ -226,7 +233,7 @@ test("map groups close places into one counted pin and splits them on tap", asyn
   await expect(page.locator(".voice-pin-count")).toHaveCount(0);
   await expect(page.locator(".leaflet-popup")).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Fit all locations" }).click();
+  await page.locator(".map-section").getByRole("button", { name: "Fit all locations" }).click();
   await expect(pins).toHaveCount(2);
   await expect(group).toBeVisible();
   await page.screenshot({ path: "test-results/map-clustered.png", fullPage: true });
@@ -237,7 +244,8 @@ test("a map download failure leaves the recording list and details usable", asyn
   await page.route("**/src/RecordingMap.tsx*", route => route.abort());
   await page.goto("/");
   await page.getByRole("button", { name: "Show map" }).click();
-  await expect(page.getByRole("alert")).toContainText("Map unavailable");
+  await expect(page.getByRole("region", { name: "Recording map view" }).getByRole("alert")).toContainText("Map unavailable");
+  await expect(page.locator(".recording-location").getByRole("alert")).toContainText("Map unavailable");
   await expect(page.locator(".transcript")).toHaveText("아이스 라떼 5,000원");
   await expect(page.getByRole("button", { name: "Load original audio" })).toBeEnabled();
 });
@@ -371,7 +379,7 @@ test("switches between Timeline and Calendar and toggles the map", async ({ page
   // 2. Map toggle in Timeline
   await page.getByRole("button", { name: "Show map" }).click();
   await expect(page.locator(".map-section")).toBeVisible();
-  await expect(page.locator(".recording-map")).toBeVisible();
+  await expect(page.locator(".map-section .recording-map")).toBeVisible();
 
   // 3. Switch to Calendar — slider is gone, map persists
   await page.getByRole("tab", { name: "Calendar" }).click();
@@ -423,24 +431,24 @@ test("Calendar map follows the selected day, hides pins for empty days, and open
 
   // Today (2026-10-25) has no recordings — the map should show zero pins, not the two elsewhere.
   await expect(page.getByText("0 of 0 recordings have a saved location")).toBeVisible();
-  await expect(page.locator(".voice-marker")).toHaveCount(0);
+  await expect(page.locator(".map-section .voice-marker")).toHaveCount(0);
 
   // Select 2026-10-16 (base recording, single pin).
   await page.getByRole("button", { name: "1 recording on 2026-10-16", exact: true }).click();
-  await expect(page.getByText("1 of 1 recordings have a saved location")).toBeVisible();
-  await expect(page.locator(".voice-marker")).toHaveCount(1);
+  await expect(page.locator(".map-section").getByText("1 of 1 recordings have a saved location")).toBeVisible();
+  await expect(page.locator(".map-section .voice-marker")).toHaveCount(1);
 
   // Tapping the pin and choosing its recording opens the inspector.
-  await page.locator(".voice-marker").first().click();
-  await page.locator(".map-recordings button").filter({ hasText: "Coffee on the corner" }).click();
+  await page.locator(".map-section .voice-marker").first().click();
+  await page.locator(".map-section .map-recordings button").filter({ hasText: "Coffee on the corner" }).click();
   await expect(page.locator(".transcript")).toHaveText("아이스 라떼 5,000원");
 
   // Switching to a different day re-scopes the map to that day's recording.
   await page.getByRole("button", { name: "1 recording on 2026-10-14", exact: true }).click();
-  await expect(page.getByText("1 of 1 recordings have a saved location")).toBeVisible();
-  await expect(page.locator(".voice-marker")).toHaveCount(1);
-  await page.locator(".voice-marker").first().click();
-  await page.locator(".map-recordings button").filter({ hasText: "Earlier coffee" }).click();
+  await expect(page.locator(".map-section").getByText("1 of 1 recordings have a saved location")).toBeVisible();
+  await expect(page.locator(".map-section .voice-marker")).toHaveCount(1);
+  await page.locator(".map-section .voice-marker").first().click();
+  await page.locator(".map-section .map-recordings button").filter({ hasText: "Earlier coffee" }).click();
   await expect(page.locator(".transcript")).toHaveText("Earlier day transcript");
 });
 

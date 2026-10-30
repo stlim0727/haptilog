@@ -72,7 +72,7 @@
 }
 @media (max-width: 350px) {
   .calendar-header:has(.calendar-all-dates) {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 4px;
     padding-inline: 4px;
   }

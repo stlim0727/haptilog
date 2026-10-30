@@ -2097,10 +2097,16 @@ function Inspector({
           )}
         </>
       )}
-      <section className="recording-location">
-        <span><MapPin size={16} aria-hidden="true" /> {lang === "ko" ? "녹음 위치" : "Recording location"}</span>
-        {hasLocation(r) ? <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${r.latitude},${r.longitude}`)}`} target="_blank" rel="noopener noreferrer">{t.open_in_maps}</a>
-          : <p className="muted">{t.no_location}</p>}
+      <section className="recording-location" aria-label={lang === "ko" ? "녹음 위치" : "Recording location"}>
+        {hasLocation(r) ? (
+          <MapBoundary>
+            <Suspense fallback={<p>{t.loading_map}</p>}>
+              <RecordingMap key={r.id} recordings={[r]} selectedId={r.id} onSelect={() => {}}
+                showRoute={false} showSelectionSummary={false} lang={lang}
+                heading={lang === "ko" ? "녹음 위치" : "Recording location"} />
+            </Suspense>
+          </MapBoundary>
+        ) : <p className="muted">{t.no_location}</p>}
       </section>
       <details className="recording-details">
         <summary>{lang === "ko" ? "기록 상세" : "Recording details"}</summary>
