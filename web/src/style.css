@@ -603,6 +603,7 @@ input:focus {
 }
 footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   border-top: 2px solid var(--border);
@@ -611,6 +612,10 @@ footer {
   gap: 20px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+.build-info {
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 footer span:last-child {
   font-size: 11px;
