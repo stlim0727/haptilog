@@ -661,9 +661,6 @@ export function MobileWorkspace(p: Props) {
                       </select>
                     </label>
                   )}
-                  {placeRecords.length > 0 && (
-                    <JournalTimeline items={placeRecords} allItems={p.items} now={p.now} lang={lang} renderVoice={card} onSelectStay={openDetail} renderPlaceName={p.renderPlaceName} />
-                  )}
                 </section>
               )}
               {view === "timeline" && !isTrash && (
