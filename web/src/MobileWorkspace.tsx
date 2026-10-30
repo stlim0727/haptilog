@@ -447,21 +447,6 @@ export function MobileWorkspace(p: Props) {
               {!isTrash && (
                 <button
                   type="button"
-                  className="mobile-all-dates"
-                  aria-pressed={view === "timeline" && dateKey === "ALL"}
-                  onClick={() => {
-                    setDateKey("ALL");
-                    setView("timeline");
-                    setSelectedPlace(null);
-                    setMapSelected(null);
-                  }}
-                >
-                  {ko ? "전체 날짜" : "All dates"}
-                </button>
-              )}
-              {!isTrash && (
-                <button
-                  type="button"
                   className="mobile-icon"
                   aria-label={ko ? "기록 새로고침" : "Refresh recordings"}
                   onClick={p.refresh}
@@ -728,6 +713,12 @@ export function MobileWorkspace(p: Props) {
                   }}
                   t={t}
                   lang={lang}
+                  onAllDates={() => {
+                    setDateKey("ALL");
+                    setView("timeline");
+                    setSelectedPlace(null);
+                    setMapSelected(null);
+                  }}
                   selectedDateKey={calendarActiveDateKey}
                   onSelectDay={setDateKey}
                 />

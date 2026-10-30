@@ -27,11 +27,13 @@ export default function CalendarView({
   onDateChange,
   selectedDateKey,
   onSelectDay,
+  onAllDates,
 }: {
   lang?: "en" | "ko";
   onDateChange?: () => boolean | void;
   selectedDateKey: string;
   onSelectDay: (dateKey: string) => void;
+  onAllDates?: () => void;
   recordings: Recording[];
   journalItems?: JournalItem[];
   allItems?: JournalItem[];
@@ -128,6 +130,9 @@ export default function CalendarView({
             <h2>
               {year}. {String(month + 1).padStart(2, "0")}
             </h2>
+            {onAllDates && <button type="button" className="calendar-all-dates" onClick={onAllDates}>
+              {t.strip_all_days}
+            </button>}
           </div>
           <div className="calendar-nav-buttons">
             <button
