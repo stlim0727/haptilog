@@ -220,13 +220,6 @@ function App() {
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [date, setDate] = useState("all");
-  useEffect(() => {
-    // The mobile page has no period dropdown: its day strip and calendar already
-    // are the date controls, so a range picked on desktop would silently keep
-    // filtering a list the phone user has no way to widen again.
-    if (mobile) setDate("all");
-  }, [mobile]);
   const [category, setCategoryState] = useState("All");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([...JOURNAL_CATEGORIES]);
   const setCategory = (next: string) => {
@@ -240,6 +233,7 @@ function App() {
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording") ?? new URL(window.location.href).searchParams.get("stay"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
+  const [calendarAllDates, setCalendarAllDates] = useState(false);
   const [viewMode, setViewMode] = useState<"timeline" | "calendar">("timeline");
   const [dateKey, setDateKey] = useState<string>("ALL");
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -665,8 +659,8 @@ function App() {
   const activeRecords = records.filter((r) => !r.deleted_at);
 
   const allItems = journalItems(records, locationJournal.snapshot?.stays ?? [], locationJournal.snapshot?.places ?? [], locationJournal.now);
-  const filteredItems = allItems.filter(item => matchesJournal(item, { category: isTrashView ? "Trash" : "All", categories: selectedCategories, date, search }));
-  const stayEmptyMessage = search || date !== "all"
+  const filteredItems = allItems.filter(item => matchesJournal(item, { category: isTrashView ? "Trash" : "All", categories: selectedCategories, search }));
+  const stayEmptyMessage = search
     ? (lang === "ko" ? "조건에 맞는 체류가 없습니다." : "No stays match these filters.")
     : locationJournal.snapshot?.state.consent_enabled
       ? (lang === "ko" ? `아직 확인된 체류가 없어요. 한곳에 ${locationJournal.snapshot.state.threshold_minutes}분 이상 머무르면 기록돼요.` : `No stays confirmed yet. Stay in one area for at least ${locationJournal.snapshot.state.threshold_minutes} minutes.`)
@@ -678,7 +672,7 @@ function App() {
   const openRelatedRecording = (recording: Recording) => {
     setSelected(recording.id);
     if (!filteredItems.some(item => item.kind === "voice" && item.id === recording.id)) {
-      setCategory("All"); setSearch(""); setDate("all"); setDateKey("ALL");
+      setCategory("All"); setSearch(""); setDateKey("ALL");
     }
   };
   const renderPlaceName = (item: Extract<JournalItem, { kind: "stay" }>, compact = false, identity?: string) => !isDemo ? <StayPlaceName key={`${connection?.owner_user_id}:${connection?.session_id}:${identity ?? item.id}`} item={item} journal={locationJournal} lang={lang} compact={compact} /> : null;
@@ -688,24 +682,14 @@ function App() {
       ? filtered.filter((r) => localDate(r.recorded_at) === dateKey)
       : filtered;
   const calendarActiveDateKey = dateKey === "ALL" ? toLocalDateString() : dateKey;
-  const dateFilteredActiveRecords = activeRecords.filter((r) => {
-    const day = localDate(r.recorded_at),
-      today = toLocalDateString();
-    return (
-      date === "all" ||
-      (date === "today"
-        ? day === today
-        : day.slice(0, 7) === today.slice(0, 7))
-    );
-  });
-  const dateJournal = allItems.filter(item => matchesJournal(item, { date }));
-  const stayMinutes = dateJournal.reduce((total, item) => total + (item.kind === "stay" ? Math.floor(item.stay.observed_duration_millis / 60_000) : 0), 0);
-  const totalSeconds = dateFilteredActiveRecords.reduce(
+  const journalSummaryItems = allItems.filter(item => matchesJournal(item, {}));
+  const stayMinutes = journalSummaryItems.reduce((total, item) => total + (item.kind === "stay" ? Math.floor(item.stay.observed_duration_millis / 60_000) : 0), 0);
+  const totalSeconds = activeRecords.reduce(
     (n, r) => n + (r.duration_seconds ?? 0),
     0,
   );
-  const summary = totals(dateFilteredActiveRecords);
-  const ready = dateFilteredActiveRecords.filter(
+  const summary = totals(activeRecords);
+  const ready = activeRecords.filter(
     (r) => processingState(r) === "Ready",
   ).length;
   function exportCsv() {
@@ -1107,7 +1091,7 @@ function App() {
       ) : mobile ? (
         <MobileWorkspace key={connection.session_id} records={records} filtered={filtered} items={allItems} filteredItems={filteredItems} renderPlaceName={renderPlaceName} renderStay={renderStay} stayEmptyMessage={stayEmptyMessage} locationLoaded={!!locationJournal.snapshot || !!locationJournal.error || isDemo} loaded={loaded} truncated={truncated}
           category={category} setCategory={setCategory} selectedCategories={selectedCategories} applyCategories={applyCategories} search={search} setSearch={setSearch}
-          summary={summary} count={dateJournal.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
+          summary={summary} count={journalSummaryItems.length} stayMinutes={stayMinutes} now={locationJournal.now} seconds={totalSeconds} lastChecked={lastChecked}
           lang={lang} t={t} busy={busy} onDraftChange={setDraftInProgress} onDetailChange={setMobileDetailOpen} refresh={() => { setError(""); void load(); }} exportCsv={exportCsv} disconnect={disconnect} emptyTrash={emptyTrash}
           isDemo={isDemo} onResetDemo={resetSampleData}
           locationControl={(beforeOpen) => <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} beforeOpen={beforeOpen} /></Suspense>}
@@ -1174,15 +1158,6 @@ function App() {
               <p>{lang === "ko" ? "음성과 머문 장소를 한곳에서 돌아보세요." : "Your voice and the places you stayed, together."}</p>
             </div>
             <div className="heading-actions">
-              <label className="date-picker">
-                <CalendarDays size={16} />
-                <span className="sr-only">Date range</span>
-                <select value={date} onChange={(e) => setDate(e.target.value)}>
-                  <option value="all">{t.all_time}</option>
-                  <option value="today">{t.today}</option>
-                  <option value="month">{t.this_month}</option>
-                </select>
-              </label>
               <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} moreActions={<>
               <button
                 className="secondary-button"
@@ -1225,7 +1200,7 @@ function App() {
             <section>
               <span className="metric-label">{t.moments_label}</span>
               <strong>
-                {dateJournal.length}
+                {journalSummaryItems.length}
                 <span className="metric-unit"> {lang === "ko" ? "개 기록" : "records"}</span>
               </strong>
               <small>
@@ -1238,11 +1213,11 @@ function App() {
               <span className="metric-label">{t.ready_label}</span>
               <strong>
                 {ready}
-                <span className="metric-unit"> / {dateFilteredActiveRecords.length}</span>
+                <span className="metric-unit"> / {activeRecords.length}</span>
               </strong>
               <small>
                 <span className="status-dot" />{" "}
-                {t.awaiting_label(dateFilteredActiveRecords.length - ready)}
+                {t.awaiting_label(activeRecords.length - ready)}
               </small>
             </section>
           </div>
@@ -1301,9 +1276,9 @@ function App() {
                   type="button"
                   className={`workbench-toggle-btn ${showMap ? "active" : ""}`}
                   onClick={() => setShowMap(!showMap)}
-                  aria-expanded={showMap}
+                  aria-pressed={showMap}
                 >
-                  <MapPin size={14} /> {showMap ? t.hide_map : t.show_map}
+                  <MapPin size={14} /> {lang === "ko" ? "지도" : "Map"}
                 </button>
               </div>
             )}
@@ -1374,22 +1349,15 @@ function App() {
                     <div>
                       <p>{t.map_desc}</p>
                     </div>
-                    <button
-                      className="map-close-btn"
-                      onClick={() => setShowMap(false)}
-                      aria-label="Close map"
-                      title={t.hide_map}
-                    >
-                      ✕
-                    </button>
+
                   </div>
                   <MapBoundary>
                     <Suspense fallback={<p>{t.loading_map}</p>}>
                       <RecordingMap
                         heading={t.map_heading}
                         lang={lang}
-                        recordings={filtered.filter((r) => localDate(r.recorded_at) === calendarActiveDateKey)}
-                        journalItems={filteredItems.filter(item => journalDates(item).includes(calendarActiveDateKey))}
+                        recordings={filtered.filter((r) => calendarAllDates || localDate(r.recorded_at) === calendarActiveDateKey)}
+                        journalItems={filteredItems.filter(item => calendarAllDates || journalDates(item).includes(calendarActiveDateKey))}
                         selectedId={activeItem?.id ?? null}
                         onSelect={(id, revealDetails) => {
                           setSelected(id);
@@ -1434,8 +1402,17 @@ function App() {
                   setSelected(null);
                   return true;
                 }}
+                onAllDates={() => {
+                  if (draftInProgress && !window.confirm(lang === "ko"
+                    ? "저장하지 않은 변경을 버리고 전체 날짜로 돌아갈까요?"
+                    : "Discard unsaved changes and show all dates?")) return;
+                  setSelected(null);
+                  setDateKey("ALL");
+                  setCalendarAllDates(true);
+                }}
+                showAllDates={calendarAllDates}
                 selectedDateKey={calendarActiveDateKey}
-                onSelectDay={setDateKey}
+                onSelectDay={(key) => { setCalendarAllDates(false); setDateKey(key); }}
               />
             </>
           ) : (
@@ -1446,27 +1423,20 @@ function App() {
                     recordings={filtered}
                     journalItems={filteredItems}
                     selectedDateKey={dateKey}
-                    onSelectDate={setDateKey}
+                    onSelectDate={(key) => { setCalendarAllDates(false); setDateKey(key); }}
                     t={t}
                     lang={lang}
                   />
                 </div>
               )}
               <div className="review-layout">
-                {showMap && (
+                {showMap && !isTrashView && (
                   <section className="map-section" aria-label="Recording map view">
                     <div className="map-heading">
                       <div>
                         <p>{t.map_desc}</p>
                       </div>
-                      <button
-                        className="map-close-btn"
-                        onClick={() => setShowMap(false)}
-                        aria-label="Close map"
-                        title={t.hide_map}
-                      >
-                        ✕
-                      </button>
+
                     </div>
                     <MapBoundary>
                       <Suspense fallback={<p>{t.loading_map}</p>}>

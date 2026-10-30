@@ -60,16 +60,6 @@
   gap: 2px;
   flex: none;
 }
-.calendar-all-dates {
-  padding: 5px 6px;
-  min-height: 32px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 10px;
-  white-space: nowrap;
-}
 @media (max-width: 350px) {
   .calendar-header:has(.calendar-all-dates) {
     flex-wrap: wrap;
@@ -679,7 +669,8 @@ body.light-mode .mobile-record-foot .mobile-amount {
 .mobile-workspace .time-strip-title {
   display: none;
 }
-.mobile-workspace .time-strip-actions button {
+.mobile-workspace .time-strip-actions button,
+.mobile-workspace .time-strip-all-btn {
   min-height: 32px;
 }
 .mobile-workspace .time-strip-track {

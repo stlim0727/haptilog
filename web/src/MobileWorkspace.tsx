@@ -114,6 +114,7 @@ export function MobileWorkspace(p: Props) {
   const ko = lang === "ko";
   const [view, setView] = useState<View>("timeline");
   const [showMap, setShowMap] = useState(false);
+  const [calendarAllDates, setCalendarAllDates] = useState(false);
   const [dateKey, setDateKey] = useState<string>("ALL");
   const [detailId, setDetailId] = useState<string | null>(() =>
     (new URL(location.href).searchParams.get("recording") ?? new URL(location.href).searchParams.get("stay"))
@@ -161,7 +162,7 @@ export function MobileWorkspace(p: Props) {
   const dayScoped = dateKey === "ALL"
     ? entries
     : entries.filter((item) => journalDates(item).includes(dateKey));
-  const mapEntries = view === "calendar"
+  const mapEntries = view === "calendar" && !calendarAllDates
     ? entries.filter((item) => journalDates(item).includes(calendarActiveDateKey))
     : dayScoped;
   const mapRecordings = mapEntries.flatMap(
@@ -659,7 +660,7 @@ export function MobileWorkspace(p: Props) {
                   recordings={filtered}
                   journalItems={entries}
                   selectedDateKey={dateKey}
-                  onSelectDate={setDateKey}
+                  onSelectDate={(key) => { setCalendarAllDates(false); setDateKey(key); }}
                   t={t}
                   lang={lang}
                 />
@@ -715,12 +716,13 @@ export function MobileWorkspace(p: Props) {
                   lang={lang}
                   onAllDates={() => {
                     setDateKey("ALL");
-                    setView("timeline");
+                    setCalendarAllDates(true);
                     setSelectedPlace(null);
                     setMapSelected(null);
                   }}
                   selectedDateKey={calendarActiveDateKey}
-                  onSelectDay={setDateKey}
+                  showAllDates={calendarAllDates}
+                  onSelectDay={(key) => { setCalendarAllDates(false); setDateKey(key); }}
                 />
               )}
             </>

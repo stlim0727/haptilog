@@ -34,7 +34,7 @@ test("production headers allow map tiles with origin-only referrer", async ({ pa
   });
   const response = await page.goto("/");
   expect(response?.headers()["content-security-policy"]).toContain("img-src 'self' data: https://tile.openstreetmap.org");
-  await page.getByRole("button", { name: "Show map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator(".leaflet-tile-loaded").first()).toBeVisible();
   expect(referrers.length).toBeGreaterThan(0);
   expect(referrers.every(value => value === "http://127.0.0.1:4179/")).toBe(true);
