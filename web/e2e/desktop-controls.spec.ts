@@ -1,13 +1,15 @@
 import { expect } from '@playwright/test';
 import { test } from './fixtures';
-import { fixture } from './portal-fixture';
+import { fixture, baseRecording } from './portal-fixture';
 
 test('desktop uses the same map and date controls as mobile', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await fixture(page);
+  const state = await fixture(page);
+  state.additional.push({ ...structuredClone(baseRecording), id: 'trashed', deleted_at: '2026-10-20T12:00:00Z' });
   await page.route('https://tile.openstreetmap.org/**', route => route.abort());
   await page.goto('/');
   await expect(page.getByLabel('Date range')).toHaveCount(0);
+  await expect(page.locator('.metrics section').nth(1).locator('strong')).toContainText('1');
   const map = page.getByRole('button', { name: 'Map', exact: true });
   await expect(map).toHaveAttribute('aria-pressed', 'false');
   await map.click();
@@ -18,9 +20,14 @@ test('desktop uses the same map and date controls as mobile', async ({ page }) =
   const allDays = page.locator('.calendar-title-wrap').getByRole('button', { name: 'All Days' });
   await expect(allDays).toBeVisible();
   await allDays.click();
-  await expect(page.getByRole('tab', { name: 'Timeline', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.time-strip-all-btn')).toHaveClass(/active/);
+  await expect(page.getByRole('tab', { name: 'Calendar', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(allDays).toHaveClass(/active/);
+  await expect(page.locator('.calendar-day-card')).toHaveCount(1);
+  await expect(page.locator('.calendar-cell[aria-pressed="true"]')).toHaveCount(0);
   await expect(map).toHaveAttribute('aria-pressed', 'true');
   await map.click();
+  await expect(page.locator('.map-section')).toHaveCount(0);
+  await map.click();
+  await page.getByRole('button', { name: 'View trash', exact: true }).click();
   await expect(page.locator('.map-section')).toHaveCount(0);
 });

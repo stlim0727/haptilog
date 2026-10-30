@@ -28,12 +28,14 @@ export default function CalendarView({
   selectedDateKey,
   onSelectDay,
   onAllDates,
+  showAllDates = false,
 }: {
   lang?: "en" | "ko";
   onDateChange?: () => boolean | void;
   selectedDateKey: string;
   onSelectDay: (dateKey: string) => void;
   onAllDates?: () => void;
+  showAllDates?: boolean;
   recordings: Recording[];
   journalItems?: JournalItem[];
   allItems?: JournalItem[];
@@ -71,7 +73,7 @@ export default function CalendarView({
 
   const selectDate = (next: Date) => {
     const key = toLocalDateString(next);
-    if (key === selectedDateKey) return;
+    if (key === selectedDateKey && !showAllDates) return;
     if (onDateChange?.() === false) return;
     setCurrentDate(next);
     onSelectDay(key);
@@ -116,7 +118,7 @@ export default function CalendarView({
     });
   }
 
-  const selectedDayRecordings = dateMap.get(selectedDateKey) ?? [];
+  const selectedDayRecordings = showAllDates ? items : dateMap.get(selectedDateKey) ?? [];
 
   const weekdays = lang === "ko" ? ["일", "월", "화", "수", "목", "금", "토"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -130,7 +132,7 @@ export default function CalendarView({
             <h2>
               {year}. {String(month + 1).padStart(2, "0")}
             </h2>
-            {onAllDates && <button type="button" className="calendar-all-dates" onClick={onAllDates}>
+            {onAllDates && <button type="button" className={`time-strip-all-btn calendar-all-dates${showAllDates ? " active" : ""}`} aria-pressed={showAllDates} onClick={onAllDates}>
               {t.strip_all_days}
             </button>}
           </div>
@@ -171,7 +173,7 @@ export default function CalendarView({
 
           {dayCells.map((cell, idx) => {
             const list = cell.isCurrentMonth ? dateMap.get(cell.dateKey) ?? [] : [];
-            const isSelected = cell.dateKey === selectedDateKey;
+            const isSelected = !showAllDates && cell.dateKey === selectedDateKey;
             const isToday =
               cell.isCurrentMonth &&
               cell.dateKey === toLocalDateString();
@@ -222,7 +224,7 @@ export default function CalendarView({
       <div className="calendar-day-panel">
         <div className="calendar-day-panel-header">
           <h3>
-            {t.selected_date_recordings(selectedDateKey, selectedDayRecordings.length)}
+            {showAllDates ? `${t.strip_all_days} · ${selectedDayRecordings.length}` : t.selected_date_recordings(selectedDateKey, selectedDayRecordings.length)}
           </h3>
         </div>
 
@@ -237,7 +239,7 @@ export default function CalendarView({
         ) : (
           <div className="calendar-day-list">
             <JournalTimeline
-              dayGrouped
+              dayGrouped={!showAllDates}
               items={selectedDayRecordings}
               allItems={allItems ?? items}
               now={now}

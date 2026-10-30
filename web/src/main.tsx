@@ -233,6 +233,7 @@ function App() {
   const [selected, setSelected] = useState<string | null>(() => new URL(window.location.href).searchParams.get("recording") ?? new URL(window.location.href).searchParams.get("stay"));
   const [search, setSearch] = useState("");
   const [showMap, setShowMap] = useState(false);
+  const [calendarAllDates, setCalendarAllDates] = useState(false);
   const [viewMode, setViewMode] = useState<"timeline" | "calendar">("timeline");
   const [dateKey, setDateKey] = useState<string>("ALL");
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -681,7 +682,7 @@ function App() {
       ? filtered.filter((r) => localDate(r.recorded_at) === dateKey)
       : filtered;
   const calendarActiveDateKey = dateKey === "ALL" ? toLocalDateString() : dateKey;
-  const journalSummaryItems = allItems;
+  const journalSummaryItems = allItems.filter(item => matchesJournal(item, {}));
   const stayMinutes = journalSummaryItems.reduce((total, item) => total + (item.kind === "stay" ? Math.floor(item.stay.observed_duration_millis / 60_000) : 0), 0);
   const totalSeconds = activeRecords.reduce(
     (n, r) => n + (r.duration_seconds ?? 0),
@@ -1355,8 +1356,8 @@ function App() {
                       <RecordingMap
                         heading={t.map_heading}
                         lang={lang}
-                        recordings={filtered.filter((r) => localDate(r.recorded_at) === calendarActiveDateKey)}
-                        journalItems={filteredItems.filter(item => journalDates(item).includes(calendarActiveDateKey))}
+                        recordings={filtered.filter((r) => calendarAllDates || localDate(r.recorded_at) === calendarActiveDateKey)}
+                        journalItems={filteredItems.filter(item => calendarAllDates || journalDates(item).includes(calendarActiveDateKey))}
                         selectedId={activeItem?.id ?? null}
                         onSelect={(id, revealDetails) => {
                           setSelected(id);
@@ -1407,10 +1408,11 @@ function App() {
                     : "Discard unsaved changes and show all dates?")) return;
                   setSelected(null);
                   setDateKey("ALL");
-                  setViewMode("timeline");
+                  setCalendarAllDates(true);
                 }}
+                showAllDates={calendarAllDates}
                 selectedDateKey={calendarActiveDateKey}
-                onSelectDay={setDateKey}
+                onSelectDay={(key) => { setCalendarAllDates(false); setDateKey(key); }}
               />
             </>
           ) : (
@@ -1421,14 +1423,14 @@ function App() {
                     recordings={filtered}
                     journalItems={filteredItems}
                     selectedDateKey={dateKey}
-                    onSelectDate={setDateKey}
+                    onSelectDate={(key) => { setCalendarAllDates(false); setDateKey(key); }}
                     t={t}
                     lang={lang}
                   />
                 </div>
               )}
               <div className="review-layout">
-                {showMap && (
+                {showMap && !isTrashView && (
                   <section className="map-section" aria-label="Recording map view">
                     <div className="map-heading">
                       <div>

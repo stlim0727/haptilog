@@ -28,13 +28,17 @@ test("all dates resets timeline and calendar without another toolbar row", async
     await expect(page.getByRole("button", { name: "Close map" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Fit all locations" })).toBeVisible();
     await reset.click();
-    await expect(page.getByRole("button", { name: "Timeline", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("button", { name: "Calendar", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.locator(".time-strip-all-btn")).toHaveClass(/active/);
     await expect(page.locator(".mobile-map-view")).toBeVisible();
-    await expect(page.locator(".mobile-record")).toHaveCount(1);
+    await expect(page.locator(".calendar-day-card")).toHaveCount(1);
+    await expect(page.locator('.calendar-cell[aria-pressed="true"]')).toHaveCount(0);
+    await page.getByRole('button', { name: '1 recording on 2026-10-16', exact: true }).click();
+    await expect(reset).toHaveAttribute('aria-pressed', 'false');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `test-results/date-reset-${width}.png`, fullPage: true });
     await page.getByRole("button", { name: "Map", exact: true }).click();
+    await page.getByRole("button", { name: "Timeline", exact: true }).click();
   }
 });
 test("portrait map keeps one journal with stay ribbons", async ({ page }) => {
