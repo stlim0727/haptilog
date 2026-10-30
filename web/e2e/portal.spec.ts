@@ -153,7 +153,7 @@ test("map groups voices at one place, selects a voice, and keeps unlocated recor
     );
   }
   await page.goto("/");
-  await page.getByRole("button", { name: "Show map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.getByRole("region", { name: "Map of recording locations" }))
     .toBeVisible();
   await expect(page.getByText(/2 of 3 recordings have a saved location/))
@@ -213,7 +213,7 @@ test("map groups close places into one counted pin and splits them on tap", asyn
     }),
   );
   await page.goto("/");
-  await page.getByRole("button", { name: "Show map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   const pins = page.locator(".voice-marker");
   await expect(pins).toHaveCount(2);
   const group = page.getByTitle("2 recordings nearby", { exact: true });
@@ -236,7 +236,7 @@ test("a map download failure leaves the recording list and details usable", asyn
   await fixture(page);
   await page.route("**/src/RecordingMap.tsx*", route => route.abort());
   await page.goto("/");
-  await page.getByRole("button", { name: "Show map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Map unavailable");
   await expect(page.locator(".transcript")).toHaveText("아이스 라떼 5,000원");
   await expect(page.getByRole("button", { name: "Load original audio" })).toBeEnabled();
@@ -369,7 +369,7 @@ test("switches between Timeline and Calendar and toggles the map", async ({ page
   await expect(page.locator(".map-section")).toHaveCount(0);
 
   // 2. Map toggle in Timeline
-  await page.getByRole("button", { name: "Show map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator(".map-section")).toBeVisible();
   await expect(page.locator(".recording-map")).toBeVisible();
 
@@ -381,9 +381,9 @@ test("switches between Timeline and Calendar and toggles the map", async ({ page
   await expect(page.locator(".time-strip-container")).toHaveCount(0);
 
   // 4. Map toggle in Calendar
-  await page.getByRole("button", { name: "Hide map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator(".map-section")).toHaveCount(0);
-  await page.getByRole("button", { name: "Show map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
   await expect(page.locator(".map-section")).toBeVisible();
 
   // 5. Return to Timeline
@@ -419,7 +419,7 @@ test("Calendar map follows the selected day, hides pins for empty days, and open
   );
   await page.goto("/");
   await page.getByRole("tab", { name: "Calendar" }).click();
-  await page.getByRole("button", { name: "Show map" }).click();
+  await page.getByRole("button", { name: "Map", exact: true }).click();
 
   // Today (2026-10-25) has no recordings — the map should show zero pins, not the two elsewhere.
   await expect(page.getByText("0 of 0 recordings have a saved location")).toBeVisible();
@@ -496,6 +496,10 @@ test("desktop calendar preserves drafts on reselect and guards date changes, the
   await expect(editor).toHaveValue("Keep calendar draft");
   await expect(page.getByLabel("Amount", { exact: true })).toHaveValue("4500");
   page.removeAllListeners("dialog");
+  page.once("dialog", dialog => dialog.dismiss());
+  await page.locator('.calendar-all-dates').click();
+  await expect(page.getByRole('tab', { name: 'Calendar', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(editor).toHaveValue("Keep calendar draft");
   const emptyDay = page.getByRole("button", { name: "0 recordings on 2026-10-26", exact: true });
   page.once("dialog", dialog => dialog.dismiss());
   await emptyDay.click();

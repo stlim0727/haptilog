@@ -3365,3 +3365,14 @@ audio {
 .mobile-active-filter { gap: 10px; }
 .mobile-active-filter > span { min-width: 0; }
 .mobile-active-filter button { flex-shrink: 0; }
+
+.calendar-all-dates {
+  padding: 5px 6px;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 10px;
+  white-space: nowrap;
+}
