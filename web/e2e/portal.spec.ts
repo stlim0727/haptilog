@@ -61,6 +61,21 @@ test("retry uses recording ID, loads original audio, and displays result", async
   await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
   expect(state.retry).toBe(1);
 });
+test("Retry AI in the options menu forces a fresh analysis on a ready recording", async ({ page }) => {
+  const state = await fixture(page);
+  await page.goto("/");
+  await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
+  // The inline failure retry is hidden once the analysis is ready.
+  await expect(page.getByRole("button", { name: "Retry analysis" })).toHaveCount(0);
+  await page.getByLabel("Recording options", { exact: true }).click();
+  await page.getByRole("button", { name: "Retry AI", exact: true }).click();
+  await expect.poll(() => state.retry).toBe(1);
+  expect(state.retryBodies[0]).toMatchObject({
+    recording_id: baseRecording.id,
+    force: true,
+  });
+  await expect(page.getByText("아이스 라떼 5,000원")).toBeVisible();
+});
 test("revocation clears cached recording details and returns to pairing", async ({ page }) => {
   const state = await fixture(page);
   await page.goto("/");

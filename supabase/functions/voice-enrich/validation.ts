@@ -16,7 +16,8 @@ export function validateRequest(value: unknown) {
       v.audio_mime !== "audio/mp4" &&
       v.audio_mime !== "audio/m4a") ||
     (v.language !== undefined &&
-      (typeof v.language !== "string" || !["ko", "en"].includes(v.language)))
+      (typeof v.language !== "string" || !["ko", "en"].includes(v.language))) ||
+    (v.force !== undefined && typeof v.force !== "boolean")
   ) {
     throw new Error("Invalid request");
   }
@@ -25,6 +26,7 @@ export function validateRequest(value: unknown) {
     audio_base64: v.audio_base64 as string | undefined,
     audio_mime: (v.audio_mime as string | undefined) ?? "audio/mp4",
     language: v.language as "ko" | "en" | undefined,
+    force: v.force === true,
   };
 }
 

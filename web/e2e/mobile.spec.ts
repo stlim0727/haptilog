@@ -630,3 +630,16 @@ test("wrapped recording headings keep every options action inside the viewport",
     }
   }
 });
+
+test("mobile options menu forces a Retry AI re-analysis", async ({ page }) => {
+  const state = await fixture(page);
+  await page.goto("/");
+  await page.locator(".mobile-record").click();
+  await page.getByLabel("Recording options", { exact: true }).click();
+  await page.getByRole("button", { name: "Retry AI", exact: true }).click();
+  await expect.poll(() => state.retry).toBe(1);
+  expect(state.retryBodies[0]).toMatchObject({
+    recording_id: baseRecording.id,
+    force: true,
+  });
+});

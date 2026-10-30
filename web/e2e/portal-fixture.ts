@@ -76,6 +76,7 @@ export async function fixture(
     accountFailure: false,
     recording: structuredClone(baseRecording) as any,
     retry: 0,
+    retryBodies: [] as any[],
     retryFailure: null as string | null,
     corrections: [] as any[],
     history: [] as any[],
@@ -182,6 +183,7 @@ export async function fixture(
       });
     } else if (path.endsWith("/voice-enrich")) {
       state.retry++;
+      state.retryBodies.push(req.postDataJSON());
       if (state.retryFailure) {
         return route.fulfill({
           status: 502,
