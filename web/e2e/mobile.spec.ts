@@ -668,7 +668,7 @@ test("wrapped recording headings keep every options action inside the viewport",
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: 844 });
     for (const scale of [1, 2]) {
-      await page.locator(".inspector h2").evaluate((el, scale) => {
+      await page.locator(".inspector-top h2").evaluate((el, scale) => {
         (el as HTMLElement).style.fontSize = `${25 * scale}px`;
       }, scale);
       const options = page.getByLabel("Recording options", { exact: true });
