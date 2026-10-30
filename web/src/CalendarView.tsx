@@ -263,10 +263,11 @@ export default function CalendarView({
                   <div className="calendar-day-card-header">
                     <span className="calendar-card-time">
                       <Clock size={12} />
-                      {new Date(r.recorded_at).toLocaleTimeString([], {
+                      <time dateTime={r.recorded_at}>{new Date(r.recorded_at).toLocaleString(lang, {
+                        ...(showAllDates ? { year: "numeric", month: "short", day: "numeric" } as const : {}),
                         hour: "2-digit",
                         minute: "2-digit",
-                      })}
+                      })}</time>
                     </span>
                     <CategoryBadge type={intent} size={11} />
                   </div>

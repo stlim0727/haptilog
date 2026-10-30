@@ -21,12 +21,15 @@ for (const width of [390, 1280]) {
     await page.locator('.calendar-all-dates').click();
     await page.mouse.move(0, 0);
     await expect(page.locator('.calendar-day-card')).toHaveCount(2);
+    await expect(page.locator('[data-record-id="older"] time')).toContainText('Oct 14, 2026');
+    await expect(page.locator(`[data-record-id="${baseRecording.id}"] time`)).toContainText('Oct 16, 2026');
     await expect(page.locator('.calendar-view-container')).toBeVisible();
     await expect.poll(style).toEqual(timelineStyle);
     await page.getByRole('button', { name: 'Map', exact: true }).click();
     await expect(page.locator('.map-section, .mobile-map-view').getByText('2 of 2 recordings have a saved location', { exact: false })).toBeVisible();
     await page.getByRole('button', { name: '1 recording on 2026-10-16', exact: true }).click();
     await expect(page.locator('.calendar-day-card')).toHaveCount(1);
+    await expect(page.locator('.calendar-day-card time')).not.toContainText('Oct');
     await expect(page.locator('.calendar-all-dates')).toHaveAttribute('aria-pressed', 'false');
   });
 }
