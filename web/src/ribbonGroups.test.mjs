@@ -6,18 +6,18 @@ import { journalItems } from './journal.ts';
 import { mockStay, mockPlaces, MOCK_NOW } from './location-stays/fixtures.ts';
 const stay = (id, from, to, extra={}) => mockStay({id, started_at:`2026-10-26T${from}:00Z`, qualified_at:`2026-10-26T${from}:00Z`, last_observed_at:`2026-10-26T${to}:00Z`, observed_duration_millis:600000,...extra});
 const make = (stays, places=mockPlaces, voices=[]) => journalItems(voices, stays, places, MOCK_NOW);
-test('same place chains gaps through exactly three minutes; confirmed time excludes gaps and sources remain unchanged', () => {
-  const all=make([stay('a','04:00','04:10'),stay('b','04:13','04:23'),stay('c','04:25','04:35')]);
+test('same place chains gaps through exactly ten minutes; confirmed time excludes gaps and sources remain unchanged', () => {
+  const all=make([stay('a','04:00','04:10'),stay('b','04:20','04:30'),stay('c','04:40','04:50')]);
   const before=JSON.stringify(all), [group]=ribbonGroups(all,all);
   assert.equal(group.members.length,3);
   assert.equal(group.summary.stay.started_at,'2026-10-26T04:00:00Z');
-  assert.equal(group.summary.stay.last_observed_at,'2026-10-26T04:35:00Z');
+  assert.equal(group.summary.stay.last_observed_at,'2026-10-26T04:50:00Z');
   assert.equal(group.summary.stay.observed_duration_millis,1800000);
   assert.equal(JSON.stringify(all),before);
 });
-test('larger gaps, overlapping sources, unknown and ambiguous places remain separate', () => {
+test('gaps beyond ten minutes, overlapping sources, unknown and ambiguous places remain separate', () => {
   for(const [from,extra,places] of [
-    ['04:14',{},mockPlaces], ['04:09',{},mockPlaces],
+    ['04:21',{},mockPlaces], ['04:09',{},mockPlaces],
     ['04:13',{},[]], ['04:13',{},[...mockPlaces,{...mockPlaces[0],id:'second'}]],
   ]) {
     const all=make([stay('a','04:00','04:10'),stay('b',from,'04:24',extra)],places);

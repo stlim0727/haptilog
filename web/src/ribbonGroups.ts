@@ -1,7 +1,7 @@
 import type { JournalItem } from './journal.ts';
 import { placeCandidates } from './journal.ts';
 type StayItem = Extract<JournalItem, { kind: 'stay' }>;
-export const STAY_MERGE_GAP_MILLIS = 3 * 60_000;
+export const STAY_MERGE_GAP_MILLIS = 10 * 60_000;
 export function ribbonPlaceKey(item: StayItem): string {
   const places = placeCandidates(item);
   return places.length === 1 ? `place:${places[0].id}` : `stay:${item.id}`;
