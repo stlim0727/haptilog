@@ -712,6 +712,9 @@ export function MobileWorkspace(p: Props) {
                 <CalendarView
                   recordings={filtered}
                   journalItems={entries}
+                  allItems={p.items}
+                  now={p.now}
+                  renderPlaceName={p.renderPlaceName}
                   selectedId={detailId}
                   onSelect={(id) => {
                     const r = p.items.find((r) => r.id === id);

@@ -11,6 +11,7 @@
 .ribbon-stay-open .ribbon-stay-time { font-size: 10px; opacity: .65; line-height: 1.5; }
 .ribbon-place-save { padding: 5px; border: 0; border-radius: 4px; background: transparent; color: #62c7ae; font-size: 11px; cursor: pointer; flex-shrink: 0; }
 .ribbon-voice-row { min-width: 0; }
+.journal-ribbons .calendar-day-card { width: 100%; box-sizing: border-box; }
 .journal-ribbons .record-card, .journal-ribbons .mobile-record { width: 100%; min-height: 128px; margin: 0; box-sizing: border-box; }
 @media (max-width: 480px) { .ribbon-stay-label { flex-wrap: wrap; gap: 0 6px; } .ribbon-stay-open { flex-basis: 65%; } .ribbon-place-save { font-size: 10px; } }
 
