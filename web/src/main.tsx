@@ -54,6 +54,7 @@ import {
   createDemoAudioBlob,
 } from "./demo";
 import { MobileWorkspace } from "./MobileWorkspace";
+import { BuildInfo } from "./BuildInfo";
 import { NotionExport } from "./NotionExport";
 import { TranscriptEditor, TranscriptHistory } from "./TranscriptEditor";
 import { purgeRecordings } from "./purge";
@@ -1659,6 +1660,7 @@ function App() {
             {t.privacy_policy}
           </a>
         </span>
+        <BuildInfo />
         <span>{t.footer_quiet}</span>
       </footer>
     </>
