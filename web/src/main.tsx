@@ -1408,6 +1408,9 @@ function App() {
                 </section>
               )}
               <CalendarView
+                allItems={allItems}
+                now={locationJournal.now}
+                renderPlaceName={renderPlaceName}
                 recordings={filtered}
                 journalItems={filteredItems}
                 selectedId={activeItem?.id ?? null}

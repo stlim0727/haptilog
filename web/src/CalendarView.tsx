@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { JournalTimeline } from "./JournalTimeline";
 import {
   ChevronLeft,
   ChevronRight,
@@ -16,6 +17,9 @@ import type { TranslationKeys } from "./i18n";
 export default function CalendarView({
   recordings,
   journalItems,
+  allItems,
+  now = Date.now(),
+  renderPlaceName,
   selectedId,
   onSelect,
   t,
@@ -30,6 +34,9 @@ export default function CalendarView({
   onSelectDay: (dateKey: string) => void;
   recordings: Recording[];
   journalItems?: JournalItem[];
+  allItems?: JournalItem[];
+  now?: number;
+  renderPlaceName?: (item: Extract<JournalItem, { kind: "stay" }>, compact?: boolean, identity?: string) => ReactNode;
   selectedId: string | null;
   onSelect: (id: string, revealDetails?: boolean) => void;
   t: TranslationKeys;
@@ -224,7 +231,15 @@ export default function CalendarView({
           </div>
         ) : (
           <div className="calendar-day-list">
-            {selectedDayRecordings.map((r) => {
+            <JournalTimeline
+              dayGrouped
+              items={selectedDayRecordings}
+              allItems={allItems ?? items}
+              now={now}
+              lang={lang}
+              renderPlaceName={renderPlaceName}
+              onSelectStay={(item) => onSelect(item.id, true)}
+              renderVoice={(r) => {
               const intent = journalIntent(r);
               const cost = journalExpense(r);
               const isSelected = r.id === selectedId;
@@ -271,7 +286,7 @@ export default function CalendarView({
                   </div>
                 </button>
               );
-            })}
+            }} />
           </div>
         )}
       </div>
