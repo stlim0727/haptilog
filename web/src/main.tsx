@@ -1757,7 +1757,7 @@ function Inspector({
     link.download = `haptilog-${r.id}.m4a`;
     link.click();
   }
-  async function retry() {
+  async function retry(force = false) {
     if (isDemo || r.id.startsWith("demo-")) {
       setRetryBusy(true);
       setTimeout(async () => {
@@ -1782,7 +1782,7 @@ function Inspector({
       return;
     }
     const { error } = await supabase.functions.invoke("voice-enrich", {
-      body: { recording_id: r.id, language: lang },
+      body: { recording_id: r.id, language: lang, force },
     });
     if (mounted.current) {
       if (error) {
@@ -1910,6 +1910,9 @@ function Inspector({
           }}>
             <summary aria-label={lang === "ko" ? "녹음 옵션" : "Recording options"}><MoreHorizontal size={20} /></summary>
             <div className="recording-actions-popover">
+              {!r.deleted_at && <button onClick={() => void retry(true)} disabled={retryBusy || !r.audio_path}>
+                <Sparkles size={14} /> {retryBusy ? t.analysing : t.retry_ai}
+              </button>}
               <button onClick={() => { if (!audioBusy) void downloadAudio(); }} disabled={!r.audio_path} aria-disabled={audioBusy}>
                 <ArrowDownToLine size={14} /> {audioBusy ? t.loading_audio : t.download_audio}
               </button>
@@ -1991,7 +1994,7 @@ function Inspector({
           </div>
           <button
             className="secondary-button"
-            onClick={retry}
+            onClick={() => void retry()}
             disabled={retryBusy || state === "Processing" || !r.audio_path}
           >
             <RefreshCw size={14} />

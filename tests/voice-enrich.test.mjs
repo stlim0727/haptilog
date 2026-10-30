@@ -39,6 +39,8 @@ function fixture({
   stored = true,
   audioError = false,
   ownerId = "caller",
+  correction = null,
+  correctionHistory = null,
 } = {}) {
   let consentReads = 0;
   const calls = {
@@ -98,8 +100,14 @@ function fixture({
           return this;
         },
         async maybeSingle() {
+          if (table === "voice_enrichments") {
+            return { data: cached, error: null };
+          }
+          if (table === "recording_corrections") {
+            return { data: correction, error: null };
+          }
           return {
-            data: table === "voice_enrichments" ? cached : owner
+            data: owner
               ? {
                 id: payload.recording_id,
                 user_id: ownerId,
@@ -113,7 +121,22 @@ function fixture({
             error: null,
           };
         },
+        order() {
+          return this;
+        },
+        limit(count) {
+          calls.limit = count;
+          return Promise.resolve({
+            data: (correctionHistory ?? []).slice(0, count),
+            error: null,
+          });
+        },
         async insert(value) {
+          assert.equal(options.global, undefined);
+          calls.writes.push(value);
+          return { error: insertError };
+        },
+        async upsert(value) {
           assert.equal(options.global, undefined);
           calls.writes.push(value);
           return { error: insertError };
@@ -467,4 +490,104 @@ test("combined cloud consent authorizes AI while unknown policy versions fail cl
   const unknown = fixture({ consentPolicy: "unknown-policy" });
   assert.equal((await unknown.handler(request())).status, 403);
   assert.equal(unknown.calls.fetch, 0);
+});
+
+test("forced retry bypasses cached enrichment and overwrites the row", async () => {
+  const fresh = { ...result, summary: "Coffee 4500 at Cafe Mug" };
+  const { handler, calls } = fixture({ cached: result, providerResult: fresh });
+  const response = await handler(
+    request({ recording_id: payload.recording_id, force: true }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), fresh);
+  assert.equal(calls.fetch, 1);
+  assert.equal(calls.statusUpdates.length, 0);
+  assert.deepEqual(calls.writes, [
+    {
+      recording_id: payload.recording_id,
+      user_id: "caller",
+      pipeline_version: "v1",
+      ...fresh,
+    },
+  ]);
+});
+
+test("non-forced retry still short-circuits on the cached enrichment", async () => {
+  const { handler, calls } = fixture({ cached: result });
+  assert.equal(
+    (await handler(request({ recording_id: payload.recording_id }))).status,
+    200,
+  );
+  assert.equal(calls.fetch, 0);
+  assert.equal(calls.writes.length, 0);
+});
+
+test("rejects non-boolean force before provider calls", async () => {
+  for (const value of ["yes", 1, null]) {
+    assert.throws(() => validateRequest({ ...payload, force: value }));
+    const { handler, calls } = fixture();
+    assert.equal(
+      (await handler(request({ ...payload, force: value }))).status,
+      400,
+    );
+    assert.equal(calls.fetch, 0);
+  }
+});
+
+test("human corrections and edit history are fed to the model as context", async () => {
+  const { handler, calls } = fixture({
+    correction: {
+      amount: 4500,
+      currency: "KRW",
+      merchant: "Cafe Mug",
+      category: null,
+      completed_tasks: [],
+      transcript: "T".repeat(400),
+    },
+    // Newest first, as the function requests them.
+    correctionHistory: Array.from({ length: 12 }, (_, i) => ({
+      before_value: { amount: 5000 - i, updated_by: null },
+      after_value: { amount: 4500 - i },
+    })),
+  });
+  assert.equal(
+    (await handler(request({ recording_id: payload.recording_id }))).status,
+    200,
+  );
+  assert.equal(calls.limit, 10);
+  const contextPart = calls.input.contents[0].parts.find((p) =>
+    p.text?.startsWith("Recording context:")
+  );
+  const [recordingJson, correctionJson] = contextPart.text
+    .replace("Recording context: ", "")
+    .split("\n\nHuman corrections context: ");
+  assert.deepEqual(Object.keys(JSON.parse(recordingJson)), ["recorded_at"]);
+  const context = JSON.parse(correctionJson);
+  assert.equal(context.current.amount, 4500);
+  assert.equal(context.current.merchant, "Cafe Mug");
+  assert.equal("category" in context.current, false);
+  assert.equal(context.current.transcript.length, 301);
+  assert.equal(context.edit_history.length, 10);
+  // Rendered oldest first so the model reads the correction progression.
+  assert.equal(context.edit_history[0].before.amount, 4991);
+  assert.equal(context.edit_history[9].before.amount, 5000);
+  assert.equal("updated_by" in context.edit_history[0].before, false);
+  assert.ok(
+    calls.input.systemInstruction.parts[0].text.includes(
+      "authoritative ground truth",
+    ),
+  );
+});
+
+test("absent corrections leave the prompt without a context section", async () => {
+  const { handler, calls } = fixture();
+  assert.equal(
+    (await handler(request({ recording_id: payload.recording_id }))).status,
+    200,
+  );
+  assert.ok(
+    !calls.input.contents[0].parts.some(
+      (p) => typeof p.text === "string" && p.text.includes("Human corrections context"),
+    ),
+  );
 });
