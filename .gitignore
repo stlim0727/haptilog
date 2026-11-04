@@ -50,5 +50,10 @@ supabase/.temp/
 web/dist/
 web/.wrangler/
 
+# Worktrees
+.worktrees/
+worktrees/
+
+
 web/test-results/
 web/playwright-report/
