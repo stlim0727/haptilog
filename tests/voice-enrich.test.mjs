@@ -39,6 +39,7 @@ function fixture({
   stored = true,
   audioError = false,
   ownerId = "caller",
+  duration = 10,
   correction = null,
   correctionHistory = null,
 } = {}) {
@@ -48,6 +49,7 @@ function fixture({
     urls: [],
     writes: [],
     filters: [],
+    selects: [],
     released: 0,
     finished: [],
     audio: 0,
@@ -88,7 +90,8 @@ function fixture({
           consentReads++;
           return Promise.resolve({ data: consent && !(revokeBeforeProvider && consentReads > 1) ? ids.map(user_id => ({ user_id, enabled: true, adult_attested_at: "now", policy_version: consentPolicy })) : [], error: consentError ? "unavailable" : null });
         },
-        select() {
+        select(cols) {
+          if (table === "recordings") calls.selects.push(cols);
           return this;
         },
         delete() {
@@ -113,6 +116,7 @@ function fixture({
                 user_id: ownerId,
                 latitude: 37,
                 recorded_at: "2026-10-18T06:00:00Z",
+                duration_seconds: duration,
                 audio_path: stored
                   ? `${ownerId}/${payload.recording_id}.m4a`
                   : null,
@@ -453,7 +457,7 @@ test("context pruning: sensitive IDs, storage paths, and coordinates are never s
   const rawJson = contextPart.text.replace("Recording context:", "").trim();
   const parsed = JSON.parse(rawJson);
 
-  assert.deepEqual(Object.keys(parsed), ["recorded_at"]);
+  assert.deepEqual(Object.keys(parsed), ["recorded_at", "duration_seconds"]);
   assert.equal("user_id" in parsed, false);
   assert.equal("id" in parsed, false);
   assert.equal("audio_path" in parsed, false);
@@ -561,7 +565,10 @@ test("human corrections and edit history are fed to the model as context", async
   const [recordingJson, correctionJson] = contextPart.text
     .replace("Recording context: ", "")
     .split("\n\nHuman corrections context: ");
-  assert.deepEqual(Object.keys(JSON.parse(recordingJson)), ["recorded_at"]);
+  assert.deepEqual(Object.keys(JSON.parse(recordingJson)), [
+    "recorded_at",
+    "duration_seconds",
+  ]);
   const context = JSON.parse(correctionJson);
   assert.equal(context.current.amount, 4500);
   assert.equal(context.current.merchant, "Cafe Mug");
@@ -590,4 +597,102 @@ test("absent corrections leave the prompt without a context section", async () =
       (p) => typeof p.text === "string" && p.text.includes("Human corrections context"),
     ),
   );
+});
+
+test("sub-two-second clips are stored as UNKNOWN without audio download or paid calls", async () => {
+  for (const duration of [0, 1]) {
+    const { handler, calls } = fixture({ duration });
+    const response = await handler(request());
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      transcript: "",
+      intent_type: "UNKNOWN",
+      summary: "Recording too short to analyze.",
+      structured_data: {},
+    });
+    assert.ok(calls.selects[0].includes("duration_seconds"));
+    assert.equal(calls.audio, 0);
+    assert.equal(calls.fetch, 0);
+    assert.deepEqual(calls.writes, [
+      {
+        recording_id: payload.recording_id,
+        user_id: "caller",
+        pipeline_version: "v1",
+        transcript: "",
+        intent_type: "UNKNOWN",
+        summary: "Recording too short to analyze.",
+        structured_data: {},
+      },
+    ]);
+    assert.equal(calls.finished[0].p_error, null);
+  }
+});
+
+test("forced re-run replaces a cached short-clip hallucination for free", async () => {
+  const hallucination = {
+    ...result,
+    transcript: "Buy laundry detergent and fabric softener from the grocery store today.",
+  };
+  const { handler, calls } = fixture({ duration: 1, cached: hallucination });
+  const response = await handler(
+    request({ recording_id: payload.recording_id, force: true }),
+  );
+  assert.equal(response.status, 200);
+  assert.equal(calls.fetch, 0);
+  assert.equal(calls.writes[0].summary, "Recording too short to analyze.");
+  assert.equal(calls.writes[0].transcript, "");
+});
+
+test("transcripts implausible for the clip duration are replaced, plausible ones kept", async () => {
+  const inflated = "word ".repeat(40).trim();
+  const { handler, calls } = fixture({
+    duration: 3,
+    providerResult: { ...result, transcript: inflated },
+  });
+  const response = await handler(request());
+  assert.equal(response.status, 200);
+  assert.equal(calls.fetch, 1);
+  assert.deepEqual(await response.json(), {
+    transcript: "",
+    intent_type: "UNKNOWN",
+    summary: "No words recognized.",
+    structured_data: {},
+  });
+  assert.equal(calls.writes[0].transcript, "");
+  assert.equal(calls.writes[0].intent_type, "UNKNOWN");
+  assert.equal(calls.writes[0].summary, "No words recognized.");
+
+  const plausible = "a".repeat(200);
+  const kept = fixture({
+    duration: 30,
+    providerResult: { ...result, transcript: plausible },
+  });
+  assert.equal((await kept.handler(request())).status, 200);
+  assert.equal(kept.calls.writes[0].transcript, plausible);
+});
+
+test("unknown duration never trips the length cap", async () => {
+  const long = "word ".repeat(40).trim();
+  const { handler, calls } = fixture({
+    duration: null,
+    providerResult: { ...result, transcript: long },
+  });
+  assert.equal((await handler(request())).status, 200);
+  assert.equal(calls.fetch, 1);
+  assert.equal(calls.writes[0].transcript, long);
+});
+
+test("prompt receives the clip duration and forbids completing fragments", async () => {
+  const { handler, calls } = fixture({ duration: 4 });
+  assert.equal((await handler(request())).status, 200);
+  const text = calls.input.systemInstruction.parts[0].text;
+  assert.ok(
+    text.includes(
+      "never complete, extend, or invent full sentences beyond the few words you can clearly hear",
+    ),
+  );
+  const contextPart = calls.input.contents[0].parts.find((p) =>
+    p.text?.startsWith("Recording context:")
+  );
+  assert.match(contextPart.text, /"duration_seconds":4/);
 });

@@ -12,6 +12,8 @@ const headers = {
 const reply = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers });
 
+const MIN_ANALYZABLE_SECONDS = 2;
+
 const truncateValue = (value: unknown): unknown =>
   typeof value === "string" && value.length > 300
     ? `${value.slice(0, 300)}…`
@@ -129,7 +131,7 @@ export function createHandler(deps: Dependencies) {
       const { data: recording, error: readError } = await caller
         .from("recordings")
         .select(
-          "id,user_id,audio_path,latitude,longitude,altitude,speed,recorded_at",
+          "id,user_id,audio_path,latitude,longitude,altitude,speed,recorded_at,duration_seconds",
         )
         .eq("id", input.recording_id)
         .maybeSingle();
@@ -213,6 +215,38 @@ export function createHandler(deps: Dependencies) {
         }
       }
 
+      // Sub-two-second clips contain barely any speech, and the model
+      // reliably hallucinates fluent memos from them. End the claimed job
+      // with a deterministic UNKNOWN instead of a paid provider call.
+      // A forced re-run of an already-cached hallucination lands here too.
+      if (
+        typeof recording.duration_seconds === "number" &&
+        recording.duration_seconds < MIN_ANALYZABLE_SECONDS
+      ) {
+        const shortClipResult = {
+          transcript: "",
+          intent_type: "UNKNOWN",
+          summary: "Recording too short to analyze.",
+          structured_data: {},
+        };
+        const { error: shortError } = await admin
+          .from("voice_enrichments")
+          .upsert(
+            {
+              recording_id: recording.id,
+              user_id: recording.user_id,
+              pipeline_version: pipelineVersion,
+              ...shortClipResult,
+            },
+            { onConflict: "recording_id,pipeline_version" },
+          );
+        if (shortError) {
+          return reply(500, { error: "Unable to save enrichment" });
+        }
+        completed = true;
+        return reply(200, shortClipResult);
+      }
+
       // Storage is authoritative. Older watches may still supply base64, but
       // caller-provided bytes never replace the persisted original.
       if (!recording.audio_path) {
@@ -281,6 +315,7 @@ export function createHandler(deps: Dependencies) {
                 {
                   text: `Recording context: ${JSON.stringify({
                     recorded_at: recording.recorded_at,
+                    duration_seconds: recording.duration_seconds,
                   })}${correctionContext}`,
                 },
               ],
@@ -297,6 +332,7 @@ export function createHandler(deps: Dependencies) {
                     ? "Summarize and produce user-facing details in English, writing user-facing text values (summary, action_items, notes) in English."
                     : "",
                   "Classify its intent as EXPENSE, TRAVEL, WORKOUT, MEMO or UNKNOWN.",
+                  "Transcribe only speech actually audible within the duration_seconds given in Recording context; never complete, extend, or invent full sentences beyond the few words you can clearly hear.",
                   "If the audio contains no speech at all (only background or environmental noise), do not guess or invent content: return intent_type \"UNKNOWN\", an empty transcript, and the fixed short summary \"No speech detected.\" in any language setting.",
                   "If the audio contains vocalizations but is too noisy, garbled, or otherwise unintelligible to transcribe with confidence, do not guess or invent content: return intent_type \"UNKNOWN\", an empty transcript, and the fixed short summary \"No words recognized.\" in any language setting.",
                   "Return JSON with transcript (string), intent_type, summary (string), and structured_data (object). Keep all JSON property keys strictly in English (e.g. amount, currency, merchant, category, action_items, notes).",
@@ -358,6 +394,18 @@ export function createHandler(deps: Dependencies) {
           error: "AI provider returned invalid enrichment",
           code: failureCode,
         });
+      }
+      // Even above the hard guard, a transcript far longer than the clip
+      // could physically speak is treated as hallucination, not output.
+      if (
+        typeof recording.duration_seconds === "number" &&
+        result.transcript.length >
+          Math.max(120, recording.duration_seconds * 30)
+      ) {
+        result.transcript = "";
+        result.intent_type = "UNKNOWN";
+        result.summary = "No words recognized.";
+        result.structured_data = {};
       }
       // Ownership is checked using the caller's JWT before this privileged write.
       // A forced re-run overwrites the previous AI output for this pipeline
