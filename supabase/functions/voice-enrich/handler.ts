@@ -12,7 +12,7 @@ const headers = {
 const reply = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers });
 
-const MIN_ANALYZABLE_SECONDS = 2;
+const MIN_ANALYZABLE_SECONDS = 3;
 
 const truncateValue = (value: unknown): unknown =>
   typeof value === "string" && value.length > 300
@@ -215,7 +215,7 @@ export function createHandler(deps: Dependencies) {
         }
       }
 
-      // Sub-two-second clips contain barely any speech, and the model
+      // Clips under three seconds contain barely any speech, and the model
       // reliably hallucinates fluent memos from them. End the claimed job
       // with a deterministic UNKNOWN instead of a paid provider call.
       // A forced re-run of an already-cached hallucination lands here too.
@@ -402,6 +402,24 @@ export function createHandler(deps: Dependencies) {
         result.transcript.length >
           Math.max(120, recording.duration_seconds * 30)
       ) {
+        result.transcript = "";
+        result.intent_type = "UNKNOWN";
+        result.summary = "No words recognized.";
+        result.structured_data = {};
+      }
+      // Forced-language runs must stay inside their script domain: Latin-only
+      // output for a Korean setting, or Hangul/Han/kana output for an English
+      // setting, is fabrication noise rather than transcribed speech.
+      const wrongScript =
+        input.language === "ko"
+          ? /\p{Script=Latin}/u.test(result.transcript) &&
+            !/\p{Script=Hangul}/u.test(result.transcript)
+          : input.language === "en"
+          ? /[\p{Script=Hangul}\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(
+              result.transcript,
+            )
+          : false;
+      if (wrongScript) {
         result.transcript = "";
         result.intent_type = "UNKNOWN";
         result.summary = "No words recognized.";
