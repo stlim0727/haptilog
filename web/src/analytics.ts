@@ -36,7 +36,7 @@ export async function initAnalytics(
   client = await loader();
   client.init(apiKey, {
     api_host: apiHost || DEFAULT_POSTHOG_HOST,
-    capture_pageview: true,
+    capture_pageview: "history_change",
     persistence: "localStorage+cookie",
   });
   for (const queued of pending.splice(0)) client.capture(queued.event, queued.properties);
