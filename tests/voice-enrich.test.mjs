@@ -40,12 +40,16 @@ function fixture({
   audioError = false,
   ownerId = "caller",
   duration = 10,
+  speech = true,
+  precheckStatus = 200,
   correction = null,
   correctionHistory = null,
 } = {}) {
   let consentReads = 0;
   const calls = {
     fetch: 0,
+    prechecks: 0,
+    precheckInput: null,
     urls: [],
     writes: [],
     filters: [],
@@ -155,9 +159,37 @@ function fixture({
       }),
     }),
     fetch: async (_url, options) => {
+      const input = JSON.parse(options.body);
       calls.urls.push(_url);
+      if (
+        input.systemInstruction?.parts?.[0]?.text?.startsWith(
+          "You are a speech-presence detector",
+        )
+      ) {
+        calls.prechecks++;
+        calls.precheckInput = input;
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text:
+                        speech === null
+                          ? "{not json"
+                          : JSON.stringify({ has_speech: speech }),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+          { status: precheckStatus },
+        );
+      }
       calls.fetch++;
-      calls.input = JSON.parse(options.body);
+      calls.input = input;
       return new Response(
         JSON.stringify({
           candidates: [
@@ -732,4 +764,63 @@ test("forced-language transcripts outside the expected script are refused", asyn
   });
   await free.handler(request({ recording_id: payload.recording_id }));
   assert.equal(free.calls.writes[0].transcript, "Hähnchenfleisch kaufen.");
+});
+
+test("no-speech verdict refuses the paid transcription of a noisy clip", async () => {
+  const { handler, calls } = fixture({ duration: 4, speech: false });
+  const response = await handler(request());
+  assert.equal(response.status, 200);
+  assert.equal(calls.prechecks, 1);
+  assert.equal(calls.fetch, 0);
+  assert.deepEqual(calls.writes, [
+    {
+      recording_id: payload.recording_id,
+      user_id: "caller",
+      pipeline_version: "v1",
+      transcript: "",
+      intent_type: "UNKNOWN",
+      summary: "No speech detected.",
+      structured_data: {},
+    },
+  ]);
+  assert.equal(calls.finished[0].p_error, null);
+  assert.equal(
+    calls.precheckInput.contents[0].parts[0].inline_data.data,
+    btoa("original"),
+  );
+  assert.equal(calls.precheckInput.generationConfig.temperature, 0);
+  assert.equal(calls.precheckInput.generationConfig.maxOutputTokens, 16);
+});
+
+test("speech verdict and probe failures fall through to normal analysis", async () => {
+  const yes = fixture({ duration: 4, speech: true });
+  assert.equal((await yes.handler(request())).status, 200);
+  assert.equal(yes.calls.prechecks, 1);
+  assert.equal(yes.calls.fetch, 1);
+  assert.equal(yes.calls.writes[0].transcript, result.transcript);
+
+  const garbledVerdict = fixture({ duration: 4, speech: null });
+  assert.equal((await garbledVerdict.handler(request())).status, 200);
+  assert.equal(garbledVerdict.calls.prechecks, 1);
+  assert.equal(garbledVerdict.calls.fetch, 1);
+
+  const probeDown = fixture({
+    duration: 4,
+    speech: false,
+    precheckStatus: 500,
+  });
+  assert.equal((await probeDown.handler(request())).status, 200);
+  assert.equal(probeDown.calls.prechecks, 1);
+  assert.equal(probeDown.calls.fetch, 1);
+  assert.equal(probeDown.calls.writes[0].summary, "Coffee");
+});
+
+test("clips of eight seconds or longer skip the presence probe entirely", async () => {
+  for (const duration of [8, 12]) {
+    const { handler, calls } = fixture({ duration, speech: false });
+    assert.equal((await handler(request())).status, 200);
+    assert.equal(calls.prechecks, 0);
+    assert.equal(calls.fetch, 1);
+    assert.equal(calls.writes[0].summary, "Coffee");
+  }
 });

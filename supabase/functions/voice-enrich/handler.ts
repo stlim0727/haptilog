@@ -13,6 +13,7 @@ const reply = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers });
 
 const MIN_ANALYZABLE_SECONDS = 3;
+const SPEECH_PRECHECK_MAX_SECONDS = 8;
 
 const truncateValue = (value: unknown): unknown =>
   typeof value === "string" && value.length > 300
@@ -215,6 +216,27 @@ export function createHandler(deps: Dependencies) {
         }
       }
 
+      const persistUnknownOutcome = async (summary: string) => {
+        const outcome = {
+          transcript: "",
+          intent_type: "UNKNOWN",
+          summary,
+          structured_data: {},
+        };
+        const { error } = await admin
+          .from("voice_enrichments")
+          .upsert(
+            {
+              recording_id: recording.id,
+              user_id: recording.user_id,
+              pipeline_version: pipelineVersion,
+              ...outcome,
+            },
+            { onConflict: "recording_id,pipeline_version" },
+          );
+        return { error, outcome };
+      };
+
       // Clips under three seconds contain barely any speech, and the model
       // reliably hallucinates fluent memos from them. End the claimed job
       // with a deterministic UNKNOWN instead of a paid provider call.
@@ -223,28 +245,14 @@ export function createHandler(deps: Dependencies) {
         typeof recording.duration_seconds === "number" &&
         recording.duration_seconds < MIN_ANALYZABLE_SECONDS
       ) {
-        const shortClipResult = {
-          transcript: "",
-          intent_type: "UNKNOWN",
-          summary: "Recording too short to analyze.",
-          structured_data: {},
-        };
-        const { error: shortError } = await admin
-          .from("voice_enrichments")
-          .upsert(
-            {
-              recording_id: recording.id,
-              user_id: recording.user_id,
-              pipeline_version: pipelineVersion,
-              ...shortClipResult,
-            },
-            { onConflict: "recording_id,pipeline_version" },
-          );
-        if (shortError) {
+        const { error, outcome } = await persistUnknownOutcome(
+          "Recording too short to analyze.",
+        );
+        if (error) {
           return reply(500, { error: "Unable to save enrichment" });
         }
         completed = true;
-        return reply(200, shortClipResult);
+        return reply(200, outcome);
       }
 
       // Storage is authoritative. Older watches may still supply base64, but
@@ -351,14 +359,84 @@ export function createHandler(deps: Dependencies) {
       // Recheck after downloading audio, immediately before the paid egress.
       const withdrawn = await consentStatus();
       if (withdrawn) return reply(withdrawn === "CONSENT_UNAVAILABLE" ? 503 : 403, { error: "Cloud consent unavailable or withdrawn", code: withdrawn });
-      let response = await deps.fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${
-          encodeURIComponent(
-            model,
-          )
-        }:generateContent`,
-        providerRequest,
-      );
+      const providerUrl = `https://generativelanguage.googleapis.com/v1beta/models/${
+        encodeURIComponent(
+          model,
+        )
+      }:generateContent`;
+      // Speech pareidolia: transcription hallucinates fluent foreign words
+      // from short noisy clips even under explicit no-invention instructions,
+      // while a binary presence check stays reliable. Probe short clips first
+      // and refuse silence before paying for full transcription. Any probe
+      // failure falls through to normal analysis; it never blocks it.
+      if (
+        typeof recording.duration_seconds === "number" &&
+        recording.duration_seconds < SPEECH_PRECHECK_MAX_SECONDS
+      ) {
+        let hasSpeech: boolean | null = null;
+        try {
+          const probe = await deps.fetch(providerUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": geminiKey,
+            },
+            signal: AbortSignal.timeout(15_000),
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      inline_data: {
+                        mime_type: "audio/mp4",
+                        data: audioBase64,
+                      },
+                    },
+                    { text: "Decide whether this clip contains human speech." },
+                  ],
+                },
+              ],
+              systemInstruction: {
+                parts: [
+                  {
+                    text: "You are a speech-presence detector for short voice-logger clips. Return JSON {\"has_speech\": boolean}: true only if at least one human word is clearly spoken; false for silence, background or environmental noise, music, or wordless vocalizations. Never guess content. Respond with the JSON object only.",
+                  },
+                ],
+              },
+              generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0,
+                maxOutputTokens: 16,
+              },
+            }),
+          });
+          if (probe.ok) {
+            try {
+              const verdict = JSON.parse(
+                (await probe.json()).candidates?.[0]?.content?.parts?.[0]
+                  ?.text,
+              );
+              if (typeof verdict?.has_speech === "boolean") {
+                hasSpeech = verdict.has_speech;
+              }
+            } catch {}
+          } else {
+            await probe.body?.cancel();
+          }
+        } catch {}
+        if (hasSpeech === false) {
+          const { error, outcome } = await persistUnknownOutcome(
+            "No speech detected.",
+          );
+          if (error) {
+            return reply(500, { error: "Unable to save enrichment" });
+          }
+          completed = true;
+          return reply(200, outcome);
+        }
+      }
+      let response = await deps.fetch(providerUrl, providerRequest);
       // Existing installations configured this model. Some provider routes now
       // return NOT_FOUND although it is still listed. Fall back only on 404;
       // auth, quota and transient failures must not cause a second paid attempt.
