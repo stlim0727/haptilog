@@ -9,6 +9,8 @@ test("only the Wrangler subprocess receives Cloudflare credentials", () => {
   const inherited = {
     PATH: "/test/bin",
     VITE_SUPABASE_URL: "https://test.invalid",
+    VITE_POSTHOG_KEY: "phc_test",
+    VITE_POSTHOG_HOST: "https://eu.posthog.com",
     CLOUDFLARE_API_TOKEN: "test-token",
     CLOUDFLARE_ACCOUNT_ID: "test-account",
     CF_API_KEY: "test-legacy-key",
@@ -17,6 +19,8 @@ test("only the Wrangler subprocess receives Cloudflare credentials", () => {
   assert.deepEqual(publicEnv, {
     PATH: inherited.PATH,
     VITE_SUPABASE_URL: inherited.VITE_SUPABASE_URL,
+    VITE_POSTHOG_KEY: inherited.VITE_POSTHOG_KEY,
+    VITE_POSTHOG_HOST: inherited.VITE_POSTHOG_HOST,
   });
   for (const command of deploymentCommands(true, publicEnv, cloudflareEnv)) {
     const isWrangler = command.args[0].includes("wrangler");

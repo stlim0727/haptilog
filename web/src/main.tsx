@@ -13,6 +13,7 @@ import {
   CircleHelp,
   Clock,
   FileText,
+  Flag,
   Headphones,
   Link2,
   LoaderCircle,
@@ -32,6 +33,16 @@ import {
   Watch,
 } from "lucide-react";
 import { supabase, authCallbackFailed } from "./client";
+import {
+  captureAnalytics,
+  analyticsSessionId,
+  DEFAULT_POSTHOG_HOST,
+  identifyAnalytics,
+  initAnalytics,
+  resetAnalytics,
+} from "./analytics";
+import { PROBLEM_CATEGORIES, PROBLEM_CATEGORY_LABEL_KEYS, buildProblemCaptureProperties, buildProblemReport } from "./problem-report";
+import type { ProblemCategory } from "./problem-report";
 import { journalItems, matchesJournal, journalDates } from "./journal";
 import type { JournalItem } from "./journal";
 import { useLocationJournal } from "./location-stays/useLocationJournal";
@@ -344,6 +355,7 @@ function App() {
       authenticatedUser.current = userId;
       if (event === "SIGNED_OUT" || identityChanged) {
         if (event === "SIGNED_OUT") clearAllDismissals(localStorage);
+        resetAnalytics();
         generation.current++;
         setConnection(null);
         setRecords([]);
@@ -356,6 +368,9 @@ function App() {
       if (event === "INITIAL_SESSION" || event === "SIGNED_IN" || event === "USER_UPDATED") {
         // Defer Supabase calls until outside the Auth callback lock.
         setTimeout(() => { void refreshConnection(); }, 0);
+        if (session) {
+          setTimeout(() => { identifyAnalytics(session.user.id, session.user.is_anonymous === true); }, 0);
+        }
       }
     });
     return () => subscription.unsubscribe();
@@ -1097,7 +1112,7 @@ function App() {
           locationControl={(beforeOpen) => <Suspense fallback={null}><LocationLauncher key={`${connection.owner_user_id}:${connection.session_id}`} journal={locationJournal} lang={lang} isDemo={isDemo} beforeOpen={beforeOpen} /></Suspense>}
           renderInspector={(recording, onDirtyChange) => <Inspector key={`${recording.id}:${connection.session_id}`} recording={recording}
             onChange={load} onError={setError} onMoveToTrash={moveToTrash} onRestore={restoreRecording} onDeletePermanently={deletePermanently}
-            lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} />} />
+            lang={lang} t={t} onDirtyChange={onDirtyChange} isDemo={isDemo} view="mobile" portalSessionId={connection.session_id} />} />
       ) : (
         <main className="workspace">
           {!accountEmail && supabase && (
@@ -1581,6 +1596,8 @@ function App() {
                   lang={lang}
                   t={t}
                   isDemo={isDemo}
+                  view={viewMode}
+                  portalSessionId={connection.session_id}
                 />
               ) : (
                 <div className="inspector-empty">
@@ -1618,6 +1635,8 @@ function App() {
                 lang={lang}
                 t={t}
                 isDemo={isDemo}
+                view="calendar"
+                portalSessionId={connection.session_id}
               />
             </section>
           )}
@@ -1650,6 +1669,8 @@ function Inspector({
   t,
   onDirtyChange,
   isDemo,
+  view,
+  portalSessionId,
 }: {
   recording: Recording;
   onChange: () => Promise<void>;
@@ -1661,6 +1682,8 @@ function Inspector({
   t: TranslationKeys;
   onDirtyChange?: (dirty: boolean) => void;
   isDemo?: boolean;
+  view: string;
+  portalSessionId: string;
 }) {
   const e = latest(r),
     x = expense(r),
@@ -1668,6 +1691,11 @@ function Inspector({
   const [audioUrl, setAudioUrl] = useState("");
   const [audioBusy, setAudioBusy] = useState(false);
   const [retryBusy, setRetryBusy] = useState(false);
+  const [reportCategory, setReportCategory] = useState<ProblemCategory>("other");
+  const [reportBusy, setReportBusy] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
+  const reportDialog = useRef<HTMLDialogElement>(null);
+  const reportNote = useRef<HTMLTextAreaElement>(null);
   const [saving, setSaving] = useState(false);
   const [amount, setAmount] = useState(x?.amount?.toString() ?? "");
   const [currency, setCurrency] = useState(x?.currency ?? "");
@@ -1731,6 +1759,31 @@ function Inspector({
     link.href = url;
     link.download = `haptilog-${r.id}.m4a`;
     link.click();
+  }
+  function openReportDialog() {
+    setReportBusy(false);
+    setReportSent(false);
+    reportDialog.current?.showModal();
+  }
+  async function submitReport() {
+    if (!supabase) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { onError(t.report_failed); return; }
+    const built = buildProblemReport({
+      userId: session.user.id,
+      recordingId: r.id.startsWith("demo-") ? null : r.id,
+      category: reportCategory,
+      note: reportNote.current?.value ?? "",
+      view,
+    });
+    if ("error" in built) { onError(t.report_failed); return; }
+    setReportBusy(true);
+    const { error } = await supabase.from("app_reports").insert(built.row as never);
+    setReportBusy(false);
+    if (error && error.code !== "23505") { onError(t.report_failed); return; }
+    captureAnalytics("problem_reported", buildProblemCaptureProperties(built.row, analyticsSessionId(), portalSessionId));
+    onError("");
+    setReportSent(true);
   }
   async function retry(force = false) {
     if (isDemo || r.id.startsWith("demo-")) {
@@ -1894,10 +1947,41 @@ function Inspector({
               {!r.deleted_at && <button className="trash-trigger" onClick={() => onMoveToTrash(r.id)} aria-label={lang === "en" ? "Move recording to trash" : t.move_to_trash}>
                 <Trash2 size={14} /> {t.move_to_trash}
               </button>}
+              {!isDemo && <button className="report-trigger" onClick={openReportDialog}>
+                <Flag size={14} /> {t.report_problem}
+              </button>}
             </div>
           </details>
         </div>
       </div>
+      {!isDemo && <dialog ref={reportDialog} className="problem-report-dialog" onClose={() => setReportSent(false)}>
+        {reportSent ? (
+          <div>
+            <p role="status">{t.report_success}</p>
+            <div className="problem-report-actions">
+              <button className="primary-button" onClick={() => reportDialog.current?.close()} autoFocus>{t.report_close}</button>
+            </div>
+          </div>
+        ) : (
+          <form method="dialog" onSubmit={event => { event.preventDefault(); void submitReport(); }}>
+            <h2>{t.report_problem_title}</h2>
+            <label className="report-field">
+              <span>{t.report_category_label}</span>
+              <select value={reportCategory} onChange={event => setReportCategory(event.target.value as ProblemCategory)}>
+                {PROBLEM_CATEGORIES.map(c => <option key={c} value={c}>{t[PROBLEM_CATEGORY_LABEL_KEYS[c]]}</option>)}
+              </select>
+            </label>
+            <label className="report-field">
+              <span>{t.report_note_label}</span>
+              <textarea ref={reportNote} rows={3} maxLength={1000} placeholder={t.report_note_placeholder} />
+            </label>
+            <div className="problem-report-actions">
+              <button type="button" className="secondary-button" onClick={() => reportDialog.current?.close()}>{t.report_cancel}</button>
+              <button type="submit" className="primary-button" disabled={reportBusy}>{t.report_submit}</button>
+            </div>
+          </form>
+        )}
+      </dialog>}
       <p className="detail-time">
         {new Date(r.recorded_at).toLocaleString()} ·{" "}
         {r.duration_seconds ?? (lang === "ko" ? "알 수 없음" : "Unknown")} {lang === "ko" ? "초" : "seconds"}
@@ -2102,4 +2186,5 @@ function Inspector({
     </>
   );
 }
+void initAnalytics(import.meta.env.VITE_POSTHOG_KEY, import.meta.env.VITE_POSTHOG_HOST ?? DEFAULT_POSTHOG_HOST);
 createRoot(document.getElementById("root")!).render(<App />);

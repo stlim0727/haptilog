@@ -215,6 +215,10 @@ await assert.rejects(db.exec(`update public.app_reports set description='changed
 await assert.rejects(db.exec(`delete from public.app_reports;`));
 await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,description,diagnostics) values(gen_random_uuid(),'${owner}','issue',repeat('x',1001),'{}');`));
 await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,diagnostics) values(gen_random_uuid(),'${owner}','crash',jsonb_build_object('oversize',repeat('x',8192)));`));
+// Web portal "Report a problem" payloads share this inbox: insert-only, with recording context in diagnostics.
+const webReport = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+await db.exec(`insert into public.app_reports(id,user_id,kind,description,diagnostics) values('${webReport}','${owner}','issue','mic died','{"source":"web","view":"timeline","category":"audio","recording_id":"${rec}"}');`);
+await assert.rejects(db.exec(`select * from public.app_reports;`));
 await db.exec(`set role anon;`);
 await assert.rejects(db.exec(`select * from public.finalize_recording_purges(array['${rec}'::uuid]);`), /permission denied/);
 await assert.rejects(db.exec(`insert into public.app_reports(id,user_id,kind,diagnostics) values(gen_random_uuid(),'${owner}','crash','{}');`));
