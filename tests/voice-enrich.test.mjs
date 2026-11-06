@@ -599,8 +599,8 @@ test("absent corrections leave the prompt without a context section", async () =
   );
 });
 
-test("sub-two-second clips are stored as UNKNOWN without audio download or paid calls", async () => {
-  for (const duration of [0, 1]) {
+test("sub-three-second clips are stored as UNKNOWN without audio download or paid calls", async () => {
+  for (const duration of [0, 1, 2]) {
     const { handler, calls } = fixture({ duration });
     const response = await handler(request());
     assert.equal(response.status, 200);
@@ -695,4 +695,41 @@ test("prompt receives the clip duration and forbids completing fragments", async
     p.text?.startsWith("Recording context:")
   );
   assert.match(contextPart.text, /"duration_seconds":4/);
+});
+
+test("forced-language transcripts outside the expected script are refused", async () => {
+  const koLatin = fixture({
+    providerResult: { ...result, transcript: "Buy laundry detergent today." },
+  });
+  const koRes = await koLatin.handler(
+    request({ recording_id: payload.recording_id, language: "ko" }),
+  );
+  assert.equal(koRes.status, 200);
+  assert.equal(koLatin.calls.writes[0].transcript, "");
+  assert.equal(koLatin.calls.writes[0].intent_type, "UNKNOWN");
+  assert.equal(koLatin.calls.writes[0].summary, "No words recognized.");
+
+  const enHangul = fixture({
+    providerResult: { ...result, transcript: "오늘 물감 사기" },
+  });
+  await enHangul.handler(
+    request({ recording_id: payload.recording_id, language: "en" }),
+  );
+  assert.equal(enHangul.calls.writes[0].intent_type, "UNKNOWN");
+
+  // Korean speech with embedded Latin brand words stays legitimate.
+  const mixed = fixture({
+    providerResult: { ...result, transcript: "Emart에서 우유 사기" },
+  });
+  await mixed.handler(
+    request({ recording_id: payload.recording_id, language: "ko" }),
+  );
+  assert.equal(mixed.calls.writes[0].transcript, "Emart에서 우유 사기");
+
+  // Without a forced language, any script counts as the spoken language.
+  const free = fixture({
+    providerResult: { ...result, transcript: "Hähnchenfleisch kaufen." },
+  });
+  await free.handler(request({ recording_id: payload.recording_id }));
+  assert.equal(free.calls.writes[0].transcript, "Hähnchenfleisch kaufen.");
 });
