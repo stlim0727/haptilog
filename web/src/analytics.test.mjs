@@ -39,7 +39,7 @@ test("init uses the EU host default, capture queues until init, identify/reset f
   const init = calls.find(([name]) => name === "init");
   assert.equal(init[1], "phc_test");
   assert.equal(init[2].api_host, DEFAULT_POSTHOG_HOST);
-  assert.equal(init[2].capture_pageview, true);
+  assert.equal(init[2].capture_pageview, "history_change");
   captureAnalytics("later_event", { order: 2 });
   identifyAnalytics("u1", true);
   resetAnalytics();
