@@ -701,3 +701,35 @@ test("mobile options menu forces a Retry AI re-analysis", async ({ page }) => {
     force: true,
   });
 });
+
+test("detail report a problem submits to the support inbox", async ({ page }) => {
+  const state = await fixture(page);
+  await page.goto("/");
+  await page.locator(".mobile-record").click();
+  await page.getByLabel("Recording options", { exact: true }).click();
+  await page.getByRole("button", { name: "Report a problem", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await page.screenshot({ path: "test-results/report-problem-dialog.png" });
+  await dialog.getByLabel("What went wrong?").selectOption("sync");
+  await dialog.getByPlaceholder("What did you expect, and what happened?").fill("Audio never arrived");
+  await dialog.getByRole("button", { name: "Send report" }).click();
+  await expect(dialog.getByRole("status")).toContainText("your report was received");
+  expect(state.problemReports).toHaveLength(1);
+  const report = Array.isArray(state.problemReports[0]) ? state.problemReports[0][0] : state.problemReports[0];
+  expect(report).toMatchObject({
+    kind: "issue",
+    description: "Audio never arrived",
+    diagnostics: { source: "web", view: "mobile", category: "sync", recording_id: baseRecording.id },
+  });
+  expect(report.user_id).toMatch(/^[0-9a-f-]{36}$/);
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(dialog).toHaveCount(0);
+  // Korean build renders the same flow with translated labels.
+  await page.getByRole("button", { name: "Back to journal" }).click();
+  await page.getByRole("button", { name: "Toggle language" }).click();
+  await page.locator(".mobile-record").click();
+  await page.getByLabel("녹음 옵션", { exact: true }).click();
+  await page.getByRole("button", { name: "문제 신고" }).click();
+  await expect(page.getByRole("dialog").getByText("어떤 문제가 있었나요?")).toBeVisible();
+});

@@ -3346,6 +3346,59 @@ audio {
   overflow-wrap: anywhere;
   white-space: normal;
 }
+.recording-actions-popover > .report-trigger svg {
+  flex-shrink: 0;
+}
+.problem-report-dialog {
+  width: calc(100% - 32px);
+  max-width: 420px;
+  padding: 22px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  box-shadow: var(--ph-shadow-offset);
+}
+.problem-report-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+.problem-report-dialog h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.problem-report-dialog .report-field {
+  display: block;
+  margin-top: 14px;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+.problem-report-dialog .report-field select,
+.problem-report-dialog .report-field textarea {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 12px;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--bg-surface-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  resize: vertical;
+}
+.problem-report-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+.problem-report-actions .primary-button,
+.problem-report-actions .secondary-button {
+  justify-content: center;
+  margin-top: 0;
+}
+.problem-report-dialog [role="status"] {
+  margin: 8px 0 0;
+  font-size: 15px;
+}
 .tabs button[aria-pressed="mixed"], .category-chip-picker button[aria-pressed="mixed"] { box-shadow: inset 0 -3px 0 var(--accent-rose); }
 .category-chip-picker { display: flex; flex-wrap: wrap; gap: 8px; border: 0; padding: 0; margin: 0 0 16px; }
 .category-chip-picker legend { margin-bottom: 10px; }

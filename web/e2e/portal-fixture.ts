@@ -78,6 +78,7 @@ export async function fixture(
     retry: 0,
     retryBodies: [] as any[],
     retryFailure: null as string | null,
+    problemReports: [] as any[],
     corrections: [] as any[],
     history: [] as any[],
     audioLoads: 0,
@@ -163,6 +164,9 @@ export async function fixture(
       body = [state.recording, ...state.additional].filter(Boolean);
     } else if (path.endsWith("/recording_correction_history")) {
       body = [...state.history].reverse();
+    } else if (path.endsWith("/app_reports")) {
+      state.problemReports.push(req.postDataJSON());
+      return route.fulfill({ status: 201, contentType: "application/json", body: "" });
     } else if (path.endsWith("/recording_corrections")) {
       const patch = req.postDataJSON();
       state.history.push({
