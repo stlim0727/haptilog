@@ -77,7 +77,7 @@ HaptiLog is an eyes-free, haptic-first voice logger designed exclusively for Wea
 
 - **앱 아이콘 (App Icon)**: 512×512 PNG (`haptilog_icon_512.png`)
 - **그래픽 이미지 (Feature Graphic, 필수)**: 1024×500 PNG / JPEG (스토어 상단 배너 이미지)
-- **Wear OS 스크린샷 (Wear OS Screenshots, 최소 1개)**: `screenshots/` 디렉터리에 라운드 워치 스크린샷 5종 준비 완료
+- **Wear OS 스크린샷 (Wear OS Screenshots, 최소 1개)**: `screenshots/` 디렉터리에 최신 메인 빌드 기반 라운드 워치 스크린샷 6종(대기, 녹음 중, 일시정지, 기록 목록, AI 상세/재생, 설정) 영문(`screenshots/en/`) 및 국문(`screenshots/ko/`) 준비 완료 (454×454 Wear OS 규격)
 - **개인정보처리방침 URL (Privacy Policy URL, 필수)**:
   `https://haptilog.keepory.app/privacy.html`
   *(마이크 음성 녹음 및 위치 권한을 사용하는 앱은 공개 접근 가능한 유효한 URL 필수 입력)*

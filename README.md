@@ -7,9 +7,9 @@
 
 ## 📱 Screenshots
 
-| Idle Ready | Active Recording Pulse | Wear OS Watch Face |
-| :---: | :---: | :---: |
-| <img src="screenshots/01_idle_record_state.png" width="180"/> | <img src="screenshots/02_recording_active_state.png" width="180"/> | <img src="screenshots/04_wearos_watchface.png" width="180"/> |
+| Idle Ready | Active Recording Pulse | Voice Records History | Recording Detail & AI |
+| :---: | :---: | :---: | :---: |
+| <img src="screenshots/01_idle_record_state.png" width="160"/> | <img src="screenshots/02_recording_active_state.png" width="160"/> | <img src="screenshots/04_recordings_list.png" width="160"/> | <img src="screenshots/05_recording_detail.png" width="160"/> |
 
 ---
 
