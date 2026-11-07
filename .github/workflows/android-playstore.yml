@@ -22,6 +22,11 @@ on:
         description: 'Release status (completed, draft, inProgress, halted)'
         required: false
         default: 'completed'
+      update_screenshots:
+        description: 'Replace English and Korean Wear OS screenshots in the release edit'
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: wear-playstore
@@ -102,10 +107,23 @@ jobs:
           echo "track=$RESOLVED_TRACK" >> $GITHUB_OUTPUT
           echo "Resolved target track '$RAW_TRACK' to '$RESOLVED_TRACK'"
 
+      - uses: actions/setup-node@v4
+        if: ${{ inputs.update_screenshots }}
+        with:
+          node-version: '22'
+
+      - name: Prepare localized Wear OS screenshots
+        if: ${{ inputs.update_screenshots }}
+        id: screenshots
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/playstore-screenshots.mjs
+
       - name: Upload to Google Play Console
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          existingEditId: ${{ steps.screenshots.outputs.edit_id }}
           packageName: com.haptilog.watch
           releaseFiles: watch/app/build/outputs/bundle/release/*.aab
           tracks: ${{ steps.play_track.outputs.track }}
