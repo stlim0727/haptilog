@@ -66,6 +66,9 @@ jobs:
       - name: Test enrichment authorization and validation
         run: node --experimental-strip-types --test tests/voice-enrich.test.mjs tests/watch-access.test.mjs tests/notion-export.test.mjs
 
+      - name: Test Play screenshot edit preparation
+        run: node --test tests/playstore-screenshots.test.mjs
+
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.5.4
