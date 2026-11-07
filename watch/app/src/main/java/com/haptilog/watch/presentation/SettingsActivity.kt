@@ -196,7 +196,13 @@ class SettingsActivity : ComponentActivity() {
                                     toggleControl = { Switch(checked = cloud) })
                             }
                             item { FlexibleChip(enabled = !busy && !rawAccepted,
-                                label = { Text(stringResource(if (rawAccepted) R.string.raw_location_accepted else R.string.raw_location_title), maxLines = Int.MAX_VALUE) },
+                                label = { Text(stringResource(R.string.raw_location_title), maxLines = Int.MAX_VALUE) },
+                                secondaryLabel = {
+                                    Text(
+                                        stringResource(if (rawAccepted) R.string.raw_location_status_approved else R.string.raw_location_status_needed),
+                                        maxLines = Int.MAX_VALUE
+                                    )
+                                },
                                 onClick = { rawConsenting = true; notice = null }) }
                             if (!cloud) item { Text(stringResource(R.string.cloud_off_notice), fontSize = 12.sp,
                                 color = WatchColors.Muted, modifier = Modifier.fillMaxWidth()) }

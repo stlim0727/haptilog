@@ -1,5 +1,7 @@
 <resources>
-    <string name="raw_location_title">Sync continuous location originals</string>
+    <string name="raw_location_title">Continuous location sync</string>
+    <string name="raw_location_status_approved">Approved</string>
+    <string name="raw_location_status_needed">Agreement required</string>
     <string name="raw_location_agree">I am 18+ and agree to raw location sync</string>
     <string name="raw_location_accepted">Continuous location sync approved</string>
     <string name="raw_location_unavailable">Could not enable original location sync. Check cloud sync and the server version, then retry.</string>

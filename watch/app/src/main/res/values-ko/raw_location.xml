@@ -1,5 +1,7 @@
 <resources>
-    <string name="raw_location_title">연속 위치 원본 동기화 동의</string>
+    <string name="raw_location_title">연속 위치 원본 동기화</string>
+    <string name="raw_location_status_approved">승인됨</string>
+    <string name="raw_location_status_needed">동의 필요</string>
     <string name="raw_location_agree">만 18세 이상이며 위치 원본 전송에 동의</string>
     <string name="raw_location_accepted">연속 위치 원본 동기화 승인됨</string>
     <string name="raw_location_unavailable">위치 원본 동기화를 켜지 못했습니다. 클라우드 동기화와 서버 버전을 확인한 뒤 다시 시도하세요.</string>
