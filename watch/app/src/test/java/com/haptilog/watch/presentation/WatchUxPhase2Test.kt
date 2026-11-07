@@ -104,4 +104,15 @@ class WatchUxPhase2Test {
         assertEquals("m3-coral-3", resources.version)
         assertNotNull(resources.idToImageMapping["microphone"])
     }
+
+    @Test
+    fun rawLocationSyncStatusStringsDifferentiateConsentState() {
+        val titleRes = context.getString(com.haptilog.watch.R.string.raw_location_title)
+        val approvedRes = context.getString(com.haptilog.watch.R.string.raw_location_status_approved)
+        val neededRes = context.getString(com.haptilog.watch.R.string.raw_location_status_needed)
+        assertTrue(titleRes.isNotBlank())
+        assertTrue(approvedRes.isNotBlank())
+        assertTrue(neededRes.isNotBlank())
+        assertNotEquals(approvedRes, neededRes)
+    }
 }
