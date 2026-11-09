@@ -1,0 +1,3 @@
+• Improved Wear OS large font size support: when larger font sizes are selected in system settings, the UI smoothly adapts to a scrollable layout without text clipping.
+• Enhanced recording and pause control buttons with multi-line text wrapping for improved readability.
+• Wear OS quality guidelines compliance and overall stability improvements.
