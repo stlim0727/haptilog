@@ -129,6 +129,7 @@ jobs:
           tracks: ${{ steps.play_track.outputs.track }}
           mappingFile: watch/app/build/outputs/mapping/release/mapping.txt
           status: ${{ github.event.inputs.status || 'completed' }}
+          whatsNewDirectory: distribution/whatsnew
           # Completed releases are explicitly authorized for submission.
           # Keep draft preparation from submitting saved policy/listing changes.
           changesNotSentForReview: ${{ github.event.inputs.status != 'completed' }}
