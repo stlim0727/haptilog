@@ -130,4 +130,14 @@ class WatchUxPhase2Test {
         assertTrue(1.30f > ENLARGED_FONT_SCALE_THRESHOLD)
         assertTrue(2.0f > ENLARGED_FONT_SCALE_THRESHOLD)
     }
+
+    @Test
+    fun recordingsListPaddingGuaranteesRoundScreenClearance() {
+        // Wear OS round screens require bottom padding >= 48dp so the last card doesn't clip against curved bezel
+        assertTrue(RECORDINGS_LIST_BOTTOM_PADDING.value >= 48f)
+        // Top padding must clear TimeText and the curved top bezel
+        assertTrue(RECORDINGS_LIST_TOP_PADDING.value >= 36f)
+        assertTrue(RECORDINGS_LIST_TOP_EXPANDED_PADDING.value >= 40f)
+        assertTrue(RECORDINGS_LIST_SIDE_PADDING.value >= 16f)
+    }
 }

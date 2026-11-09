@@ -182,8 +182,8 @@ fun RecordingDetailScreen(
         ScalingLazyColumn(
             state = listState,
             autoCentering = null,
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = .95f, edgeAlpha = 1f),
-            contentPadding = PaddingValues(top = if (expandedFont) 36.dp else 30.dp, bottom = 48.dp),
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(edgeScale = .7f, edgeAlpha = .9f),
+            contentPadding = PaddingValues(top = if (expandedFont) 40.dp else 36.dp, bottom = 48.dp),
             modifier = Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 16.dp)
                 .focusRequester(focus).focusable().onRotaryScrollEvent { event ->
                     scope.launch { listState.scrollBy(event.verticalScrollPixels) }; true
