@@ -109,7 +109,7 @@ class SettingsActivity : ComponentActivity() {
                                     finally { busy = false }
                                 }
                             }) }
-                            item { FlexibleChip(enabled = !busy, label = { Text(stringResource(R.string.cancel_action)) }, onClick = { rawConsenting = false }) }
+                            item { FlexibleChip(enabled = !busy, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.cancel_action)) }, onClick = { rawConsenting = false }) }
                         } else if (consenting) {
 
                             item { Text(stringResource(R.string.unified_cloud_disclosure), fontSize = 12.sp, textAlign = TextAlign.Center) }

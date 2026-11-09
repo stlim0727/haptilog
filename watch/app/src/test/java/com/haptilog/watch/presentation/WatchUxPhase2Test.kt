@@ -115,4 +115,19 @@ class WatchUxPhase2Test {
         assertTrue(neededRes.isNotBlank())
         assertNotEquals(approvedRes, neededRes)
     }
+
+    @Test
+    fun enlargedFontThresholdTriggersForWearOsLargeFontSetting() {
+        // Wear OS default font scale is 1.0f
+        assertFalse(1.0f > ENLARGED_FONT_SCALE_THRESHOLD)
+        // Wear OS small font scale is 0.94f
+        assertFalse(0.94f > ENLARGED_FONT_SCALE_THRESHOLD)
+
+        // Wear OS medium/large font scale settings (1.12f, 1.15f, 1.24f, 1.30f)
+        assertTrue(1.12f > ENLARGED_FONT_SCALE_THRESHOLD)
+        assertTrue(1.15f > ENLARGED_FONT_SCALE_THRESHOLD)
+        assertTrue(1.24f > ENLARGED_FONT_SCALE_THRESHOLD)
+        assertTrue(1.30f > ENLARGED_FONT_SCALE_THRESHOLD)
+        assertTrue(2.0f > ENLARGED_FONT_SCALE_THRESHOLD)
+    }
 }
