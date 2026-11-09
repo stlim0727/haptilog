@@ -30,6 +30,8 @@ import com.haptilog.watch.R
 import com.haptilog.watch.data.RecordingItem
 import java.util.Locale
 
+const val ENLARGED_FONT_SCALE_THRESHOLD = 1.05f
+
 @Composable
 fun CaptureScreen(
     isRecording: Boolean,
@@ -40,7 +42,7 @@ fun CaptureScreen(
     onRecordings: () -> Unit,
     onSettings: () -> Unit
 ) {
-    val expanded = LocalDensity.current.fontScale > 1.3f
+    val expanded = LocalDensity.current.fontScale > ENLARGED_FONT_SCALE_THRESHOLD
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val compact = maxWidth < 210.dp
         val sidePadding = maxWidth * .09f
@@ -64,7 +66,8 @@ fun CaptureScreen(
                                     containerColor = if (isPaused) WatchColors.Record else Color(0xFF262626),
                                     contentColor = if (isPaused) WatchColors.OnRecord else Color.White
                                 ),
-                                modifier = Modifier.fillMaxWidth().height(48.dp).semantics { contentDescription = pauseResumeLabel }
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { contentDescription = pauseResumeLabel }
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Icon(
@@ -74,7 +77,9 @@ fun CaptureScreen(
                                     )
                                     Text(
                                         stringResource(if (isPaused) R.string.record_resume else R.string.record_pause),
-                                        fontSize = 14.sp
+                                        fontSize = 14.sp,
+                                        maxLines = Int.MAX_VALUE,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
@@ -110,7 +115,7 @@ fun CaptureScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = if (compact) 8.dp else 12.dp)
-                        .fillMaxWidth(0.92f),
+                        .fillMaxWidth(if (compact) 0.96f else 0.92f),
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
                 ) {
                     val pauseResumeLabel = stringResource(if (isPaused) R.string.record_resume else R.string.record_pause)
@@ -120,7 +125,8 @@ fun CaptureScreen(
                             containerColor = if (isPaused) WatchColors.Record else Color(0xFF262626),
                             contentColor = if (isPaused) WatchColors.OnRecord else Color.White
                         ),
-                        modifier = Modifier.weight(1f).height(48.dp).semantics { contentDescription = pauseResumeLabel }
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics { contentDescription = pauseResumeLabel }
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Icon(
@@ -131,7 +137,8 @@ fun CaptureScreen(
                             Text(
                                 stringResource(if (isPaused) R.string.record_resume else R.string.record_pause),
                                 fontSize = 11.sp,
-                                maxLines = 1
+                                maxLines = 2,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -143,14 +150,16 @@ fun CaptureScreen(
                             containerColor = if (isPaused) Color(0xFF262626) else WatchColors.Record,
                             contentColor = if (isPaused) Color.White else WatchColors.OnRecord
                         ),
-                        modifier = Modifier.weight(1f).height(48.dp).semantics { contentDescription = stopLabel }
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                        modifier = Modifier.weight(1f).heightIn(min = 48.dp).semantics { contentDescription = stopLabel }
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Icon(painterResource(R.drawable.ic_stop), null, Modifier.size(16.dp))
                             Text(
                                 stringResource(R.string.record_stop),
                                 fontSize = 11.sp,
-                                maxLines = 1
+                                maxLines = 2,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }
@@ -171,7 +180,7 @@ fun CaptureScreen(
                             Text(stringResource(R.string.record_start), fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
-                    Row(Modifier.fillMaxWidth(.76f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(if (compact) .86f else .80f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         NavigationAction(R.drawable.ic_records, R.string.recordings_action,
                             categoryStyle("MEMO"), onRecordings, Modifier.weight(1f))
                         NavigationAction(R.drawable.ic_settings, R.string.settings_title,
@@ -186,10 +195,24 @@ fun CaptureScreen(
 @Composable
 private fun CaptureAction(recording: Boolean, onClick: () -> Unit, modifier: Modifier) {
     val label = stringResource(if (recording) R.string.record_stop_accessibility else R.string.record_start_accessibility)
-    Button(onClick, modifier.semantics { contentDescription = label }, contentPadding = PaddingValues(12.dp)) {
-        Icon(painterResource(if (recording) R.drawable.ic_stop else R.drawable.ic_mic), null, Modifier.size(24.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(stringResource(if (recording) R.string.record_stop else R.string.record_start))
+    Button(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 48.dp).semantics { contentDescription = label },
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(painterResource(if (recording) R.drawable.ic_stop else R.drawable.ic_mic), null, Modifier.size(24.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                stringResource(if (recording) R.string.record_stop else R.string.record_start),
+                maxLines = Int.MAX_VALUE,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 
@@ -203,15 +226,27 @@ private fun ElapsedTime(seconds: Long, size: Int) {
 
 @Composable
 private fun NavigationAction(icon: Int, label: Int, style: CategoryStyle, onClick: () -> Unit, modifier: Modifier) {
-    Button(onClick, modifier.heightIn(min = 48.dp),
+    Button(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 48.dp),
         colors = ButtonDefaults.buttonColors(containerColor = style.surface, contentColor = WatchColors.Text),
-        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically) {
-            Icon(painterResource(icon), null, Modifier.size(20.dp), tint = style.accent)
-            Spacer(Modifier.width(5.dp))
-            Text(stringResource(label), fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center, modifier = Modifier.weight(1f, fill = false))
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(painterResource(icon), null, Modifier.size(18.dp), tint = style.accent)
+            Spacer(Modifier.width(4.dp))
+            Text(
+                stringResource(label),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.wrapContentSize(),
+                maxLines = Int.MAX_VALUE
+            )
         }
     }
 }
@@ -231,7 +266,7 @@ fun RecordingsScreen(
         ResponsiveTransformationSpec.largeScreen(minTransitionAreaHeightFraction = .10f,
             maxTransitionAreaHeightFraction = .20f, contentAlpha = TransformationVariableSpec(1f),
             containerAlpha = TransformationVariableSpec(1f), scale = TransformationVariableSpec(.95f)))
-    val expanded = LocalDensity.current.fontScale > 1.3f
+    val expanded = LocalDensity.current.fontScale > ENLARGED_FONT_SCALE_THRESHOLD
     ScreenScaffold(scrollState = listState, timeText = {},
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp,
             top = if (expanded) 36.dp else 30.dp, bottom = 32.dp)) { padding ->
@@ -263,7 +298,7 @@ fun RecordingCard(item: RecordingItem, cloudEnabled: Boolean, onOpen: () -> Unit
     modifier: Modifier = Modifier, transformation: SurfaceTransformation? = null) {
     val context = LocalContext.current
     val category = categoryStyle(item.intentType)
-    val expanded = LocalDensity.current.fontScale > 1.3f
+    val expanded = LocalDensity.current.fontScale > ENLARGED_FONT_SCALE_THRESHOLD
     val needsAttention = item.syncStatus in setOf("ACTION_REQUIRED", "CAPTURE_FAILED", "RECOVERY_REQUIRED")
     val statusDescription = listOfNotNull(recordingStageLabel(context, item),
         recordingSyncLabel(context, item, cloudEnabled).takeIf { item.syncStatus != "SYNCED" }).joinToString(" · ")

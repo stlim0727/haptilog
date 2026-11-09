@@ -177,7 +177,7 @@ fun RecordingDetailScreen(
 
     val category = categoryStyle(item.intentType)
     val heroAmount = expenseHeroAmount(context, item)
-    val expandedFont = LocalDensity.current.fontScale > 1.3f
+    val expandedFont = LocalDensity.current.fontScale > ENLARGED_FONT_SCALE_THRESHOLD
     ScreenScaffold(scrollState = listState, timeText = {}) {
         ScalingLazyColumn(
             state = listState,
