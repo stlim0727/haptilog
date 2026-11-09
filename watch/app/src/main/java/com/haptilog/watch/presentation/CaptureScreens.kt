@@ -24,13 +24,15 @@ import androidx.wear.compose.foundation.lazy.*
 import androidx.wear.compose.material3.*
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
 import androidx.wear.compose.material3.lazy.transformedHeight
-import androidx.wear.compose.material3.lazy.ResponsiveTransformationSpec
-import androidx.wear.compose.material3.lazy.TransformationVariableSpec
 import com.haptilog.watch.R
 import com.haptilog.watch.data.RecordingItem
 import java.util.Locale
 
 const val ENLARGED_FONT_SCALE_THRESHOLD = 1.05f
+val RECORDINGS_LIST_TOP_PADDING = 36.dp
+val RECORDINGS_LIST_TOP_EXPANDED_PADDING = 40.dp
+val RECORDINGS_LIST_BOTTOM_PADDING = 48.dp
+val RECORDINGS_LIST_SIDE_PADDING = 16.dp
 
 @Composable
 fun CaptureScreen(
@@ -259,17 +261,12 @@ fun RecordingsScreen(
     notice: String?,
     onOpenRecording: (RecordingItem) -> Unit
 ) {
-    val transformation = rememberTransformationSpec(
-        ResponsiveTransformationSpec.smallScreen(minTransitionAreaHeightFraction = .10f,
-            maxTransitionAreaHeightFraction = .20f, contentAlpha = TransformationVariableSpec(1f),
-            containerAlpha = TransformationVariableSpec(1f), scale = TransformationVariableSpec(.95f)),
-        ResponsiveTransformationSpec.largeScreen(minTransitionAreaHeightFraction = .10f,
-            maxTransitionAreaHeightFraction = .20f, contentAlpha = TransformationVariableSpec(1f),
-            containerAlpha = TransformationVariableSpec(1f), scale = TransformationVariableSpec(.95f)))
+    val transformation = rememberTransformationSpec()
     val expanded = LocalDensity.current.fontScale > ENLARGED_FONT_SCALE_THRESHOLD
+    val topPadding = if (expanded) RECORDINGS_LIST_TOP_EXPANDED_PADDING else RECORDINGS_LIST_TOP_PADDING
     ScreenScaffold(scrollState = listState, timeText = {},
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp,
-            top = if (expanded) 36.dp else 30.dp, bottom = 32.dp)) { padding ->
+        contentPadding = PaddingValues(start = RECORDINGS_LIST_SIDE_PADDING, end = RECORDINGS_LIST_SIDE_PADDING,
+            top = topPadding, bottom = RECORDINGS_LIST_BOTTOM_PADDING)) { padding ->
         TransformingLazyColumn(state = listState, contentPadding = padding,
             modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text(stringResource(R.string.recordings_title), style = MaterialTheme.typography.titleMedium,
@@ -312,7 +309,7 @@ fun RecordingCard(item: RecordingItem, cloudEnabled: Boolean, onOpen: () -> Unit
         stateDescription = statusDescription
     }, transformation = transformation,
         colors = CardDefaults.cardColors(containerColor = category.surface),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 9.dp)) {
+        contentPadding = PaddingValues(start = 12.dp, end = 14.dp, top = 9.dp, bottom = 9.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             CategoryIcon(category)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -322,7 +319,7 @@ fun RecordingCard(item: RecordingItem, cloudEnabled: Boolean, onOpen: () -> Unit
                     fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold)
                 if (!expanded) RecordingMetadata(item, compact = true)
             }
-            Box(Modifier.align(Alignment.Top).padding(top = 5.dp).size(6.dp)
+            Box(Modifier.align(Alignment.Top).padding(top = 5.dp, end = 2.dp).size(6.dp)
                 .background(statusColor, CircleShape))
         }
         if (expanded) {
