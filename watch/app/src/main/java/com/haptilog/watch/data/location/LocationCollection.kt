@@ -7,6 +7,7 @@ import com.haptilog.watch.R
 enum class LocationCollection(val label: Int) {
     OFF(R.string.location_scope_off),
     RECORDING_ONLY(R.string.location_scope_recording),
+    PASSIVE(R.string.location_scope_passive),
     INCLUDING_NON_RECORDING(R.string.location_scope_also);
 
     val includesRecordings: Boolean get() = this != OFF

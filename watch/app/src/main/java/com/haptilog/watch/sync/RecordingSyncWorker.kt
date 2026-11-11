@@ -41,13 +41,22 @@ class RecordingSyncWorker(context: Context, params: WorkerParameters) : Coroutin
         }
         fun schedule(context: Context) {
             if (!enabled(context) || !CloudClient.configured) return
-            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
+            val deferred = context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).getBoolean("deferred_sync", false)
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true)
+            if (deferred) constraints.setRequiresCharging(true)
             val manager = WorkManager.getInstance(context)
-            manager.enqueueUniqueWork("recording-sync", ExistingWorkPolicy.KEEP,
+            manager.enqueueUniqueWork("recording-sync", ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<RecordingSyncWorker>().setConstraints(constraints.build())
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
+            manager.enqueueUniquePeriodicWork("recording-sync-safety", ExistingPeriodicWorkPolicy.UPDATE,
+                PeriodicWorkRequestBuilder<RecordingSyncWorker>(15, TimeUnit.MINUTES).setConstraints(constraints.build()).build())
+        }
+        fun flushNow(context: Context) {
+            if (!enabled(context) || !CloudClient.configured) return
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
+            WorkManager.getInstance(context).enqueueUniqueWork("recording-sync", ExistingWorkPolicy.REPLACE,
                 OneTimeWorkRequestBuilder<RecordingSyncWorker>().setConstraints(constraints)
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
-            manager.enqueueUniquePeriodicWork("recording-sync-safety", ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<RecordingSyncWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build())
         }
     }
     override suspend fun doWork(): Result = syncMutex.withLock { withContext(Dispatchers.IO) {

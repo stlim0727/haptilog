@@ -57,6 +57,7 @@ class SettingsActivity : ComponentActivity() {
                 val focus = remember { FocusRequester() }
                 var collectionScope by remember { mutableStateOf(com.haptilog.watch.data.location.LocationCollection.load(this)) }
                 var cloud by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
+                var deferredSync by remember { mutableStateOf(getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).getBoolean("deferred_sync", false)) }
                 var crashes by remember { mutableStateOf(AppReports.crashReportsEnabled(this)) }
                 var hapticIntensity by remember { mutableStateOf(HapticPreferences.getIntensity(this)) }
                 val hapticManager = remember { HapticHeartbeatManager(this) }
@@ -194,6 +195,19 @@ class SettingsActivity : ComponentActivity() {
                                         uncheckedStartBackgroundColor = WatchColors.Surface,
                                         uncheckedEndBackgroundColor = WatchColors.Surface),
                                     toggleControl = { Switch(checked = cloud) })
+                            }
+                            if (cloud) {
+                                item {
+                                    ToggleChip(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp),
+                                        checked = deferredSync, enabled = CloudClient.configured && !busy,
+                                        onCheckedChange = { enabled ->
+                                            getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).edit().putBoolean("deferred_sync", enabled).apply()
+                                            deferredSync = enabled
+                                            RecordingSyncWorker.schedule(this@SettingsActivity)
+                                            com.haptilog.watch.sync.RawLocationSyncWorker.schedule(this@SettingsActivity)
+                                        }, label = { Text(stringResource(R.string.cloud_sync_deferred_title), maxLines = Int.MAX_VALUE) },
+                                        toggleControl = { Switch(checked = deferredSync) })
+                                }
                             }
                             item { FlexibleChip(enabled = !busy && !rawAccepted,
                                 label = { Text(stringResource(R.string.raw_location_title), maxLines = Int.MAX_VALUE) },

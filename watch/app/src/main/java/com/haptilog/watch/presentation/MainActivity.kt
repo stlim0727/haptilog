@@ -274,6 +274,10 @@ class MainActivity : ComponentActivity() {
         cloudSyncEnabled = RecordingSyncWorker.enabled(this)
         LocationTrackingService.ensureAlwaysSession(this)
         repository.refresh()
+        if (getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).getBoolean("deferred_sync", false)) {
+            RecordingSyncWorker.flushNow(this)
+            com.haptilog.watch.sync.RawLocationSyncWorker.flushNow(this)
+        }
     }
 
     override fun onUserLeaveHint() {

@@ -3,6 +3,7 @@
     <string name="location_scope_title">위치 기록</string>
     <string name="location_scope_off">끔</string>
     <string name="location_scope_recording">녹음할 때만</string>
+    <string name="location_scope_passive">절전 꼽사리 수집</string>
     <string name="location_scope_also">항상</string>
     <string name="location_scope_disclosure">녹음 밖에서는 직접 중지할 때까지 방문·체류를 기록하며 배터리를 사용합니다.</string>
     <string name="location_scope_microphone">마이크는 켜지지 않습니다. 클라우드 동기화는 별도 설정입니다.</string>

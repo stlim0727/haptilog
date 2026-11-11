@@ -69,6 +69,7 @@
     <string name="help_group">도움말 및 개인정보</string>
     <string name="about_group">앱 정보</string>
     <string name="cloud_sync_title">클라우드 동기화</string>
+    <string name="cloud_sync_deferred_title">절전/지연 동기화</string>
     <string name="web_access_title">웹에서 기록 보기</string>
     <string name="web_access_hint">브라우저 연결 및 관리</string>
     <string name="privacy_action">개인정보 처리방침</string>

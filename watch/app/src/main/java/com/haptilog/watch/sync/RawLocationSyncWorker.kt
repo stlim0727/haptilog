@@ -23,13 +23,22 @@ class RawLocationSyncWorker(context: Context, params: WorkerParameters) : Corout
         }
         fun schedule(context: Context) {
             if (RawLocationConsent.grant(context) == null || !CloudClient.configured) return
-            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
+            val deferred = context.getSharedPreferences("cloud_options", Context.MODE_PRIVATE).getBoolean("deferred_sync", false)
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true)
+            if (deferred) constraints.setRequiresCharging(true)
             val wm = WorkManager.getInstance(context)
-            wm.enqueueUniqueWork("raw-location-sync", ExistingWorkPolicy.KEEP,
+            wm.enqueueUniqueWork("raw-location-sync", ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<RawLocationSyncWorker>().setConstraints(constraints.build())
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
+            wm.enqueueUniquePeriodicWork("raw-location-safety", ExistingPeriodicWorkPolicy.UPDATE,
+                PeriodicWorkRequestBuilder<RawLocationSyncWorker>(15, TimeUnit.MINUTES).setConstraints(constraints.build()).build())
+        }
+        fun flushNow(context: Context) {
+            if (RawLocationConsent.grant(context) == null || !CloudClient.configured) return
+            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
+            WorkManager.getInstance(context).enqueueUniqueWork("raw-location-sync", ExistingWorkPolicy.REPLACE,
                 OneTimeWorkRequestBuilder<RawLocationSyncWorker>().setConstraints(constraints)
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
-            wm.enqueueUniquePeriodicWork("raw-location-safety", ExistingPeriodicWorkPolicy.KEEP,
-                PeriodicWorkRequestBuilder<RawLocationSyncWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build())
         }
 
         /** ACK only exact server IDs/outcomes. Lost responses leave identical sources pending. */

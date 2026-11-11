@@ -3,6 +3,7 @@
     <string name="location_scope_title">Location recording</string>
     <string name="location_scope_off">Off</string>
     <string name="location_scope_recording">Only when recording</string>
+    <string name="location_scope_passive">Passive / Eco</string>
     <string name="location_scope_also">Always</string>
     <string name="location_scope_disclosure">Outside recordings, saves visits and stays until you stop it. Uses battery.</string>
     <string name="location_scope_microphone">The microphone stays off. Cloud sync is a separate choice.</string>
