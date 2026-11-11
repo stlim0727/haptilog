@@ -24,8 +24,7 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
             RawLocationSyncWorker.schedule(context)
             val prefs = LocationConsent.preferences(context)
             if ((!LocationConsent.enabled(context) && !prefs.getBoolean("revoke_pending", false)) || !CloudClient.configured) return
-            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED)
-                .setRequiresBatteryNotLow(true).build()
+            val constraints = syncConstraints(context)
             val manager = WorkManager.getInstance(context)
             manager.enqueueUniqueWork("location-sync", ExistingWorkPolicy.KEEP,
                 OneTimeWorkRequestBuilder<LocationSyncWorker>().setConstraints(constraints)
@@ -33,6 +32,25 @@ class LocationSyncWorker(context: Context, params: WorkerParameters) : Coroutine
             manager.enqueueUniquePeriodicWork("location-sync-safety", ExistingPeriodicWorkPolicy.KEEP,
                 PeriodicWorkRequestBuilder<LocationSyncWorker>(15, TimeUnit.MINUTES)
                     .setConstraints(constraints).build())
+        }
+
+        /** Foreground trigger: a deferred flush ignores the charger requirement. */
+        fun flush(context: Context) {
+            if (!SyncPolicy.load(context).deferred) return
+            val prefs = LocationConsent.preferences(context)
+            if ((!LocationConsent.enabled(context) && !prefs.getBoolean("revoke_pending", false)) || !CloudClient.configured) return
+            WorkManager.getInstance(context).enqueueUniqueWork("location-sync", ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<LocationSyncWorker>().setConstraints(foregroundFlushConstraints())
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
+        }
+
+        /** Applies a just-changed upload policy to pending work instead of waiting for a trigger. */
+        fun applyPolicy(context: Context) {
+            val prefs = LocationConsent.preferences(context)
+            if ((!LocationConsent.enabled(context) && !prefs.getBoolean("revoke_pending", false)) || !CloudClient.configured) return
+            WorkManager.getInstance(context).enqueueUniqueWork("location-sync", ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<LocationSyncWorker>().setConstraints(syncConstraints(context))
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
         }
 
         /** Only downloaded, consented settings; active sessions defer application atomically. */

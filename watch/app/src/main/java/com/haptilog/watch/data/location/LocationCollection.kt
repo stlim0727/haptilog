@@ -7,9 +7,18 @@ import com.haptilog.watch.R
 enum class LocationCollection(val label: Int) {
     OFF(R.string.location_scope_off),
     RECORDING_ONLY(R.string.location_scope_recording),
+
+    /** Piggybacks on fixes other apps request; never wakes the GPS itself. */
+    PASSIVE(R.string.location_scope_passive),
     INCLUDING_NON_RECORDING(R.string.location_scope_also);
 
     val includesRecordings: Boolean get() = this != OFF
+
+    /** True when non-recording collection runs, whether passive or active GPS. */
+    val tracksOutsideRecordings: Boolean get() = this == PASSIVE || this == INCLUDING_NON_RECORDING
+
+    /** True when non-recording collection must not wake the GPS chipset. */
+    val passive: Boolean get() = this == PASSIVE
 
     companion object {
         fun load(context: Context): LocationCollection {

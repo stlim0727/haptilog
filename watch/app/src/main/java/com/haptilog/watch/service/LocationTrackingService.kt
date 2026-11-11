@@ -54,12 +54,12 @@ class LocationTrackingService : Service() {
         private val mutableStatus = MutableStateFlow<String?>(null)
         val status: StateFlow<String?> = mutableStatus
         /**
-         * The Always scope is a standing instruction, so a visible screen resumes collection
+         * The Always/Eco scopes are a standing instruction, so a visible screen resumes collection
          * after an interruption rather than asking for the same consent twice. startTracking
          * re-checks permission, device location and notifications and refuses any other scope.
          */
         fun ensureAlwaysSession(context: Context) {
-            if (LocationCollection.load(context) != LocationCollection.INCLUDING_NON_RECORDING ||
+            if (!LocationCollection.load(context).tracksOutsideRecordings ||
                 isTracking.value) return
             try {
                 // Plain startService, not startForegroundService: a refused start would never
@@ -94,6 +94,8 @@ class LocationTrackingService : Service() {
     private var started = false
     private var stopping = false
     private var receiverRegistered = false
+    // The passive/active priority of the live request, so a mode change can be re-requested.
+    private var activePassive: Boolean? = null
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -195,7 +197,7 @@ class LocationTrackingService : Service() {
         when (intent?.action) {
             ACTION_START -> startTracking()
             ACTION_STOP -> {
-                if (LocationCollection.load(this) == LocationCollection.INCLUDING_NON_RECORDING) {
+                if (LocationCollection.load(this).tracksOutsideRecordings) {
                     LocationCollection.save(this, LocationCollection.RECORDING_ONLY)
                 }
                 stopTracking()
@@ -207,8 +209,11 @@ class LocationTrackingService : Service() {
     }
 
     private fun startTracking() {
-        if (started || stopping) return
-        if (LocationCollection.load(this) != LocationCollection.INCLUDING_NON_RECORDING) {
+        if (stopping) return
+        // A repeated start while already running only re-evaluates the request priority, so a
+        // passive/active change in settings takes effect without tearing the session down.
+        if (started) { refreshRequest(); return }
+        if (!LocationCollection.load(this).tracksOutsideRecordings) {
             stopTracking()
             return
         }
@@ -253,6 +258,17 @@ class LocationTrackingService : Service() {
         }
     }
 
+    /** Re-requests location updates only when the passive/active priority actually changed. */
+    private fun refreshRequest() {
+        if (!LocationCollection.load(this).tracksOutsideRecordings) {
+            stopTracking()
+            return
+        }
+        if (activePassive == LocationCollection.load(this).passive) return
+        removeLocationUpdates()
+        requestLocationUpdates()
+    }
+
     @SuppressLint("MissingPermission")
     private fun fetchInitialLocation() {
         if (!hasPreciseLocationPermission()) return
@@ -270,10 +286,21 @@ class LocationTrackingService : Service() {
             stopTracking(getString(R.string.location_service_permission_required), LocationStayEndReason.PERMISSION_LOST)
             return
         }
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60_000L)
-            .setMinUpdateIntervalMillis(30_000L)
-            .setMaxUpdateAgeMillis(0L)
-            .build()
+        // Eco mode piggybacks on fixes other apps request and never wakes the GPS chipset.
+        // Active mode wakes the GPS itself on a one-minute target with a 30-second floor.
+        val passive = LocationCollection.load(this).passive
+        val request = if (passive) {
+            LocationRequest.Builder(Priority.PRIORITY_PASSIVE, 60_000L)
+                .setMinUpdateIntervalMillis(0L)
+                .setMaxUpdateAgeMillis(0L)
+                .build()
+        } else {
+            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60_000L)
+                .setMinUpdateIntervalMillis(30_000L)
+                .setMaxUpdateAgeMillis(0L)
+                .build()
+        }
+        activePassive = passive
         try {
             locationUpdates!!.request(request, locationCallback, registered = {
                     // Stop may race the asynchronous registration; remove it again when
@@ -302,6 +329,7 @@ class LocationTrackingService : Service() {
     private fun finishStop() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+        activePassive = null
         if (owner === this) {
             owner = null
             mutableIsTracking.value = false

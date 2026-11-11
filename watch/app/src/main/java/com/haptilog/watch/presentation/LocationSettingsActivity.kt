@@ -36,7 +36,7 @@ class LocationSettingsActivity : ComponentActivity() {
         val desired = pendingScope
         pendingScope = null
         if (desired != null) {
-            if (hasLocation() && (desired != LocationCollection.INCLUDING_NON_RECORDING || hasNotifications())) {
+            if (hasLocation() && (!desired.tracksOutsideRecordings || hasNotifications())) {
                 applyScope(desired)
             } else notice = getString(R.string.location_permission_needed)
         }
@@ -63,8 +63,10 @@ class LocationSettingsActivity : ComponentActivity() {
                                 Text((if (selection == option) "✓ " else "") + stringResource(option.label))
                             })
                         } }
-                        if (selection == LocationCollection.INCLUDING_NON_RECORDING) {
+                        if (selection.tracksOutsideRecordings) {
                             item { Text(stringResource(if (active) R.string.location_running else R.string.location_scope_interrupted), textAlign = TextAlign.Center) }
+                            item { Text(stringResource(if (selection.passive) R.string.location_scope_passive_note else R.string.location_scope_active_note),
+                                fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = 12.dp)) }
                         }
                         listOf(R.string.location_scope_disclosure, R.string.location_scope_microphone,
                             R.string.location_scope_lifecycle).forEach { text -> item {
@@ -101,13 +103,13 @@ class LocationSettingsActivity : ComponentActivity() {
     private fun choose(scope: LocationCollection) {
         notice = null
         if (scope == LocationCollection.OFF ||
-            (scope == LocationCollection.RECORDING_ONLY && selection == LocationCollection.INCLUDING_NON_RECORDING) || (hasLocation() &&
-                (scope != LocationCollection.INCLUDING_NON_RECORDING || hasNotifications()))) {
+            (scope == LocationCollection.RECORDING_ONLY && selection.tracksOutsideRecordings) || (hasLocation() &&
+                (!scope.tracksOutsideRecordings || hasNotifications()))) {
             applyScope(scope)
         } else {
             pendingScope = scope
             val requested = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-            if (scope == LocationCollection.INCLUDING_NON_RECORDING && Build.VERSION.SDK_INT >= 33) {
+            if (scope.tracksOutsideRecordings && Build.VERSION.SDK_INT >= 33) {
                 requested += Manifest.permission.POST_NOTIFICATIONS
             }
             permissions.launch(requested.toTypedArray())
@@ -118,8 +120,14 @@ class LocationSettingsActivity : ComponentActivity() {
         try {
             LocationCollection.save(this, scope)
             selection = scope
-            if (scope == LocationCollection.INCLUDING_NON_RECORDING) {
-                LocationTrackingService.ensureAlwaysSession(this)
+            if (scope.tracksOutsideRecordings) {
+                if (LocationTrackingService.isTracking.value) {
+                    // A repeated start re-evaluates the request, applying a passive/active change.
+                    startService(Intent(this, LocationTrackingService::class.java)
+                        .setAction(LocationTrackingService.ACTION_START))
+                } else {
+                    LocationTrackingService.ensureAlwaysSession(this)
+                }
             } else if (LocationTrackingService.isTracking.value) {
                 startService(Intent(this, LocationTrackingService::class.java).setAction(LocationTrackingService.ACTION_STOP))
             }

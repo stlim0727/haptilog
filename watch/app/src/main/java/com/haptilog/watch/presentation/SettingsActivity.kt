@@ -41,7 +41,10 @@ import com.haptilog.watch.support.AppReports
 import com.haptilog.watch.support.ReportUploadWorker
 import com.haptilog.watch.sync.CloudConsent
 import com.haptilog.watch.sync.CloudClient
+import com.haptilog.watch.sync.LocationSyncWorker
+import com.haptilog.watch.sync.RawLocationSyncWorker
 import com.haptilog.watch.sync.RecordingSyncWorker
+import com.haptilog.watch.sync.SyncPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +60,7 @@ class SettingsActivity : ComponentActivity() {
                 val focus = remember { FocusRequester() }
                 var collectionScope by remember { mutableStateOf(com.haptilog.watch.data.location.LocationCollection.load(this)) }
                 var cloud by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
+                var syncPolicy by remember { mutableStateOf(SyncPolicy.load(this)) }
                 var crashes by remember { mutableStateOf(AppReports.crashReportsEnabled(this)) }
                 var hapticIntensity by remember { mutableStateOf(HapticPreferences.getIntensity(this)) }
                 val hapticManager = remember { HapticHeartbeatManager(this) }
@@ -73,6 +77,7 @@ class SettingsActivity : ComponentActivity() {
                         if (event == Lifecycle.Event.ON_RESUME) {
                             queued = AppReports.pending(this@SettingsActivity)
                             cloud = RecordingSyncWorker.enabled(this@SettingsActivity)
+                            syncPolicy = SyncPolicy.load(this@SettingsActivity)
                             rawAccepted = com.haptilog.watch.sync.RawLocationConsent.grant(this@SettingsActivity) != null
                             collectionScope = com.haptilog.watch.data.location.LocationCollection.load(this@SettingsActivity)
                         }
@@ -195,6 +200,30 @@ class SettingsActivity : ComponentActivity() {
                                         uncheckedEndBackgroundColor = WatchColors.Surface),
                                     toggleControl = { Switch(checked = cloud) })
                             }
+                            if (cloud) item {
+                                ToggleChip(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp),
+                                    checked = syncPolicy.deferred, enabled = !busy,
+                                    onCheckedChange = { deferred ->
+                                        val next = if (deferred) SyncPolicy.DEFERRED else SyncPolicy.IMMEDIATE
+                                        SyncPolicy.save(this@SettingsActivity, next)
+                                        syncPolicy = next
+                                        // Re-apply the new timing to already queued work instead of
+                                        // waiting for the next coalescing trigger.
+                                        RecordingSyncWorker.applyPolicy(this@SettingsActivity)
+                                        RawLocationSyncWorker.applyPolicy(this@SettingsActivity)
+                                        LocationSyncWorker.applyPolicy(this@SettingsActivity)
+                                    }, label = { Text(stringResource(R.string.sync_mode_title), maxLines = Int.MAX_VALUE) },
+                                    secondaryLabel = { Text(stringResource(syncPolicy.label), maxLines = Int.MAX_VALUE) },
+                                    colors = ToggleChipDefaults.toggleChipColors(
+                                        checkedStartBackgroundColor = Color(0xFF142A38),
+                                        checkedEndBackgroundColor = Color(0xFF142A38),
+                                        checkedContentColor = WatchColors.Text,
+                                        uncheckedStartBackgroundColor = WatchColors.Surface,
+                                        uncheckedEndBackgroundColor = WatchColors.Surface),
+                                    toggleControl = { Switch(checked = syncPolicy.deferred) })
+                            }
+                            if (cloud) item { Text(stringResource(R.string.sync_mode_hint), fontSize = 12.sp,
+                                color = WatchColors.Muted, modifier = Modifier.fillMaxWidth()) }
                             item { FlexibleChip(enabled = !busy && !rawAccepted,
                                 label = { Text(stringResource(R.string.raw_location_title), maxLines = Int.MAX_VALUE) },
                                 secondaryLabel = {

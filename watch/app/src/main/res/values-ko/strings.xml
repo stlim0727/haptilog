@@ -69,6 +69,10 @@
     <string name="help_group">도움말 및 개인정보</string>
     <string name="about_group">앱 정보</string>
     <string name="cloud_sync_title">클라우드 동기화</string>
+    <string name="sync_mode_title">전송 시점</string>
+    <string name="sync_policy_immediate">즉시</string>
+    <string name="sync_policy_deferred">절전 · 지연 전송</string>
+    <string name="sync_mode_hint">지연 모드는 충전 중이거나 앱을 열 때 한꺼번에 전송합니다.</string>
     <string name="web_access_title">웹에서 기록 보기</string>
     <string name="web_access_hint">브라우저 연결 및 관리</string>
     <string name="privacy_action">개인정보 처리방침</string>

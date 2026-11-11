@@ -63,7 +63,7 @@ class LocationTrackingServiceTest {
         shadowOf(application.getSystemService(NotificationManager::class.java)).setNotificationsEnabled(true)
     }
 
-    @Test fun collectionScopeAndCloudChoiceHaveSixIndependentCombinations() {
+    @Test fun collectionScopeAndCloudChoiceAreIndependent() {
         shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
         for (scope in LocationCollection.entries) for (cloud in listOf(false, true)) {
             application.getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).edit()
@@ -73,7 +73,7 @@ class LocationTrackingServiceTest {
             val controller = controller()
             val service = controller.get()
             service.onStartCommand(startIntent(), 0, 1)
-            if (scope == LocationCollection.INCLUDING_NON_RECORDING) {
+            if (scope.tracksOutsideRecordings) {
                 await { updates.requests == 1 }
                 assertTrue(LocationTrackingService.isTracking.value)
                 service.onStartCommand(Intent(application, LocationTrackingService::class.java)
@@ -86,6 +86,40 @@ class LocationTrackingServiceTest {
             assertEquals(cloud, com.haptilog.watch.sync.RecordingSyncWorker.enabled(application))
             controller.destroy()
         }
+    }
+
+    @Test fun passiveScopeRequestsPiggybackedFixesWithoutWakingTheGps() {
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        LocationCollection.save(application, LocationCollection.PASSIVE)
+        val controller = controller()
+        controller.get().onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        assertEquals(com.google.android.gms.location.Priority.PRIORITY_PASSIVE, updates.request!!.priority)
+        assertEquals(0L, updates.request!!.minUpdateIntervalMillis)
+        controller.get().onStartCommand(Intent(application, LocationTrackingService::class.java)
+            .setAction(LocationTrackingService.ACTION_STOP), 0, 2)
+        await { !LocationTrackingService.isTracking.value }
+        controller.destroy()
+    }
+
+    @Test fun switchingBetweenPassiveAndActiveReRequestsOnlyOnPriorityChange() {
+        shadowOf(application).grantPermissions(Manifest.permission.ACCESS_FINE_LOCATION)
+        LocationCollection.save(application, LocationCollection.PASSIVE)
+        val controller = controller()
+        val service = controller.get()
+        service.onStartCommand(startIntent(), 0, 1)
+        await { updates.requests == 1 }
+        // Same priority: a repeated start only re-evaluates and reuses the live request.
+        service.onStartCommand(startIntent(), 0, 2)
+        assertEquals(1, updates.requests)
+        LocationCollection.save(application, LocationCollection.INCLUDING_NON_RECORDING)
+        service.onStartCommand(startIntent(), 0, 3)
+        await { updates.requests == 2 }
+        assertEquals(com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY, updates.request!!.priority)
+        service.onStartCommand(Intent(application, LocationTrackingService::class.java)
+            .setAction(LocationTrackingService.ACTION_STOP), 0, 4)
+        await { !LocationTrackingService.isTracking.value }
+        controller.destroy()
     }
 
     @Test fun alwaysScopeResumesCollectionWhenAScreenOpens() {

@@ -22,4 +22,18 @@ class LocationCollectionTest {
         LocationCollection.save(context, LocationCollection.INCLUDING_NON_RECORDING)
         assertTrue(LocationCollection.load(context).includesRecordings)
     }
+
+    @Test fun passiveScopeTracksOutsideRecordingsWithoutWakingTheGps() {
+        val context = RuntimeEnvironment.getApplication()
+        LocationCollection.save(context, LocationCollection.PASSIVE)
+        val loaded = LocationCollection.load(context)
+        assertEquals(LocationCollection.PASSIVE, loaded)
+        assertTrue(loaded.includesRecordings)
+        assertTrue(loaded.tracksOutsideRecordings)
+        assertTrue(loaded.passive)
+        assertFalse(LocationCollection.INCLUDING_NON_RECORDING.passive)
+        assertTrue(LocationCollection.INCLUDING_NON_RECORDING.tracksOutsideRecordings)
+        assertFalse(LocationCollection.RECORDING_ONLY.tracksOutsideRecordings)
+        assertFalse(LocationCollection.RECORDING_ONLY.passive)
+    }
 }

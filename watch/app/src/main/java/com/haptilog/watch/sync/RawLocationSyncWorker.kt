@@ -23,13 +23,30 @@ class RawLocationSyncWorker(context: Context, params: WorkerParameters) : Corout
         }
         fun schedule(context: Context) {
             if (RawLocationConsent.grant(context) == null || !CloudClient.configured) return
-            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
+            val constraints = syncConstraints(context)
             val wm = WorkManager.getInstance(context)
             wm.enqueueUniqueWork("raw-location-sync", ExistingWorkPolicy.KEEP,
                 OneTimeWorkRequestBuilder<RawLocationSyncWorker>().setConstraints(constraints)
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
             wm.enqueueUniquePeriodicWork("raw-location-safety", ExistingPeriodicWorkPolicy.KEEP,
                 PeriodicWorkRequestBuilder<RawLocationSyncWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build())
+        }
+
+        /** Foreground trigger: a deferred flush ignores the charger requirement. */
+        fun flush(context: Context) {
+            if (!SyncPolicy.load(context).deferred) return
+            if (RawLocationConsent.grant(context) == null || !CloudClient.configured) return
+            WorkManager.getInstance(context).enqueueUniqueWork("raw-location-sync", ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<RawLocationSyncWorker>().setConstraints(foregroundFlushConstraints())
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
+        }
+
+        /** Applies a just-changed upload policy to pending work instead of waiting for a trigger. */
+        fun applyPolicy(context: Context) {
+            if (RawLocationConsent.grant(context) == null || !CloudClient.configured) return
+            WorkManager.getInstance(context).enqueueUniqueWork("raw-location-sync", ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<RawLocationSyncWorker>().setConstraints(syncConstraints(context))
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
         }
 
         /** ACK only exact server IDs/outcomes. Lost responses leave identical sources pending. */

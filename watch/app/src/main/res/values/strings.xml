@@ -69,6 +69,10 @@
     <string name="help_group">Help &amp; privacy</string>
     <string name="about_group">About</string>
     <string name="cloud_sync_title">Cloud sync</string>
+    <string name="sync_mode_title">Sync timing</string>
+    <string name="sync_policy_immediate">Immediate</string>
+    <string name="sync_policy_deferred">Battery saver · deferred</string>
+    <string name="sync_mode_hint">Deferred uploads on the charger or when you open the app.</string>
     <string name="web_access_title">Review on the web</string>
     <string name="web_access_hint">Connect and manage browsers</string>
     <string name="privacy_action">Privacy policy</string>

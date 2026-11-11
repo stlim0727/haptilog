@@ -9,6 +9,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.haptilog.watch.data.RecordingExport
 import com.haptilog.watch.sync.RecordingSyncWorker
+import com.haptilog.watch.sync.RawLocationSyncWorker
+import com.haptilog.watch.sync.LocationSyncWorker
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -272,6 +274,10 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         entryState.resumed()
         cloudSyncEnabled = RecordingSyncWorker.enabled(this)
+        // Opening the app is a coalescing trigger: deferred outbox sends flush without the charger.
+        RecordingSyncWorker.flush(this)
+        RawLocationSyncWorker.flush(this)
+        LocationSyncWorker.flush(this)
         LocationTrackingService.ensureAlwaysSession(this)
         repository.refresh()
     }

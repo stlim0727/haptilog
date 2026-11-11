@@ -41,13 +41,33 @@ class RecordingSyncWorker(context: Context, params: WorkerParameters) : Coroutin
         }
         fun schedule(context: Context) {
             if (!enabled(context) || !CloudClient.configured) return
-            val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).setRequiresBatteryNotLow(true).build()
+            val constraints = syncConstraints(context)
             val manager = WorkManager.getInstance(context)
             manager.enqueueUniqueWork("recording-sync", ExistingWorkPolicy.KEEP,
                 OneTimeWorkRequestBuilder<RecordingSyncWorker>().setConstraints(constraints)
                     .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
             manager.enqueueUniquePeriodicWork("recording-sync-safety", ExistingPeriodicWorkPolicy.KEEP,
                 PeriodicWorkRequestBuilder<RecordingSyncWorker>(15, TimeUnit.MINUTES).setConstraints(constraints).build())
+        }
+
+        /**
+         * A foreground launch is itself a coalescing trigger, so a deferred flush runs even when
+         * the watch is not charging. It replaces the charging-constrained pending work.
+         */
+        fun flush(context: Context) {
+            if (!SyncPolicy.load(context).deferred) return
+            if (!enabled(context) || !CloudClient.configured) return
+            WorkManager.getInstance(context).enqueueUniqueWork("recording-sync", ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<RecordingSyncWorker>().setConstraints(foregroundFlushConstraints())
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
+        }
+
+        /** Applies a just-changed upload policy to pending work instead of waiting for a trigger. */
+        fun applyPolicy(context: Context) {
+            if (!enabled(context) || !CloudClient.configured) return
+            WorkManager.getInstance(context).enqueueUniqueWork("recording-sync", ExistingWorkPolicy.REPLACE,
+                OneTimeWorkRequestBuilder<RecordingSyncWorker>().setConstraints(syncConstraints(context))
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build())
         }
     }
     override suspend fun doWork(): Result = syncMutex.withLock { withContext(Dispatchers.IO) {
