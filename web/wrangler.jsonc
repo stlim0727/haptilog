@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "haptilog-web-preview",
+  "name": "haptilog",
   "compatibility_date": "2026-10-16",
   "preview_urls": true,
   "previews": {},
