@@ -270,10 +270,17 @@ class LocationTrackingService : Service() {
             stopTracking(getString(R.string.location_service_permission_required), LocationStayEndReason.PERMISSION_LOST)
             return
         }
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60_000L)
-            .setMinUpdateIntervalMillis(30_000L)
-            .setMaxUpdateAgeMillis(0L)
-            .build()
+        val mode = LocationCollection.load(this)
+        val request = if (mode == LocationCollection.PASSIVE) {
+            LocationRequest.Builder(Priority.PRIORITY_PASSIVE, 60_000L)
+                .setMaxUpdateAgeMillis(0L)
+                .build()
+        } else {
+            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 60_000L)
+                .setMinUpdateIntervalMillis(30_000L)
+                .setMaxUpdateAgeMillis(0L)
+                .build()
+        }
         try {
             locationUpdates!!.request(request, locationCallback, registered = {
                     // Stop may race the asynchronous registration; remove it again when

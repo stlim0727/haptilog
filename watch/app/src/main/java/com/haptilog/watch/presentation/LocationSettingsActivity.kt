@@ -101,7 +101,7 @@ class LocationSettingsActivity : ComponentActivity() {
     private fun choose(scope: LocationCollection) {
         notice = null
         if (scope == LocationCollection.OFF ||
-            (scope == LocationCollection.RECORDING_ONLY && selection == LocationCollection.INCLUDING_NON_RECORDING) || (hasLocation() &&
+            ((scope == LocationCollection.RECORDING_ONLY || scope == LocationCollection.PASSIVE) && selection == LocationCollection.INCLUDING_NON_RECORDING) || (hasLocation() &&
                 (scope != LocationCollection.INCLUDING_NON_RECORDING || hasNotifications()))) {
             applyScope(scope)
         } else {
