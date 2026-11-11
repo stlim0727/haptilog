@@ -6,13 +6,20 @@ const { publicEnv, cloudflareEnv } = splitDeploymentEnv(process.env);
 for (const name of Object.keys(cloudflareEnv)) delete process.env[name];
 const { checkBackend, publicConfig } = await import("./backend-readiness.mjs");
 const config = publicConfig();
-const checks = await checkBackend(config);
-for (const check of checks)
-  console.log(
-    `${check.ready ? "READY" : "BLOCKED"}: ${check.name}${check.ready ? "" : `. ${check.remedy}`}`,
-  );
-if (checks.some((check) => !check.ready)) process.exit(1);
+if (process.argv.includes("--build-only")) {
+  // CI/Cloudflare Workers builds have no guarantee of reaching Supabase or a generous timeout.
+  // Build must verify the bundle, not production reachability; `npm run check:backend` covers that.
+  console.log("SKIPPED: backend readiness checks (build-only mode)");
+} else {
+  const checks = await checkBackend(config);
+  for (const check of checks)
+    console.log(
+      `${check.ready ? "READY" : "BLOCKED"}: ${check.name}${check.ready ? "" : `. ${check.remedy}`}`,
+    );
+  if (checks.some((check) => !check.ready)) process.exit(1);
+}
 const isProduction = process.argv.includes("--production");
+
 const buildEnv = {
   ...publicEnv,
   VITE_SUPABASE_URL: config.url,

@@ -5,7 +5,7 @@
   "preview_urls": true,
   "previews": {},
   "build": {
-    "command": "npm --prefix web ci --ignore-scripts && npm --prefix web run prepare:deploy"
+    "command": "npm --prefix web ci --ignore-scripts --omit=dev && npm --prefix web run prepare:deploy"
   },
   "assets": {
     "directory": "./web/dist",
