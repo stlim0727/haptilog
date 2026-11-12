@@ -1,0 +1,106 @@
+{
+  "generatedAt": "2026-11-12T09:37:11.811Z",
+  "branch": "main",
+  "commit": "288ebe13ec302fc9a6c5553daa1e5b0a174605d6",
+  "commitShort": "288ebe1",
+  "commitDate": "2026-11-12T18:35:37+09:00",
+  "surface": "web-portal",
+  "viewport": "desktop",
+  "dimensions": "1440x900",
+  "screens": [
+    {
+      "id": "01_pairing_login",
+      "category": "auth",
+      "file": "01_pairing_login.png",
+      "title_ko": "로그인 — 워치 연결 코드 입력",
+      "title_en": "Sign-in — Watch Access Code",
+      "description_ko": "구글 로그인 또는 6자리 워치 액세스 코드로 브라우저 연결, 미리보기용 샘플 데이터 로그인 카드",
+      "description_en": "Browser pairing via Google sign-in or 6-digit watch access code, plus the preview sample-data login card",
+      "selector": ".pair-card",
+      "tier": "core"
+    },
+    {
+      "id": "02_workspace_list_detail",
+      "category": "workspace",
+      "file": "02_workspace_list_detail.png",
+      "title_ko": "데스크톱 작업대 — 타임라인 저널과 상세 인스펙터",
+      "title_en": "Desktop Workspace — Journal Timeline & Inspector",
+      "description_ko": "지출 요약·녹음 메트릭·카테고리 탭과 선택한 녹음의 전사·GPS·AI 분류 상세 인스펙터",
+      "description_en": "Spending metrics, category tabs, and the detail inspector of the selected recording with transcript, GPS context, and AI classification",
+      "selector": ".workspace",
+      "scrollTo": ".review-layout",
+      "tier": "core"
+    },
+    {
+      "id": "03_timeline_map",
+      "category": "workspace",
+      "file": "03_timeline_map.png",
+      "title_ko": "타임라인 저널과 지도 패널",
+      "title_en": "Journal Timeline with Map Panel",
+      "description_ko": "체류 리본과 음성 이벤트가 있는 타임라인 저널, OpenStreetMap 위에 녹음 핀과 경로",
+      "description_en": "Journal timeline with stay ribbons and voice events, plus recording pins and routes on OpenStreetMap",
+      "selector": ".map-section",
+      "scrollTo": ".map-section",
+      "tier": "core"
+    },
+    {
+      "id": "04_account_panel",
+      "category": "auth",
+      "file": "04_account_panel.png",
+      "title_ko": "계정 및 워치 드롭다운 패널",
+      "title_en": "Account & Watches Dropdown Panel",
+      "description_ko": "연결된 워치 목록, 브라우저 해제, 구글 계정 연결/복구 컨트롤",
+      "description_en": "Paired watch list, disconnect, and Google account link/recovery controls",
+      "selector": ".account-dropdown-panel",
+      "tier": "core"
+    },
+    {
+      "id": "05_calendar_view",
+      "category": "workspace",
+      "file": "05_calendar_view.png",
+      "title_ko": "월간 캘린더 — 카테고리 도트 브라우징",
+      "title_en": "Monthly Calendar — Category Dot Browsing",
+      "description_ko": "일별 활동 요약과 카테고리 색상 도트가 있는 달력 뷰, 날짜 선택 시 목록 필터",
+      "description_en": "Calendar grid with per-day activity and category color dots; selecting a day filters the feed",
+      "selector": ".workspace",
+      "scrollTo": ".calendar-view-container",
+      "tier": "full"
+    },
+    {
+      "id": "06_trash_view",
+      "category": "workspace",
+      "file": "06_trash_view.png",
+      "title_ko": "휴지통 — 삭제된 녹음 복원/완전 삭제",
+      "title_en": "Trash — Restore & Purge Deleted Recordings",
+      "description_ko": "휴지통 탭의 삭제된 녹음 목록, 복원 버튼과 휴지통 비우기",
+      "description_en": "Trashed recordings list with restore actions and empty-trash control",
+      "selector": ".feed",
+      "scrollTo": ".feed",
+      "tier": "full"
+    },
+    {
+      "id": "07_category_search",
+      "category": "workspace",
+      "file": "07_category_search.png",
+      "title_ko": "카테고리 필터와 전사 검색",
+      "title_en": "Category Filter & Transcript Search",
+      "description_ko": "지출 카테고리와 검색어로 녹음 목록을 좁히는 작업대 필터",
+      "description_en": "Workbench narrowing by expense category and transcript keyword search",
+      "selector": ".global-filters-bar",
+      "scrollTo": ".review-layout",
+      "tier": "full"
+    },
+    {
+      "id": "08_workspace_ko",
+      "category": "workspace",
+      "file": "08_workspace_ko.png",
+      "title_ko": "작업대 — 한국어 UI",
+      "title_en": "Workspace — Korean UI",
+      "description_ko": "한국어 전체 로케일: 지출 메트릭, 필터, 상세 인스펙터",
+      "description_en": "Full Korean locale: spending metrics, filters, and the detail inspector",
+      "selector": ".workspace",
+      "scrollTo": ".review-layout",
+      "tier": "full"
+    }
+  ]
+}
