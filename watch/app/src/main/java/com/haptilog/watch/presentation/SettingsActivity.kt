@@ -1,290 +1,301 @@
 package com.haptilog.watch.presentation
 
-import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
-import androidx.compose.ui.res.stringArrayResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
-import com.haptilog.watch.R
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.material.*
+import androidx.wear.compose.material3.*
 import com.haptilog.watch.BuildConfig
-import com.haptilog.watch.data.HapticIntensity
+import com.haptilog.watch.R
 import com.haptilog.watch.data.HapticPreferences
+import com.haptilog.watch.data.location.LocationCollection
 import com.haptilog.watch.service.HapticHeartbeatManager
-import com.haptilog.watch.support.AppReports
-import com.haptilog.watch.support.ReportUploadWorker
-import com.haptilog.watch.sync.CloudConsent
 import com.haptilog.watch.sync.CloudClient
+import com.haptilog.watch.sync.CloudConsent
 import com.haptilog.watch.sync.RecordingSyncWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Version and support remain available offline, independently of recording count. */
+/** Clean, glanceable Wear OS settings hub. */
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            LegacyHaptiLogTheme {
-                val scope = rememberCoroutineScope()
-                val list = rememberScalingLazyListState(initialCenterItemIndex = 0)
-                val focus = remember { FocusRequester() }
-                var collectionScope by remember { mutableStateOf(com.haptilog.watch.data.location.LocationCollection.load(this)) }
-                var cloud by remember { mutableStateOf(RecordingSyncWorker.enabled(this)) }
-                var deferredSync by remember { mutableStateOf(getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).getBoolean("deferred_sync", false)) }
-                var crashes by remember { mutableStateOf(AppReports.crashReportsEnabled(this)) }
-                var hapticIntensity by remember { mutableStateOf(HapticPreferences.getIntensity(this)) }
-                val hapticManager = remember { HapticHeartbeatManager(this) }
-                var rawConsenting by rememberSaveable { mutableStateOf(false) }
-                var rawAccepted by remember { mutableStateOf(com.haptilog.watch.sync.RawLocationConsent.grant(this) != null) }
-                var consenting by rememberSaveable { mutableStateOf(false) }
-                var reporting by rememberSaveable { mutableStateOf(false) }
-                var description by rememberSaveable { mutableStateOf("") }
-                var busy by remember { mutableStateOf(false) }
-                var notice by remember { mutableStateOf<String?>(null) }
-                var queued by remember { mutableStateOf(AppReports.pending(this)) }
-                DisposableEffect(Unit) {
-                    val observer = LifecycleEventObserver { _, event ->
-                        if (event == Lifecycle.Event.ON_RESUME) {
-                            queued = AppReports.pending(this@SettingsActivity)
-                            cloud = RecordingSyncWorker.enabled(this@SettingsActivity)
-                            rawAccepted = com.haptilog.watch.sync.RawLocationConsent.grant(this@SettingsActivity) != null
-                            collectionScope = com.haptilog.watch.data.location.LocationCollection.load(this@SettingsActivity)
-                        }
-                    }
-                    lifecycle.addObserver(observer)
-                    onDispose { lifecycle.removeObserver(observer) }
-                }
-                BackHandler(enabled = (reporting || consenting || rawConsenting) && !busy) { reporting = false; consenting = false; rawConsenting = false; notice = null }
-                LaunchedEffect(reporting, consenting, rawConsenting) { list.scrollToItem(0); focus.requestFocus() }
-                val rawDisclosure = stringArrayResource(R.array.raw_location_disclosure_steps)
-                Scaffold(positionIndicator = { PositionIndicator(scalingLazyListState = list) }) {
-                    ScalingLazyColumn(
-                        state = list,
-                        autoCentering = null,
-                        contentPadding = PaddingValues(top = 36.dp, bottom = 56.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxSize().background(Color.Black).padding(horizontal = 18.dp)
-                            .focusRequester(focus).focusable().onRotaryScrollEvent { event ->
-                                scope.launch { list.scrollBy(event.verticalScrollPixels) }; true
-                            }
-                    ) {
-                        item { Text(stringResource(when { rawConsenting -> R.string.raw_location_title; consenting -> R.string.cloud_consent_title; reporting -> R.string.report_action; else -> R.string.settings_title }), fontSize = 18.sp, textAlign = TextAlign.Center) }
-                        notice?.let { message -> item { Text(message, fontSize = 12.sp, textAlign = TextAlign.Center) } }
-                        if (rawConsenting) {
-                            if (!cloud) item { Text(stringResource(R.string.raw_location_requires_cloud), fontSize = 12.sp, textAlign = TextAlign.Center) }
-                            rawDisclosure.forEach { paragraph -> item { Text(paragraph, fontSize = 12.sp, textAlign = TextAlign.Center) } }
-                            item { FlexibleChip(enabled = !busy && cloud, label = { Text(stringResource(R.string.raw_location_agree), maxLines = Int.MAX_VALUE) }, onClick = {
-                                busy = true
-                                scope.launch {
-                                    try {
-                                        withContext(Dispatchers.IO) { com.haptilog.watch.sync.RawLocationConsent.enable(this@SettingsActivity) }
-                                        rawAccepted = true; rawConsenting = false
-                                    } catch (_: Exception) { notice = getString(R.string.raw_location_unavailable) }
-                                    finally { busy = false }
-                                }
-                            }) }
-                            item { FlexibleChip(enabled = !busy, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.cancel_action)) }, onClick = { rawConsenting = false }) }
-                        } else if (consenting) {
+            HaptiLogTheme {
+                AppScaffold {
+                    val scope = rememberCoroutineScope()
+                    val list = rememberScalingLazyListState(initialCenterItemIndex = 0)
+                    val focus = remember { FocusRequester() }
 
-                            item { Text(stringResource(R.string.unified_cloud_disclosure), fontSize = 12.sp, textAlign = TextAlign.Center) }
-                            item { Text(stringResource(R.string.unified_cloud_withdrawal), fontSize = 12.sp, textAlign = TextAlign.Center) }
-                            item { Text("Privacy: haptilog.keepory.app/privacy.html", fontSize = 12.sp, textAlign = TextAlign.Center) }
-                            item { FlexibleChip(enabled = !busy, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(if (busy) R.string.connecting_notice else R.string.agree_cloud)) }, onClick = {
-                                busy = true
-                                scope.launch {
-                                    try {
-                                        withContext(Dispatchers.IO) { CloudConsent.enable(this@SettingsActivity) }
-                                        cloud = true
-                                        consenting = false
-                                        notice = getString(R.string.unified_cloud_enabled)
-                                    } catch (_: Exception) { notice = "Could not enable cloud. Check your connection and retry." }
-                                    finally { busy = false }
+                    var collectionScope by remember { mutableStateOf(LocationCollection.load(this@SettingsActivity)) }
+                    var cloud by remember { mutableStateOf(RecordingSyncWorker.enabled(this@SettingsActivity)) }
+                    var deferredSync by remember {
+                        mutableStateOf(getSharedPreferences("cloud_options", MODE_PRIVATE).getBoolean("deferred_sync", false))
+                    }
+                    var hapticIntensity by remember { mutableStateOf(HapticPreferences.getIntensity(this@SettingsActivity)) }
+                    val hapticManager = remember { HapticHeartbeatManager(this@SettingsActivity) }
+
+                    var consenting by rememberSaveable { mutableStateOf(false) }
+                    var busy by remember { mutableStateOf(false) }
+                    var notice by remember { mutableStateOf<String?>(null) }
+
+                    DisposableEffect(Unit) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            if (event == Lifecycle.Event.ON_RESUME) {
+                                cloud = RecordingSyncWorker.enabled(this@SettingsActivity)
+                                collectionScope = LocationCollection.load(this@SettingsActivity)
+                                deferredSync = getSharedPreferences("cloud_options", MODE_PRIVATE).getBoolean("deferred_sync", false)
+                                hapticIntensity = HapticPreferences.getIntensity(this@SettingsActivity)
+                            }
+                        }
+                        lifecycle.addObserver(observer)
+                        onDispose { lifecycle.removeObserver(observer) }
+                    }
+
+                    BackHandler(enabled = consenting && !busy) {
+                        consenting = false
+                        notice = null
+                    }
+                    LaunchedEffect(consenting) {
+                        list.scrollToItem(0)
+                        focus.requestFocus()
+                    }
+
+                    ScreenScaffold(scrollState = list) {
+                        ScalingLazyColumn(
+                            state = list,
+                            autoCentering = null,
+                            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 36.dp, bottom = 48.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .focusRequester(focus)
+                                .focusable()
+                                .onRotaryScrollEvent { event ->
+                                    scope.launch { list.scrollBy(event.verticalScrollPixels) }
+                                    true
                                 }
-                            }) }
-                            item { FlexibleChip(enabled = !busy, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.decline_cloud)) }, onClick = { consenting = false }) }
-                        } else if (reporting) {
-                            item { Text("Tap to describe the problem.", fontSize = 12.sp, textAlign = TextAlign.Center) }
+                        ) {
                             item {
-                                BasicTextField(
-                                    value = description,
-                                    onValueChange = { description = it.take(1000) },
-                                    enabled = !busy,
-                                    textStyle = TextStyle(color = Color.White, fontSize = 14.sp),
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)
-                                        .background(Color(0xFF242428)).padding(12.dp),
-                                    decorationBox = { field ->
-                                        if (description.isEmpty()) Text(stringResource(R.string.describe_issue), fontSize = 14.sp, color = Color.LightGray)
-                                        field()
-                                    }
+                                Text(
+                                    stringResource(if (consenting) R.string.cloud_consent_title else R.string.settings_title),
+                                    fontSize = 16.sp,
+                                    textAlign = TextAlign.Center
                                 )
                             }
-                            item { Text("Includes app build, watch model and Android version. No recordings or location. Avoid private details.", fontSize = 12.sp, textAlign = TextAlign.Center) }
-                            item {
-                                FlexibleChip(enabled = !busy && description.isNotBlank() && CloudClient.configured,
-                                    label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(if (busy) R.string.saving_notice else R.string.send_report_action)) },
-                                    onClick = {
-                                        busy = true
-                                        scope.launch {
-                                            try {
-                                                val id = withContext(Dispatchers.IO) { AppReports.save(this@SettingsActivity, "issue", description.trim())!! }
-                                                ReportUploadWorker.schedule(this@SettingsActivity)
-                                                description = ""
-                                                notice = "Saved on watch · ${id.take(8)}. Waiting to send."
-                                                reporting = false
-                                                queued = AppReports.pending(this@SettingsActivity)
-                                            } catch (_: Exception) {
-                                                notice = if (AppReports.pending(this@SettingsActivity) >= 10)
-                                                    "Report queue full. Go back and retry queued reports when online. Your draft is kept."
-                                                else "Could not save report. Your draft is kept. Try again."
-                                            }
-                                            finally { busy = false }
-                                        }
-                                    })
-                            }
-                            item { FlexibleChip(enabled = !busy, onClick = { reporting = false; notice = null }, label = { Text(maxLines = Int.MAX_VALUE, text = stringResource(R.string.cancel_action)) }) }
-                        } else {
-                            item { SettingsSection(stringResource(R.string.location_scope_group)) }
-                            item { FlexibleChip(onClick = {
-                                startActivity(Intent(this@SettingsActivity, LocationSettingsActivity::class.java))
-                            }, label = { Text(stringResource(R.string.location_scope_title), maxLines = Int.MAX_VALUE) },
-                                secondaryLabel = { Text(stringResource(collectionScope.label), maxLines = Int.MAX_VALUE) }) }
-                            item { SettingsSection(stringResource(R.string.connection_group)) }
-                            item {
-                                ToggleChip(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp),
-                                    checked = cloud, enabled = CloudClient.configured && !busy,
-                                    onCheckedChange = { enabled ->
-                                        if (enabled) consenting = true else {
-                                            CloudConsent.disable(this@SettingsActivity)
-                                            cloud = false
-                                            rawAccepted = false
-                                            notice = "Sync stopped. Server withdrawal will be sent when online. Cloud copies remain until deleted."
-                                        }
-                                    }, label = { Text(stringResource(R.string.cloud_sync_title), maxLines = Int.MAX_VALUE) },
-                                    secondaryLabel = { Text(stringResource(R.string.unified_cloud_scope), maxLines = Int.MAX_VALUE) },
-                                    colors = ToggleChipDefaults.toggleChipColors(
-                                        checkedStartBackgroundColor = Color(0xFF142A38),
-                                        checkedEndBackgroundColor = Color(0xFF142A38),
-                                        checkedContentColor = WatchColors.Text,
-                                        uncheckedStartBackgroundColor = WatchColors.Surface,
-                                        uncheckedEndBackgroundColor = WatchColors.Surface),
-                                    toggleControl = { Switch(checked = cloud) })
-                            }
-                            if (cloud) {
+                            notice?.let { message ->
                                 item {
-                                    ToggleChip(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp),
-                                        checked = deferredSync, enabled = CloudClient.configured && !busy,
-                                        onCheckedChange = { enabled ->
-                                            getSharedPreferences("cloud_options", android.content.Context.MODE_PRIVATE).edit().putBoolean("deferred_sync", enabled).apply()
-                                            deferredSync = enabled
-                                            RecordingSyncWorker.schedule(this@SettingsActivity)
-                                            com.haptilog.watch.sync.RawLocationSyncWorker.schedule(this@SettingsActivity)
-                                        }, label = { Text(stringResource(R.string.cloud_sync_deferred_title), maxLines = Int.MAX_VALUE) },
-                                        toggleControl = { Switch(checked = deferredSync) })
+                                    Text(
+                                        message,
+                                        fontSize = 12.sp,
+                                        color = WatchColors.Muted,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    )
                                 }
                             }
-                            item { FlexibleChip(enabled = !busy && !rawAccepted,
-                                label = { Text(stringResource(R.string.raw_location_title), maxLines = Int.MAX_VALUE) },
-                                secondaryLabel = {
+
+                            if (consenting) {
+                                item {
                                     Text(
-                                        stringResource(if (rawAccepted) R.string.raw_location_status_approved else R.string.raw_location_status_needed),
-                                        maxLines = Int.MAX_VALUE
+                                        stringResource(R.string.cloud_consent_dialog_msg),
+                                        fontSize = 12.sp,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
                                     )
-                                },
-                                onClick = { rawConsenting = true; notice = null }) }
-                            if (!cloud) item { Text(stringResource(R.string.cloud_off_notice), fontSize = 12.sp,
-                                color = WatchColors.Muted, modifier = Modifier.fillMaxWidth()) }
-                            item {
-                                FlexibleChip(enabled = CloudClient.configured, onClick = {
-                                    startActivity(Intent(this@SettingsActivity, WebAccessActivity::class.java))
-                                }, label = { Text(stringResource(R.string.web_access_title), maxLines = Int.MAX_VALUE) },
-                                    secondaryLabel = { Text(stringResource(R.string.web_access_hint), maxLines = Int.MAX_VALUE) },
-                                    icon = { Icon(painterResource(R.drawable.ic_link), null, Modifier.size(22.dp), tint = Color(0xFFA8D8FF)) })
+                                }
+                                item {
+                                    SettingAction(
+                                        enabled = !busy,
+                                        onClick = {
+                                            busy = true
+                                            scope.launch {
+                                                try {
+                                                    withContext(Dispatchers.IO) { CloudConsent.enable(this@SettingsActivity) }
+                                                    cloud = true
+                                                    consenting = false
+                                                    notice = getString(R.string.unified_cloud_enabled)
+                                                } catch (_: Exception) {
+                                                    notice = getString(R.string.cloud_enable_failed)
+                                                } finally {
+                                                    busy = false
+                                                }
+                                            }
+                                        },
+                                        label = stringResource(if (busy) R.string.connecting_notice else R.string.cloud_consent_agree)
+                                    )
+                                }
+                                item {
+                                    SettingAction(
+                                        enabled = !busy,
+                                        onClick = { consenting = false },
+                                        label = stringResource(R.string.cancel_action)
+                                    )
+                                }
+                            } else {
+                                // 1. Haptic Intensity
+                                item {
+                                    SettingAction(
+                                        onClick = {
+                                            val next = hapticIntensity.next()
+                                            HapticPreferences.setIntensity(this@SettingsActivity, next)
+                                            hapticIntensity = next
+                                            hapticManager.playPreviewPulse(next)
+                                        },
+                                        label = stringResource(R.string.haptic_intensity_title),
+                                        secondaryLabel = stringResource(hapticIntensity.labelRes)
+                                    )
+                                }
+
+                                // 2. Location Scope
+                                item {
+                                    SettingAction(
+                                        onClick = {
+                                            startActivity(Intent(this@SettingsActivity, LocationSettingsActivity::class.java))
+                                        },
+                                        label = stringResource(R.string.location_scope_title),
+                                        secondaryLabel = stringResource(collectionScope.label)
+                                    )
+                                }
+
+                                // 3. Cloud Sync Toggle
+                                item {
+                                    SwitchButton(
+                                        checked = cloud,
+                                        enabled = CloudClient.configured && !busy,
+                                        onCheckedChange = { enabled ->
+                                            if (enabled) {
+                                                consenting = true
+                                                notice = null
+                                            } else {
+                                                CloudConsent.disable(this@SettingsActivity)
+                                                cloud = false
+                                                notice = "Sync stopped. Cloud copies remain until deleted."
+                                            }
+                                        },
+                                        label = {
+                                            Text(
+                                                stringResource(R.string.cloud_sync_title),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        secondaryLabel = {
+                                            Text(
+                                                stringResource(R.string.cloud_sync_summary),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp)
+                                    )
+                                }
+
+                                // 4. Deferred Sync Toggle (Battery saver, when cloud is on)
+                                if (cloud) {
+                                    item {
+                                        SwitchButton(
+                                            checked = deferredSync,
+                                            enabled = CloudClient.configured && !busy,
+                                            onCheckedChange = { enabled ->
+                                                getSharedPreferences("cloud_options", MODE_PRIVATE)
+                                                    .edit()
+                                                    .putBoolean("deferred_sync", enabled)
+                                                    .apply()
+                                                deferredSync = enabled
+                                                RecordingSyncWorker.schedule(this@SettingsActivity)
+                                                com.haptilog.watch.sync.RawLocationSyncWorker.schedule(this@SettingsActivity)
+                                            },
+                                            label = {
+                                                Text(
+                                                    stringResource(R.string.cloud_sync_deferred_title),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            },
+                                            secondaryLabel = {
+                                                Text(
+                                                    stringResource(R.string.cloud_sync_deferred_summary),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            },
+                                            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp)
+                                        )
+                                    }
+                                }
+
+                                // 5. Web Access
+                                item {
+                                    SettingAction(
+                                        enabled = CloudClient.configured,
+                                        onClick = {
+                                            startActivity(Intent(this@SettingsActivity, WebAccessActivity::class.java))
+                                        },
+                                        label = stringResource(R.string.web_access_title),
+                                        secondaryLabel = stringResource(R.string.web_access_hint),
+                                        icon = {
+                                            Icon(
+                                                painter = painterResource(R.drawable.ic_link),
+                                                contentDescription = null,
+                                                tint = Color(0xFFA8D8FF),
+                                                modifier = Modifier.size(20.dp).padding(end = 6.dp)
+                                            )
+                                        }
+                                    )
+                                }
+
+                                // 6. System Notifications
+                                item {
+                                    SettingAction(
+                                        onClick = {
+                                            startActivity(
+                                                Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+                                            )
+                                        },
+                                        label = stringResource(R.string.notification_settings),
+                                        secondaryLabel = stringResource(R.string.notification_settings_hint)
+                                    )
+                                }
+
+                                // 7. About & Support
+                                item {
+                                    SettingAction(
+                                        onClick = {
+                                            startActivity(Intent(this@SettingsActivity, SupportActivity::class.java))
+                                        },
+                                        label = stringResource(R.string.support_title),
+                                        secondaryLabel = stringResource(R.string.support_hint, BuildConfig.VERSION_NAME)
+                                    )
+                                }
                             }
-                            item { SettingsSection(stringResource(R.string.haptics_group)) }
-                            item {
-                                FlexibleChip(onClick = {
-                                    val next = hapticIntensity.next()
-                                    HapticPreferences.setIntensity(this@SettingsActivity, next)
-                                    hapticIntensity = next
-                                    hapticManager.playPreviewPulse(next)
-                                }, label = { Text(stringResource(R.string.haptic_intensity_title), maxLines = Int.MAX_VALUE) },
-                                    secondaryLabel = { Text(stringResource(hapticIntensity.labelRes), maxLines = Int.MAX_VALUE) })
-                            }
-                            item { FlexibleChip(onClick = {
-                                startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))
-                            }, label = { Text(stringResource(R.string.notification_settings), maxLines = Int.MAX_VALUE) },
-                                secondaryLabel = { Text(stringResource(R.string.notification_settings_hint), maxLines = Int.MAX_VALUE) }) }
-                            item { SettingsSection(stringResource(R.string.help_group)) }
-                            item { FlexibleChip(onClick = {
-                                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://haptilog.keepory.app/privacy.html"))) }
-                                catch (_: ActivityNotFoundException) { notice = "Privacy policy: https://haptilog.keepory.app/privacy.html" }
-                            }, label = { Text(stringResource(R.string.privacy_action), maxLines = Int.MAX_VALUE) }) }
-                            item { FlexibleChip(onClick = { reporting = true; notice = null },
-                                label = { Text(stringResource(R.string.report_action), maxLines = Int.MAX_VALUE) }) }
-                            item {
-                                ToggleChip(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp),
-                                    checked = crashes, onCheckedChange = { enabled ->
-                                        AppReports.setCrashReportsEnabled(this@SettingsActivity, enabled)
-                                        crashes = enabled
-                                        queued = AppReports.pending(this@SettingsActivity)
-                                    }, label = { Text(stringResource(R.string.crash_reports_title), maxLines = Int.MAX_VALUE) },
-                                    toggleControl = { Switch(checked = crashes) })
-                            }
-                            item { Text("Optional. Sends app crash types and code locations after restart. No recordings, location, credentials or exception messages. Turning off stops future reports and removes queued crashes.", fontSize = 12.sp, textAlign = TextAlign.Center) }
-                            if (queued > 0) item {
-                                FlexibleChip(onClick = {
-                                    queued = AppReports.pending(this@SettingsActivity)
-                                    ReportUploadWorker.schedule(this@SettingsActivity)
-                                    notice = if (queued == 0) "All queued reports sent." else "$queued queued. Will retry online."
-                                }, label = { Text("Retry reports ($queued)", maxLines = Int.MAX_VALUE) })
-                            }
-                            item { SettingsSection(stringResource(R.string.about_group)) }
-                            item { FlexibleChip(onClick = {
-                                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))) }
-                                catch (_: ActivityNotFoundException) { notice = "Play Store unavailable on this watch." }
-                            }, label = { Text(stringResource(R.string.store_action), maxLines = Int.MAX_VALUE) }) }
-                            item { Text(stringResource(R.string.build_info, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                                fontSize = 12.sp, color = WatchColors.Muted) }
                         }
-                        if (!CloudClient.configured) item { Text("Reporting needs cloud configuration.", fontSize = 12.sp, textAlign = TextAlign.Center) }
-                        item { Spacer(Modifier.height(24.dp)) }
                     }
                 }
             }
         }
     }
-}
-
-@Composable
-private fun SettingsSection(title: String) {
-    Text(title, fontSize = 12.sp, color = WatchColors.Muted,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 2.dp))
 }

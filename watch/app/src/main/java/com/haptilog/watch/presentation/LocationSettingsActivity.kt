@@ -6,11 +6,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -20,12 +23,16 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.Role
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.*
 import com.haptilog.watch.R
 import com.haptilog.watch.data.location.LocationCollection
 import com.haptilog.watch.service.LocationTrackingService
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** One scope choice, separate from actual service state and cloud consent. */
 class LocationSettingsActivity : ComponentActivity() {
@@ -53,29 +60,85 @@ class LocationSettingsActivity : ComponentActivity() {
                 val list = rememberScalingLazyListState(initialCenterItemIndex = 0)
                 val active by LocationTrackingService.isTracking.collectAsState()
                 val serviceNotice by LocationTrackingService.status.collectAsState()
+                var rawConsenting by rememberSaveable { mutableStateOf(false) }
+                var rawAccepted by remember { mutableStateOf(com.haptilog.watch.sync.RawLocationConsent.grant(this@LocationSettingsActivity) != null) }
+                val rawDisclosure = stringArrayResource(R.array.raw_location_disclosure_steps)
+
+                BackHandler(enabled = rawConsenting) { rawConsenting = false }
+                LaunchedEffect(rawConsenting) { list.scrollToItem(0) }
+
                 ScreenScaffold(scrollState = list) {
                     ScalingLazyColumn(state = list, autoCentering = null,
                         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 38.dp, bottom = 48.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
-                        item { Text(stringResource(R.string.location_scope_title), textAlign = TextAlign.Center) }
-                        LocationCollection.entries.forEach { option -> item {
-                            DetailAction(modifier = Modifier.semantics { selected = selection == option; role = Role.RadioButton }, onClick = { choose(option) }, label = {
-                                Text((if (selection == option) "✓ " else "") + stringResource(option.label))
-                            })
-                        } }
-                        if (selection == LocationCollection.INCLUDING_NON_RECORDING) {
-                            item { Text(stringResource(if (active) R.string.location_running else R.string.location_scope_interrupted), textAlign = TextAlign.Center) }
+                        if (rawConsenting) {
+                            item { Text(stringResource(R.string.raw_location_title), textAlign = TextAlign.Center) }
+                            rawDisclosure.forEach { paragraph ->
+                                item { Text(paragraph, fontSize = 12.sp, textAlign = TextAlign.Center) }
+                            }
+                            item {
+                                SettingAction(
+                                    onClick = {
+                                        rawConsenting = false
+                                        lifecycleScope.launch {
+                                            try {
+                                                withContext(Dispatchers.IO) {
+                                                    com.haptilog.watch.sync.RawLocationConsent.enable(this@LocationSettingsActivity)
+                                                }
+                                                rawAccepted = true
+                                                notice = getString(R.string.raw_location_accepted)
+                                            } catch (_: Exception) {
+                                                notice = getString(R.string.raw_location_unavailable)
+                                            }
+                                        }
+                                    },
+                                    label = stringResource(R.string.raw_location_agree)
+                                )
+                            }
+                            item {
+                                SettingAction(
+                                    onClick = { rawConsenting = false },
+                                    label = stringResource(R.string.cancel_action)
+                                )
+                            }
+                        } else {
+                            item { Text(stringResource(R.string.location_scope_title), textAlign = TextAlign.Center) }
+                            LocationCollection.entries.forEach { option -> item {
+                                DetailAction(modifier = Modifier.semantics { selected = selection == option; role = Role.RadioButton }, onClick = { choose(option) }, label = {
+                                    Text((if (selection == option) "✓ " else "") + stringResource(option.label))
+                                })
+                            } }
+                            if (selection == LocationCollection.INCLUDING_NON_RECORDING) {
+                                item { Text(stringResource(if (active) R.string.location_running else R.string.location_scope_interrupted), textAlign = TextAlign.Center) }
+                                item {
+                                    val cloudActive = com.haptilog.watch.sync.RecordingSyncWorker.enabled(this@LocationSettingsActivity)
+                                    SettingAction(
+                                        onClick = {
+                                            if (!cloudActive) {
+                                                notice = getString(R.string.raw_location_requires_cloud)
+                                                return@SettingAction
+                                            }
+                                            if (!rawAccepted) {
+                                                rawConsenting = true
+                                            }
+                                        },
+                                        label = stringResource(R.string.raw_location_title),
+                                        secondaryLabel = stringResource(if (rawAccepted) R.string.raw_location_status_approved else R.string.raw_location_status_needed),
+                                        enabled = cloudActive
+                                    )
+                                }
+                            }
+                            listOf(R.string.location_scope_disclosure, R.string.location_scope_microphone,
+                                R.string.location_scope_lifecycle).forEach { text -> item {
+                                Text(stringResource(text), fontSize = 13.sp, textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 12.dp))
+                            } }
+                            (notice ?: serviceNotice)?.let { message -> item { Text(message, textAlign = TextAlign.Center) } }
+                            item { DetailAction(onClick = {
+                                startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.parse("package:$packageName")))
+                            }, label = { Text(stringResource(R.string.location_open_settings)) }) }
                         }
-                        listOf(R.string.location_scope_disclosure, R.string.location_scope_microphone,
-                            R.string.location_scope_lifecycle).forEach { text -> item {
-                            Text(stringResource(text), fontSize = 13.sp, textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 12.dp))
-                        } }
-                        (notice ?: serviceNotice)?.let { message -> item { Text(message, textAlign = TextAlign.Center) } }
-                        item { DetailAction(onClick = {
-                            startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                android.net.Uri.parse("package:$packageName")))
-                        }, label = { Text(stringResource(R.string.location_open_settings)) }) }
                     }
                 }
             } }
