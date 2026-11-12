@@ -137,4 +137,4 @@ jobs:
           whatsNewDirectory: distribution/whatsnew
           # When policy reviews or declarations are pending, Play Console rejects automatic review submission.
           # Setting changesNotSentForReview to true commits the release for review in Play Console UI.
-          changesNotSentForReview: ${{ github.event.inputs.changes_not_sent_for_review != false }}
+          changesNotSentForReview: false
