@@ -27,11 +27,6 @@ on:
         type: boolean
         required: false
         default: false
-      changes_not_sent_for_review:
-        description: 'Set changesNotSentForReview (true allows manual review submission from Play Console UI)'
-        type: boolean
-        required: false
-        default: true
 
 concurrency:
   group: wear-playstore
@@ -135,6 +130,5 @@ jobs:
           mappingFile: watch/app/build/outputs/mapping/release/mapping.txt
           status: ${{ github.event.inputs.status || 'completed' }}
           whatsNewDirectory: distribution/whatsnew
-          # When policy reviews or declarations are pending, Play Console rejects automatic review submission.
-          # Setting changesNotSentForReview to true commits the release for review in Play Console UI.
+          # Play Console sends changes for review automatically; this flag must stay false.
           changesNotSentForReview: false
