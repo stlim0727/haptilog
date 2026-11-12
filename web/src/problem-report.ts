@@ -55,6 +55,61 @@ export function buildProblemReport(
   return { row: { id: newId(), user_id: input.userId, kind: "issue", description: note, diagnostics } };
 }
 
+export type ProblemReportDraft = Omit<ProblemReportInput, "userId">;
+
+export interface ProblemReportDeps {
+  getSession: () => Promise<{
+    session: { user: { id: string } } | null;
+    error?: { message?: string } | null;
+  }>;
+  insert: (row: AppReportRow) => Promise<{
+    code?: string | null;
+    message?: string | null;
+    details?: string | null;
+  } | null>;
+  capture: (event: string, properties: Record<string, unknown>) => void;
+  analyticsSessionId: () => string;
+  portalSessionId: string;
+  newId?: () => string;
+}
+
+export type ProblemReportOutcome =
+  | { ok: true }
+  | { ok: false; reason: "no_session"; detail: string }
+  | { ok: false; reason: "validation"; detail: string }
+  | { ok: false; reason: "conflict"; detail: string }
+  | { ok: false; reason: "insert"; code: string; detail: string };
+
+/**
+ * Submits one problem report and reports every failure mode distinctly.
+ * Callers must not treat a conflict (23505) as success: ids are generated
+ * per submit, so a conflict means this row was not written by this attempt.
+ */
+export async function submitProblemReport(
+  draft: ProblemReportDraft,
+  deps: ProblemReportDeps,
+): Promise<ProblemReportOutcome> {
+  const { session, error: sessionError } = await deps.getSession();
+  if (sessionError || !session) {
+    return { ok: false, reason: "no_session", detail: sessionError?.message || "no auth session" };
+  }
+  const built = buildProblemReport({ ...draft, userId: session.user.id }, deps.newId);
+  if ("error" in built) return { ok: false, reason: "validation", detail: built.error };
+  const error = await deps.insert(built.row);
+  if (error) {
+    const code = error.code ?? "";
+    const detail = [error.message, error.details].filter(Boolean).join(" ");
+    return code === "23505"
+      ? { ok: false, reason: "conflict", detail: detail || "duplicate report id" }
+      : { ok: false, reason: "insert", code, detail };
+  }
+  deps.capture(
+    "problem_reported",
+    buildProblemCaptureProperties(built.row, deps.analyticsSessionId(), deps.portalSessionId),
+  );
+  return { ok: true };
+}
+
 export function buildProblemCaptureProperties(
   row: AppReportRow,
   analyticsSessionId: string,
