@@ -41,7 +41,7 @@ import {
   initAnalytics,
   resetAnalytics,
 } from "./analytics";
-import { PROBLEM_CATEGORIES, PROBLEM_CATEGORY_LABEL_KEYS, buildProblemCaptureProperties, buildProblemReport } from "./problem-report";
+import { PROBLEM_CATEGORIES, PROBLEM_CATEGORY_LABEL_KEYS, submitProblemReport } from "./problem-report";
 import type { ProblemCategory } from "./problem-report";
 import { journalItems, matchesJournal, journalDates } from "./journal";
 import type { JournalItem } from "./journal";
@@ -1767,23 +1767,48 @@ function Inspector({
   }
   async function submitReport() {
     if (!supabase) return;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { onError(t.report_failed); return; }
-    const built = buildProblemReport({
-      userId: session.user.id,
-      recordingId: r.id.startsWith("demo-") ? null : r.id,
-      category: reportCategory,
-      note: reportNote.current?.value ?? "",
-      view,
-    });
-    if ("error" in built) { onError(t.report_failed); return; }
+    const client = supabase;
     setReportBusy(true);
-    const { error } = await supabase.from("app_reports").insert(built.row as never);
-    setReportBusy(false);
-    if (error && error.code !== "23505") { onError(t.report_failed); return; }
-    captureAnalytics("problem_reported", buildProblemCaptureProperties(built.row, analyticsSessionId(), portalSessionId));
-    onError("");
-    setReportSent(true);
+    try {
+      const outcome = await submitProblemReport({
+        recordingId: r.id.startsWith("demo-") ? null : r.id,
+        category: reportCategory,
+        note: reportNote.current?.value ?? "",
+        view,
+      }, {
+        getSession: async () => {
+          const { data, error } = await client.auth.getSession();
+          return { session: data.session, error };
+        },
+        insert: async row => {
+          const { error } = await client.from("app_reports").insert(row as never);
+          return error;
+        },
+        capture: captureAnalytics,
+        analyticsSessionId,
+        portalSessionId,
+      });
+      if (outcome.ok) {
+        onError("");
+        setReportSent(true);
+        return;
+      }
+      console.error("[problem-report] submit failed", outcome);
+      onError(
+        outcome.reason === "no_session"
+          ? t.report_sign_in_required
+          : outcome.reason === "validation"
+            ? `${t.report_invalid} (${outcome.detail})`
+            : outcome.reason === "conflict"
+              ? t.report_conflict
+              : `${t.report_failed} (${outcome.code || "network"})`,
+      );
+    } catch (error) {
+      console.error("[problem-report] submit threw", error);
+      onError(t.report_failed);
+    } finally {
+      setReportBusy(false);
+    }
   }
   async function retry(force = false) {
     if (isDemo || r.id.startsWith("demo-")) {
