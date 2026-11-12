@@ -41,6 +41,8 @@ These shorthands retain the repository's existing checks and approval requiremen
 | Cloud AI Pipeline | `supabase/functions/voice-enrich/` | Gemini Multimodal parsing (Audio + GPS -> Expense/Travel/Workout/Note) |
 | DB & Security | `supabase/migrations/` | Postgres schema, RLS policies, Anonymous auth |
 | Play Store CI/CD | `.github/workflows/android-playstore.yml` | Wear OS AAB build & Internal Testing auto-publish |
+| UI Screens (Web) | `.github/workflows/ui-screens-web.yml` | Tiered portal screenshot showcase (`web/public/screenshots/ui`) |
+| UI Screens (Watch) | `.github/workflows/ui-screens-watch.yml` | Disposable Wear OS emulator screen capture (`screenshots/watch`) |
 
 ## Critical Invariants
 

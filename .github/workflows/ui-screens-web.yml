@@ -1,0 +1,91 @@
+name: UI Screens (Web)
+
+# Captures the web portal UI screens showcase (tiered, deterministic mocks).
+# Verify-only by default; "publish" commits web/public/screenshots/ui and
+# dispatches the review portal deploy so the new screens ship with it.
+on:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Which screens tier to capture/verify'
+        required: false
+        default: 'core'
+        type: choice
+        options:
+          - core
+          - full
+          - all
+      publish:
+        description: 'Publish: save screenshots, commit to repository, and trigger portal deploy'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: ui-screens-web-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-screens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Capture UI screens
+        run: |
+          if [ "${{ inputs.publish }}" = "true" ]; then
+            node --experimental-strip-types scripts/capture-all-ui-screens.mjs --tier ${{ inputs.tier || 'core' }}
+          else
+            node --experimental-strip-types scripts/capture-all-ui-screens.mjs --tier ${{ inputs.tier || 'core' }} --verify
+          fi
+
+      - name: Commit and push updated UI screens
+        if: ${{ inputs.publish }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          if [ -n "$(git status --porcelain web/public/screenshots/ui)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add web/public/screenshots/ui/
+            git commit -m "chore(screens): update web UI screens showcase [tier: ${{ inputs.tier || 'core' }}]"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "No screenshot or catalog changes to commit."
+          fi
+
+      - name: Trigger review portal deployment
+        if: ${{ inputs.publish && github.ref_name == 'main' }}
+        run: |
+          curl -s -f -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy-portal.yml/dispatches \
+            -d '{"ref":"main"}' || echo "Notice: Could not dispatch deploy-portal.yml via API; the next portal deploy will pick up the commit."
+
+      - name: Upload UI screenshots artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screens-web-${{ inputs.tier || 'core' }}
+          path: |
+            web/public/screenshots/ui/
+            /tmp/haptilog-ui-screens-*/
+          if-no-files-found: ignore
