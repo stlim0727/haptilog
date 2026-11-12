@@ -1,0 +1,124 @@
+name: UI Screens (Watch)
+
+# Captures the Wear OS app UI screens showcase on a disposable emulator:
+# builds the debug APK, boots a Wear OS 5 (API 34) round emulator, and
+# drives the eyes-free recording/list/settings flows via adb screencap.
+# Verify-only by default; "publish" commits screenshots/watch to the repo.
+on:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Which screens tier to capture/verify'
+        required: false
+        default: 'core'
+        type: choice
+        options:
+          - core
+          - full
+          - all
+      publish:
+        description: 'Publish: save screenshots and commit them to the repository'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ui-screens-watch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ui-screens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: "gradle"
+
+      - name: Build Wear OS Debug APK
+        working-directory: watch
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Install Wear OS emulator image
+        run: |
+          export ANDROID_SDK_ROOT="$ANDROID_HOME"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" "emulator" \
+            "system-images;android-34;android-wear;x86_64"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager" create avd \
+            --name ui_screens --force \
+            --package "system-images;android-34;android-wear;x86_64" \
+            --device "wearos_large_round"
+
+      - name: Boot emulator
+        run: |
+          "$ANDROID_HOME/emulator/emulator" -avd ui_screens \
+            -no-window -no-audio -no-boot-anim -no-snapshot \
+            -gpu swiftshader_indirect -camera-back emulated \
+            > /tmp/emulator.log 2>&1 &
+          "$ANDROID_HOME/platform-tools/adb" wait-for-device
+          for i in $(seq 1 120); do
+            if [ "$("$ANDROID_HOME/platform-tools/adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+              echo "Emulator booted."
+              break
+            fi
+            sleep 5
+            if [ "$i" = "120" ]; then
+              echo "Emulator failed to boot; log follows:"
+              cat /tmp/emulator.log
+              exit 1
+            fi
+          done
+
+      - name: Install app
+        run: |
+          "$ANDROID_HOME/platform-tools/adb" install -r watch/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Capture watch UI screens
+        run: |
+          if [ "${{ inputs.publish }}" = "true" ]; then
+            python3 scripts/capture-watch-ui-screens.py --tier ${{ inputs.tier || 'core' }}
+          else
+            python3 scripts/capture-watch-ui-screens.py --tier ${{ inputs.tier || 'core' }} --verify
+          fi
+
+      - name: Commit and push updated watch UI screens
+        if: ${{ inputs.publish }}
+        run: |
+          if [ -n "$(git status --porcelain screenshots/watch)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add screenshots/watch/
+            git commit -m "chore(screens): update watch UI screens showcase [tier: ${{ inputs.tier || 'core' }}]"
+            git push origin HEAD:${{ github.ref_name }}
+          else
+            echo "No screenshot or catalog changes to commit."
+          fi
+
+      - name: Upload watch screenshots artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-screens-watch-${{ inputs.tier || 'core' }}
+          path: |
+            screenshots/watch/
+            /tmp/haptilog-ui-screens-watch-*/
+          if-no-files-found: ignore
+
+      - name: Stop emulator
+        if: always()
+        run: pkill -f 'emulator -avd ui_screens' || true

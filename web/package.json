@@ -13,6 +13,8 @@
     "test:production": "playwright test --config playwright.production.config.ts",
     "deploy:production": "node scripts/deploy.mjs --production",
     "check:backend": "node scripts/backend-readiness.mjs",
+    "capture:ui-screens": "node --experimental-strip-types scripts/capture-all-ui-screens.mjs",
+    "test:ui-screens": "node --experimental-strip-types scripts/capture-all-ui-screens.mjs --tier all --verify",
     "prepare:deploy": "node scripts/deploy.mjs --build-only"
   },
   "dependencies": {
