@@ -28,11 +28,11 @@ fun categoryStyle(intent: String?): CategoryStyle = when (intent) {
 }
 
 @Composable
-fun CategoryIcon(style: CategoryStyle, modifier: Modifier = Modifier) {
+fun CategoryIcon(style: CategoryStyle, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 42.dp) {
     // Decorative: adjacent localized category text provides the accessible name.
-    Box(modifier.size(42.dp).background(style.accent, CircleShape), contentAlignment = Alignment.Center) {
+    Box(modifier.size(size).background(style.accent, CircleShape), contentAlignment = Alignment.Center) {
         Icon(painterResource(style.icon), contentDescription = null,
-            tint = style.surface, modifier = Modifier.size(25.dp))
+            tint = style.surface, modifier = Modifier.size(size * 0.6f))
     }
 }
 

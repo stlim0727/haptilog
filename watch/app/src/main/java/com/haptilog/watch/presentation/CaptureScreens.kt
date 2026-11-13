@@ -33,6 +33,10 @@ val RECORDINGS_LIST_TOP_PADDING = 36.dp
 val RECORDINGS_LIST_TOP_EXPANDED_PADDING = 40.dp
 val RECORDINGS_LIST_BOTTOM_PADDING = 48.dp
 val RECORDINGS_LIST_SIDE_PADDING = 16.dp
+const val BOTTOM_ACTION_ROW_WIDTH_FRACTION = 0.76f
+const val BOTTOM_ACTION_ROW_COMPACT_WIDTH_FRACTION = 0.78f
+val BOTTOM_ACTION_ROW_BOTTOM_PADDING = 28.dp
+val BOTTOM_ACTION_ROW_COMPACT_BOTTOM_PADDING = 24.dp
 
 @Composable
 fun CaptureScreen(
@@ -99,7 +103,7 @@ fun CaptureScreen(
             }
         } else if (isRecording) {
             ScreenScaffold {
-                Column(Modifier.fillMaxSize().padding(top = 38.dp, bottom = 64.dp),
+                Column(Modifier.fillMaxSize().padding(top = 36.dp, bottom = 82.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center) {
                     val badgeColor = if (isPaused) Color(0xFFF2B705) else WatchColors.Record
@@ -116,8 +120,8 @@ fun CaptureScreen(
                 Row(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = if (compact) 8.dp else 12.dp)
-                        .fillMaxWidth(if (compact) 0.96f else 0.92f),
+                        .padding(bottom = if (compact) BOTTOM_ACTION_ROW_COMPACT_BOTTOM_PADDING else BOTTOM_ACTION_ROW_BOTTOM_PADDING)
+                        .fillMaxWidth(if (compact) BOTTOM_ACTION_ROW_COMPACT_WIDTH_FRACTION else BOTTOM_ACTION_ROW_WIDTH_FRACTION),
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)
                 ) {
                     val pauseResumeLabel = stringResource(if (isPaused) R.string.record_resume else R.string.record_pause)
@@ -169,20 +173,23 @@ fun CaptureScreen(
             }
         } else {
             ScreenScaffold {
-                Column(Modifier.fillMaxSize().padding(top = if (compact) 28.dp else 30.dp, bottom = 16.dp),
+                Column(Modifier.fillMaxSize().padding(
+                        top = if (compact) 20.dp else 22.dp,
+                        bottom = if (compact) BOTTOM_ACTION_ROW_COMPACT_BOTTOM_PADDING else BOTTOM_ACTION_ROW_BOTTOM_PADDING
+                    ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 6.dp)) {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                     val recordLabel = stringResource(R.string.record_start_accessibility)
                     Button(onClick = onToggleRecording,
                         shape = CircleShape, contentPadding = PaddingValues(4.dp),
-                        modifier = Modifier.size(if (compact) 74.dp else 100.dp).semantics { contentDescription = recordLabel }) {
+                        modifier = Modifier.size(if (compact) 70.dp else 92.dp).semantics { contentDescription = recordLabel }) {
                         Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(painterResource(R.drawable.ic_mic), null, Modifier.size(36.dp))
+                            Icon(painterResource(R.drawable.ic_mic), null, Modifier.size(if (compact) 28.dp else 34.dp))
                             Text(stringResource(R.string.record_start), fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
-                    Row(Modifier.fillMaxWidth(if (compact) .86f else .80f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(if (compact) BOTTOM_ACTION_ROW_COMPACT_WIDTH_FRACTION else BOTTOM_ACTION_ROW_WIDTH_FRACTION), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         NavigationAction(R.drawable.ic_records, R.string.recordings_action,
                             categoryStyle("MEMO"), onRecordings, Modifier.weight(1f))
                         NavigationAction(R.drawable.ic_settings, R.string.settings_title,
@@ -310,21 +317,35 @@ fun RecordingCard(item: RecordingItem, cloudEnabled: Boolean, onOpen: () -> Unit
     }, transformation = transformation,
         colors = CardDefaults.cardColors(containerColor = category.surface),
         contentPadding = PaddingValues(start = 12.dp, end = 14.dp, top = 9.dp, bottom = 9.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            CategoryIcon(category)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(recordingTitle(context, item), fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, color = WatchColors.Text)
-                Text(categoryLabel(context, item.intentType), color = category.accent,
-                    fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold)
-                if (!expanded) RecordingMetadata(item, compact = true)
-            }
-            Box(Modifier.align(Alignment.Top).padding(top = 5.dp, end = 2.dp).size(6.dp)
-                .background(statusColor, CircleShape))
-        }
         if (expanded) {
+            // Stack icon header above full-width title/category so 192dp + 200% font keeps whole words.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                CategoryIcon(category, size = 28.dp)
+                Spacer(Modifier.weight(1f))
+                Box(Modifier.padding(end = 2.dp).size(6.dp).background(statusColor, CircleShape))
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(recordingTitle(context, item), fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 3, overflow = TextOverflow.Ellipsis, color = WatchColors.Text)
+            Spacer(Modifier.height(2.dp))
+            Text(categoryLabel(context, item.intentType), color = category.accent,
+                fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(4.dp))
             RecordingMetadata(item, compact = true)
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                CategoryIcon(category)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(recordingTitle(context, item), fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis, color = WatchColors.Text)
+                    Text(categoryLabel(context, item.intentType), color = category.accent,
+                        fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.SemiBold)
+                    RecordingMetadata(item, compact = true)
+                }
+                Box(Modifier.align(Alignment.Top).padding(top = 5.dp, end = 2.dp).size(6.dp)
+                    .background(statusColor, CircleShape))
+            }
         }
         if (needsAttention) {
             Text(recordingSyncLabel(context, item, cloudEnabled), style = MaterialTheme.typography.bodySmall,
