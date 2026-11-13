@@ -140,4 +140,24 @@ class WatchUxPhase2Test {
         assertTrue(RECORDINGS_LIST_TOP_EXPANDED_PADDING.value >= 40f)
         assertTrue(RECORDINGS_LIST_SIDE_PADDING.value >= 16f)
     }
+
+    @Test
+    fun bottomActionRowStaysInsideRoundSafeArea() {
+        fun assertPillRowFitsInscribedCircle(diameterDp: Float, widthFraction: Float, bottomPaddingDp: Float) {
+            val radius = diameterDp / 2f
+            val pillRadius = 24f // 48dp min-height stadium button endcap radius
+            val halfRowWidth = (diameterDp * widthFraction) / 2f
+            val dx = halfRowWidth - pillRadius
+            val dy = radius - bottomPaddingDp - pillRadius
+            val outerEdgeRadius = kotlin.math.hypot(dx.toDouble(), dy.toDouble()) + pillRadius
+            assertTrue(
+                "Bottom row (widthFraction=$widthFraction, bottom=${bottomPaddingDp}dp) exceeds ${diameterDp}dp circle: $outerEdgeRadius > $radius",
+                outerEdgeRadius <= radius
+            )
+        }
+        // Standard 454x454 @ 320dpi (227dp)
+        assertPillRowFitsInscribedCircle(227f, BOTTOM_ACTION_ROW_WIDTH_FRACTION, BOTTOM_ACTION_ROW_BOTTOM_PADDING.value)
+        // Compact 192dp
+        assertPillRowFitsInscribedCircle(192f, BOTTOM_ACTION_ROW_COMPACT_WIDTH_FRACTION, BOTTOM_ACTION_ROW_COMPACT_BOTTOM_PADDING.value)
+    }
 }
