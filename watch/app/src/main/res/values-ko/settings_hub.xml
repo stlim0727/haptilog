@@ -1,0 +1,13 @@
+<resources>
+    <string name="settings_haptics_title">진동 및 알림</string>
+    <string name="settings_connection_title">연결 및 동기화</string>
+    <string name="settings_support_title">도움말 및 앱 정보</string>
+    <string name="settings_cloud_on">클라우드 켜짐</string>
+    <string name="settings_cloud_off">클라우드 꺼짐</string>
+    <string name="settings_cloud_unavailable">이 빌드에서는 클라우드를 사용할 수 없습니다</string>
+    <string name="settings_cloud_disabled">동기화를 중지했습니다. 기존 클라우드 사본은 별도로 삭제해야 합니다.</string>
+    <string name="settings_haptic_preview">진동 미리보기</string>
+    <string name="settings_back_action">뒤로</string>
+    <string name="raw_location_cloud_off">전송 중지 · 클라우드 꺼짐</string>
+    <string name="raw_location_transfer_allowed">전송 허용 · 네트워크 및 전원 조건 충족 시 전송</string>
+</resources>

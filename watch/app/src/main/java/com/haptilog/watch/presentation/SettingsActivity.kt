@@ -10,15 +10,17 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -28,6 +30,7 @@ import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material3.*
 import com.haptilog.watch.BuildConfig
 import com.haptilog.watch.R
+import com.haptilog.watch.data.HapticIntensity
 import com.haptilog.watch.data.HapticPreferences
 import com.haptilog.watch.data.location.LocationCollection
 import com.haptilog.watch.service.HapticHeartbeatManager
@@ -38,7 +41,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Clean, glanceable Wear OS settings hub. */
+internal enum class SettingsPage { HUB, HAPTICS, CONNECTION }
+
+/** Four navigation entries; settings change only inside their detail page. */
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +62,7 @@ class SettingsActivity : ComponentActivity() {
                     var hapticIntensity by remember { mutableStateOf(HapticPreferences.getIntensity(this@SettingsActivity)) }
                     val hapticManager = remember { HapticHeartbeatManager(this@SettingsActivity) }
 
+                    var page by rememberSaveable { mutableStateOf(SettingsPage.HUB) }
                     var consenting by rememberSaveable { mutableStateOf(false) }
                     var busy by remember { mutableStateOf(false) }
                     var notice by remember { mutableStateOf<String?>(null) }
@@ -74,11 +80,11 @@ class SettingsActivity : ComponentActivity() {
                         onDispose { lifecycle.removeObserver(observer) }
                     }
 
-                    BackHandler(enabled = consenting && !busy) {
-                        consenting = false
+                    BackHandler(enabled = (consenting || page != SettingsPage.HUB) && !busy) {
+                        if (consenting) consenting = false else page = SettingsPage.HUB
                         notice = null
                     }
-                    LaunchedEffect(consenting) {
+                    LaunchedEffect(page, consenting) {
                         list.scrollToItem(0)
                         focus.requestFocus()
                     }
@@ -100,7 +106,12 @@ class SettingsActivity : ComponentActivity() {
                         ) {
                             item {
                                 Text(
-                                    stringResource(if (consenting) R.string.cloud_consent_title else R.string.settings_title),
+                                    stringResource(when {
+                                        consenting -> R.string.cloud_consent_title
+                                        page == SettingsPage.HAPTICS -> R.string.settings_haptics_title
+                                        page == SettingsPage.CONNECTION -> R.string.settings_connection_title
+                                        else -> R.string.settings_title
+                                    }),
                                     fontSize = 16.sp,
                                     textAlign = TextAlign.Center
                                 )
@@ -154,32 +165,76 @@ class SettingsActivity : ComponentActivity() {
                                         label = stringResource(R.string.cancel_action)
                                     )
                                 }
-                            } else {
-                                // 1. Haptic Intensity
+                            } else if (page == SettingsPage.HUB) {
                                 item {
                                     SettingAction(
-                                        onClick = {
-                                            val next = hapticIntensity.next()
-                                            HapticPreferences.setIntensity(this@SettingsActivity, next)
-                                            hapticIntensity = next
-                                            hapticManager.playPreviewPulse(next)
-                                        },
-                                        label = stringResource(R.string.haptic_intensity_title),
-                                        secondaryLabel = stringResource(hapticIntensity.labelRes)
+                                        onClick = { page = SettingsPage.HAPTICS; notice = null },
+                                        label = stringResource(R.string.settings_haptics_title),
+                                        secondaryLabel = stringResource(hapticIntensity.labelRes),
+                                        modifier = Modifier.testTag("settings-haptics")
                                     )
                                 }
-
-                                // 2. Location Scope
                                 item {
                                     SettingAction(
-                                        onClick = {
-                                            startActivity(Intent(this@SettingsActivity, LocationSettingsActivity::class.java))
-                                        },
+                                        onClick = { startActivity(Intent(this@SettingsActivity, LocationSettingsActivity::class.java)) },
                                         label = stringResource(R.string.location_scope_title),
                                         secondaryLabel = stringResource(collectionScope.label)
                                     )
                                 }
-
+                                item {
+                                    SettingAction(
+                                        onClick = { page = SettingsPage.CONNECTION; notice = null },
+                                        label = stringResource(R.string.settings_connection_title),
+                                        secondaryLabel = stringResource(when {
+                                            !CloudClient.configured -> R.string.settings_cloud_unavailable
+                                            cloud -> R.string.settings_cloud_on
+                                            else -> R.string.settings_cloud_off
+                                        }),
+                                        modifier = Modifier.testTag("settings-connection")
+                                    )
+                                }
+                                item {
+                                    SettingAction(
+                                        onClick = { startActivity(Intent(this@SettingsActivity, SupportActivity::class.java)) },
+                                        label = stringResource(R.string.settings_support_title),
+                                        secondaryLabel = stringResource(R.string.support_hint, BuildConfig.VERSION_NAME)
+                                    )
+                                }
+                            } else if (page == SettingsPage.HAPTICS) {
+                                item { Text(stringResource(R.string.haptic_intensity_hint), fontSize = 12.sp) }
+                                HapticIntensity.entries.forEach { intensity ->
+                                    item {
+                                        SettingAction(
+                                            onClick = {
+                                                HapticPreferences.setIntensity(this@SettingsActivity, intensity)
+                                                hapticIntensity = intensity
+                                                hapticManager.playPreviewPulse(intensity)
+                                            },
+                                            label = stringResource(intensity.labelRes),
+                                            modifier = Modifier.testTag("haptic-${intensity.id}").semantics {
+                                                selected = hapticIntensity == intensity
+                                                role = Role.RadioButton
+                                            }
+                                        )
+                                    }
+                                }
+                                item {
+                                    SettingAction(
+                                        onClick = { hapticManager.playPreviewPulse(hapticIntensity) },
+                                        label = stringResource(R.string.settings_haptic_preview)
+                                    )
+                                }
+                                item {
+                                    SettingAction(
+                                        onClick = {
+                                            startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName))
+                                        },
+                                        label = stringResource(R.string.notification_settings),
+                                        secondaryLabel = stringResource(R.string.notification_settings_hint)
+                                    )
+                                }
+                            } else {
                                 // 3. Cloud Sync Toggle
                                 item {
                                     SwitchButton(
@@ -192,21 +247,19 @@ class SettingsActivity : ComponentActivity() {
                                             } else {
                                                 CloudConsent.disable(this@SettingsActivity)
                                                 cloud = false
-                                                notice = "Sync stopped. Cloud copies remain until deleted."
+                                                notice = getString(R.string.settings_cloud_disabled)
                                             }
                                         },
                                         label = {
                                             Text(
                                                 stringResource(R.string.cloud_sync_title),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                maxLines = Int.MAX_VALUE
                                             )
                                         },
                                         secondaryLabel = {
                                             Text(
                                                 stringResource(R.string.cloud_sync_summary),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                maxLines = Int.MAX_VALUE
                                             )
                                         },
                                         modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp)
@@ -231,15 +284,13 @@ class SettingsActivity : ComponentActivity() {
                                             label = {
                                                 Text(
                                                     stringResource(R.string.cloud_sync_deferred_title),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                                    maxLines = Int.MAX_VALUE
                                                 )
                                             },
                                             secondaryLabel = {
                                                 Text(
                                                     stringResource(R.string.cloud_sync_deferred_summary),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                                    maxLines = Int.MAX_VALUE
                                                 )
                                             },
                                             modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 52.dp)
@@ -247,49 +298,16 @@ class SettingsActivity : ComponentActivity() {
                                     }
                                 }
 
-                                // 5. Web Access
                                 item {
                                     SettingAction(
                                         enabled = CloudClient.configured,
-                                        onClick = {
-                                            startActivity(Intent(this@SettingsActivity, WebAccessActivity::class.java))
-                                        },
+                                        onClick = { startActivity(Intent(this@SettingsActivity, WebAccessActivity::class.java)) },
                                         label = stringResource(R.string.web_access_title),
-                                        secondaryLabel = stringResource(R.string.web_access_hint),
-                                        icon = {
-                                            Icon(
-                                                painter = painterResource(R.drawable.ic_link),
-                                                contentDescription = null,
-                                                tint = Color(0xFFA8D8FF),
-                                                modifier = Modifier.size(20.dp).padding(end = 6.dp)
-                                            )
-                                        }
+                                        secondaryLabel = stringResource(R.string.web_access_hint)
                                     )
                                 }
-
-                                // 6. System Notifications
-                                item {
-                                    SettingAction(
-                                        onClick = {
-                                            startActivity(
-                                                Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
-                                            )
-                                        },
-                                        label = stringResource(R.string.notification_settings),
-                                        secondaryLabel = stringResource(R.string.notification_settings_hint)
-                                    )
-                                }
-
-                                // 7. About & Support
-                                item {
-                                    SettingAction(
-                                        onClick = {
-                                            startActivity(Intent(this@SettingsActivity, SupportActivity::class.java))
-                                        },
-                                        label = stringResource(R.string.support_title),
-                                        secondaryLabel = stringResource(R.string.support_hint, BuildConfig.VERSION_NAME)
-                                    )
+                                if (!CloudClient.configured) item {
+                                    Text(stringResource(R.string.settings_cloud_unavailable), fontSize = 12.sp)
                                 }
                             }
                         }

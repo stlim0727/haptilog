@@ -1,0 +1,13 @@
+<resources>
+    <string name="settings_haptics_title">Vibration &amp; alerts</string>
+    <string name="settings_connection_title">Connection &amp; sync</string>
+    <string name="settings_support_title">Help &amp; app info</string>
+    <string name="settings_cloud_on">Cloud on</string>
+    <string name="settings_cloud_off">Cloud off</string>
+    <string name="settings_cloud_unavailable">Cloud unavailable in this build</string>
+    <string name="settings_cloud_disabled">Sync stopped. Cloud copies remain until deleted.</string>
+    <string name="settings_haptic_preview">Preview vibration</string>
+    <string name="settings_back_action">Back</string>
+    <string name="raw_location_cloud_off">Transfer paused · cloud off</string>
+    <string name="raw_location_transfer_allowed">Transfer allowed · waits for network and power conditions</string>
+</resources>

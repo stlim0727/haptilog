@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.material3.Button
@@ -43,16 +42,14 @@ fun SettingAction(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = label,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    maxLines = Int.MAX_VALUE,
                     fontSize = 14.sp,
                     color = WatchColors.Text
                 )
                 if (secondaryLabel != null) {
                     Text(
                         text = secondaryLabel,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        maxLines = Int.MAX_VALUE,
                         fontSize = 12.sp,
                         color = WatchColors.Muted
                     )
