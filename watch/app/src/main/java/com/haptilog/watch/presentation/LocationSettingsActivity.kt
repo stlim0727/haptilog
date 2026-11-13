@@ -23,6 +23,8 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.Role
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.lifecycleScope
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
@@ -62,6 +64,17 @@ class LocationSettingsActivity : ComponentActivity() {
                 val serviceNotice by LocationTrackingService.status.collectAsState()
                 var rawConsenting by rememberSaveable { mutableStateOf(false) }
                 var rawAccepted by remember { mutableStateOf(com.haptilog.watch.sync.RawLocationConsent.grant(this@LocationSettingsActivity) != null) }
+                var cloudActive by remember { mutableStateOf(com.haptilog.watch.sync.RecordingSyncWorker.enabled(this@LocationSettingsActivity)) }
+                DisposableEffect(Unit) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            cloudActive = com.haptilog.watch.sync.RecordingSyncWorker.enabled(this@LocationSettingsActivity)
+                            rawAccepted = com.haptilog.watch.sync.RawLocationConsent.grant(this@LocationSettingsActivity) != null
+                        }
+                    }
+                    lifecycle.addObserver(observer)
+                    onDispose { lifecycle.removeObserver(observer) }
+                }
                 val rawDisclosure = stringArrayResource(R.array.raw_location_disclosure_steps)
 
                 BackHandler(enabled = rawConsenting) { rawConsenting = false }
@@ -73,11 +86,20 @@ class LocationSettingsActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxSize()) {
                         if (rawConsenting) {
                             item { Text(stringResource(R.string.raw_location_title), textAlign = TextAlign.Center) }
+                            item { Text(stringResource(if (rawAccepted) R.string.raw_location_status_approved else R.string.raw_location_status_needed), textAlign = TextAlign.Center) }
+                            item { Text(stringResource(when {
+                                !com.haptilog.watch.sync.CloudClient.configured -> R.string.settings_cloud_unavailable
+                                !cloudActive -> R.string.raw_location_cloud_off
+                                !rawAccepted -> R.string.raw_location_status_needed
+                                else -> R.string.raw_location_transfer_allowed
+                            }), fontSize = 12.sp, textAlign = TextAlign.Center) }
+                            item { Text(stringResource(if (active) R.string.location_running else R.string.location_scope_interrupted), fontSize = 12.sp, textAlign = TextAlign.Center) }
                             rawDisclosure.forEach { paragraph ->
                                 item { Text(paragraph, fontSize = 12.sp, textAlign = TextAlign.Center) }
                             }
-                            item {
+                            if (!rawAccepted) item {
                                 SettingAction(
+                                    enabled = cloudActive && com.haptilog.watch.sync.CloudClient.configured,
                                     onClick = {
                                         rawConsenting = false
                                         lifecycleScope.launch {
@@ -98,7 +120,7 @@ class LocationSettingsActivity : ComponentActivity() {
                             item {
                                 SettingAction(
                                     onClick = { rawConsenting = false },
-                                    label = stringResource(R.string.cancel_action)
+                                    label = stringResource(R.string.settings_back_action)
                                 )
                             }
                         } else {
@@ -111,20 +133,12 @@ class LocationSettingsActivity : ComponentActivity() {
                             if (selection == LocationCollection.INCLUDING_NON_RECORDING) {
                                 item { Text(stringResource(if (active) R.string.location_running else R.string.location_scope_interrupted), textAlign = TextAlign.Center) }
                                 item {
-                                    val cloudActive = com.haptilog.watch.sync.RecordingSyncWorker.enabled(this@LocationSettingsActivity)
                                     SettingAction(
                                         onClick = {
-                                            if (!cloudActive) {
-                                                notice = getString(R.string.raw_location_requires_cloud)
-                                                return@SettingAction
-                                            }
-                                            if (!rawAccepted) {
-                                                rawConsenting = true
-                                            }
+                                            rawConsenting = true
                                         },
                                         label = stringResource(R.string.raw_location_title),
-                                        secondaryLabel = stringResource(if (rawAccepted) R.string.raw_location_status_approved else R.string.raw_location_status_needed),
-                                        enabled = cloudActive
+                                        secondaryLabel = stringResource(if (rawAccepted) R.string.raw_location_status_approved else R.string.raw_location_status_needed)
                                     )
                                 }
                             }
