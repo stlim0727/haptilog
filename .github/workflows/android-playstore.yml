@@ -130,5 +130,5 @@ jobs:
           mappingFile: watch/app/build/outputs/mapping/release/mapping.txt
           status: ${{ github.event.inputs.status || 'completed' }}
           whatsNewDirectory: distribution/whatsnew
-          # Play Console sends changes for review automatically; this flag must stay false.
-          changesNotSentForReview: false
+          # Google Play requires manual review submission for this release.
+          changesNotSentForReview: true
