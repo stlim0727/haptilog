@@ -10,3 +10,4 @@ Start with `AGENTS.md` for architecture and critical invariants.
 - For Wear OS Android code, adhere to modern Jetpack Compose for Wear OS, Material 3 for Wear OS, and Android 14+ (API 34/35) foreground service permissions.
 - For Supabase functions, use Deno / TypeScript edge functions with streaming / multimodal Gemini integration.
 - Prefer configured MCP tools over ad-hoc scripts.
+- After opening or updating a PR, apply the global `~/.agents/PR_FOLLOWTHROUGH.md` loop in the same task; use `~/.agents/bin/pr-status [PR]` once for status, then fix actionable feedback, preserve concurrent work on conflicts, reproduce CI failures, recheck once, and merge only when checks and reviews pass.
