@@ -27,6 +27,7 @@ These shorthands retain the repository's existing checks and approval requiremen
 - System Architecture lives in `docs/architecture/overview.md`.
 - Product Specification lives in `docs/design/product-spec.md`.
 - Prioritize configured MCP tools over skills or ad-hoc scripts.
+- After opening or updating a PR, follow the global `~/.agents/PR_FOLLOWTHROUGH.md` loop in the same task: one `~/.agents/bin/pr-status [PR]` call for state, CI, review decision, threads and comments; then fix actionable feedback, preserve other agents' work on conflicts, reproduce CI failures before editing, recheck once, resolve only fixed threads, and merge only with green checks and reviews. Never poll `gh pr checks` across turns.
 
 ## Architecture entry points
 
