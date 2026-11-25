@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme for HaptiLog on Wear OS -->
+    <style name="Theme.HaptiLog" parent="@android:style/Theme.DeviceDefault.NoActionBar" />
+
+    <!-- Starting theme meeting Wear OS App Quality Guidelines (branded launch splash screen) -->
+    <style name="Theme.HaptiLog.Starting" parent="Theme.SplashScreen">
+        <!-- Google Play Wear OS Quality Guideline requires a solid black background -->
+        <item name="windowSplashScreenBackground">@android:color/black</item>
+        <!-- 48x48dp app icon in center of the display -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_round</item>
+        <!-- Theme to switch to after the splash screen is dismissed -->
+        <item name="postSplashScreenTheme">@style/Theme.HaptiLog</item>
+    </style>
+</resources>
