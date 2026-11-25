@@ -22,6 +22,11 @@ on:
         description: 'Release status (completed, draft, inProgress, halted)'
         required: false
         default: 'completed'
+      changes_not_sent_for_review:
+        description: 'Set changesNotSentForReview (true allows committing release without auto-submitting when review is gated)'
+        type: boolean
+        required: false
+        default: false
       update_screenshots:
         description: 'Replace English and Korean Wear OS screenshots in the release edit'
         type: boolean
@@ -130,5 +135,6 @@ jobs:
           mappingFile: watch/app/build/outputs/mapping/release/mapping.txt
           status: ${{ github.event.inputs.status || 'completed' }}
           whatsNewDirectory: distribution/whatsnew
-          # Play Console sends changes for review automatically; this flag must stay false.
-          changesNotSentForReview: false
+          # When policy reviews or declarations are pending, Play Console rejects automatic review submission.
+          # Allow changes_not_sent_for_review input or draft status to commit changes cleanly.
+          changesNotSentForReview: ${{ inputs.changes_not_sent_for_review || inputs.status == 'draft' }}
