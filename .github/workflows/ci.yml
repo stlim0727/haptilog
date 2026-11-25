@@ -33,6 +33,16 @@ jobs:
           distribution: "temurin"
           cache: "gradle"
 
+      - name: Cache Robolectric jars
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository/org/robolectric
+            ~/.cache/robolectric
+          key: ${{ runner.os }}-robolectric-${{ hashFiles('watch/gradle/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-robolectric-
+
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v4
 
