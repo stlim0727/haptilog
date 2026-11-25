@@ -27,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.wear.compose.material3.AppScaffold
 import com.haptilog.watch.R
 import com.haptilog.watch.data.RecordingItem
@@ -137,6 +138,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         entryState.restoreInternalReturn(savedInstanceState?.getBoolean("internal_return") == true,
             savedInstanceState?.getString("capture_request"))
