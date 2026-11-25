@@ -137,4 +137,4 @@ jobs:
           whatsNewDirectory: distribution/whatsnew
           # When policy reviews or declarations are pending, Play Console rejects automatic review submission.
           # Allow changes_not_sent_for_review input or draft status to commit changes cleanly.
-          changesNotSentForReview: ${{ github.event.inputs.changes_not_sent_for_review == true || github.event.inputs.status == 'draft' }}
+          changesNotSentForReview: ${{ inputs.changes_not_sent_for_review || inputs.status == 'draft' }}
